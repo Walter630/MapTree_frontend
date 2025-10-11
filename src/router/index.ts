@@ -1,10 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// Firebase Auth
-// import { onAuthStateChanged } from "firebase/auth";
 import MainComponent from '@/components/MainView/MainComponent.vue'
 import MensageEmailComponent from '@/components/MainView/MensageEmailComponent.vue'
 import LoginPage from '@/pages/LoginPage.vue'
+import ResetSenhaComponent from '@/components/MainView/ResetSenhaComponent.vue'
 // Importação de Componentes de Rotas
 import MainPage from '@/pages/MainPage.vue'
 
@@ -48,6 +47,12 @@ const router = createRouter({
           path: 'recovery-code',
           name: 'recovery-code',
           component: MensageEmailComponent,
+          meta: { requiresAuth: false },
+        },
+        {
+          path: 'reset-senha',
+          name: 'reset-senha',
+          component: ResetSenhaComponent,
           meta: { requiresAuth: false },
         },
       ],
