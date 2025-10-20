@@ -1,19 +1,18 @@
 <template>
   <v-container class="login-container" fluid>
-    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh;">
-      <!-- Coluna do formulário -->
-      <v-col class="form-section" cols="12" md="4">
-        <v-card class="form-card" flat>
-          <!-- Logo -->
-          <v-img
+  <v-img
             alt="Logo"
             class="mb-4 mx-auto"
             contain
             max-width="10"
+            style="position: absolute; top: 0; left: 0;"
           />
-          <v-card-title class="font-weight-bold text-h5 mb-4">
-            MapTree
-          </v-card-title>
+    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh;">
+      <!-- Coluna do formulário -->
+      <v-col class="form-section" cols="12" md="4">
+        <div>
+          <!-- Logo -->
+          
 
           <h2 class="title">Bem-vindo(a)!</h2>
 
@@ -25,43 +24,45 @@
               dense
               hide-details
               label="Email"
-              outlined
+              variant="outlined"
               placeholder="Digite seu email"
               required
             />
 
             <v-text-field
               v-model="password"
-              :append-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
               class="mb-2"
               color="green"
               dense
               hide-details
               label="Senha"
-              outlined
+              variant="outlined"
               placeholder="Digite sua senha"
               required
               :type="showPassword ? 'text' : 'password'"
-              @click:append="showPassword = !showPassword"
-            />
+            >
+              <template #append-inner>
+                <v-icon @click="showPassword = !showPassword">{{ showPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+              </template>
+            </v-text-field>
 
             <v-btn
               block
               class="mb-4"
               color="#C6F513"
-              dark
+              style="display: flex; align-items: center; flex-direction: row;"
+              append-icon="mdi-arrow-right"
               @click="login"
             >
-              ENTRAR
-              <v-icon right>mdi-arrow-right</v-icon>
+              entrar
             </v-btn>
 
             <div class="text-left mb-2">
               <a class="forgot-password" @click="$router.push('/recovery')">Esqueceu sua senha?</a>
             </div>
-
-            <hr class="hr">
-
+            <div>
+              <hr class="hr">
+            </div>
             <!-- Botão Google -->
             <v-btn block class="mb-2 google-btn" @click="loginWithGoogle">
               <img
@@ -81,7 +82,7 @@
 
             <div class="text-center mt-4">
               Não possui uma conta?
-              <a class="register-link" href="#">Cadastre-se</a>
+              <a class="register-link" style="color: blue;" href="#">Cadastre-se</a>
               <v-icon color="blue">mdi-chevron-right</v-icon>
             </div>
           </v-form>
@@ -91,7 +92,7 @@
             <v-icon small>mdi-circle-small</v-icon>
             Política de Privacidade
           </div>
-        </v-card>
+       </div>
       </v-col>
 
       <!-- Coluna direita -->
@@ -199,13 +200,7 @@ export default {
   background-color: #145dbb;
 }
 
-.form-card {
-  width: 100%;
-  max-width: 400px;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-}
+
 
 /* Títulos */
 .title {
@@ -218,9 +213,9 @@ export default {
 /* Links */
 .forgot-password,
 .register-link {
-  color: #1e88e5;
+  color: #000;
   font-weight: 500;
-  text-decoration: none;
+  text-decoration: underline;
 }
 .forgot-password:hover,
 .register-link:hover {
@@ -253,9 +248,8 @@ export default {
 
 /* Botões sociais */
 .google-btn {
-  border: 1px solid #ddd;
-  background-color: #fff;
-  color: #444;
+  border: 1px solid white;
+ 
   text-transform: none;
   font-weight: 500;
 }
@@ -271,7 +265,7 @@ export default {
 /* Termos */
 .terms-privacy {
   font-size: 12px;
-  margin-top: 20px;
+  margin-top: 20px; 
   color: gray;
   text-align: center;
 }
