@@ -1,22 +1,22 @@
 <script lang="ts">
-  import { useRouter } from 'vue-router'
-  import { useAppStore } from '@/stores/app.ts'
-  import { ref } from 'vue'
-  export default {
-    name: 'MainComponent',
-    data () {
-      return {
-        search: ref(''),
-        router: useRouter(),
-        store: useAppStore(),
-      }
+import { useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app.ts'
+import { ref } from 'vue'
+export default {
+  name: 'MainComponent',
+  data () {
+    return {
+      search: ref(''),
+      router: useRouter(),
+      store: useAppStore(),
+    }
+  },
+  methods: {
+    clearSearch () {
+      this.search = ''
     },
-    methods: {
-      clearSearch () {
-        this.search = ''
-      },
-    },
-  }
+  },
+}
 </script>
 
 <template>

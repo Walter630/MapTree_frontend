@@ -4,8 +4,17 @@ import MainComponent from '@/components/MainView/MainComponent.vue'
 import MensageEmailComponent from '@/components/MainView/MensageEmailComponent.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import ResetSenhaComponent from '@/components/MainView/ResetSenhaComponent.vue'
+import CadastroComponent from '@/components/MainView/CadastroComponent.vue'
 // Importação de Componentes de Rotas
 import MainPage from '@/pages/MainPage.vue'
+
+//rotas admin
+import MainComponentAdmin from '@/components/AdminView/MainComponentAdmin.vue'
+import GestoresAdminoView from '@/components/AdminView/GestoresAdminoView.vue'
+import AdminPage from '@/pages/AdminPage.vue'
+import EmpresasAdminView from '@/components/AdminView/EmpresasAdminView.vue'
+
+
 
 import RecoveryPage from '@/pages/RecoveryPage.vue'
 
@@ -38,6 +47,12 @@ const router = createRouter({
           meta: { requiresAuth: false },
         },
         {
+          path: 'cadastro',
+          name: 'Cadastro',
+          component: CadastroComponent,
+          meta: { requiresAuth: false },
+        },
+        {
           path: 'recovery',
           name: 'recovery',
           component: RecoveryPage,
@@ -54,6 +69,31 @@ const router = createRouter({
           name: 'reset-senha',
           component: ResetSenhaComponent,
           meta: { requiresAuth: false },
+        },
+        {
+          path: 'admin',
+          name: 'Admin',
+          component: AdminPage,
+          children: [
+            {
+              path: '',
+              name: 'AdminHome',
+              component: MainComponentAdmin,
+              meta: { requiresAuth: false },
+            },
+            {
+              path: 'gestores',
+              name: 'Gestores',
+              component: GestoresAdminoView,
+              meta: { requiresAuth: false },
+            },
+            {
+              path: 'empresas',
+              name: 'Empresas',
+              component: EmpresasAdminView,
+              meta: { requiresAuth: false },
+            },
+          ],
         },
       ],
     },
