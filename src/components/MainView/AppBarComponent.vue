@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar color="white" flat >
+  <v-app-bar color="white" flat v-if="!isMobile">
     <img src="@/assets/LogomaptreeHeaderpng.png" alt="Logo" style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px;">
     <v-spacer></v-spacer>
     <v-toolbar-items class="d-flex justify-center " style="margin-top: 10px;">
@@ -7,10 +7,9 @@
       <v-btn
         variant="text"
         style="margin-right: 10px;"
-        :color="isActive('/') ? 'black' : '#C1E328'"
         @click="goTo('/')"
       >
-        <v-icon :color="isActive('/') ? '#C1E328' : 'black'">
+        <v-icon :color="isActive('/') ? green : 'black'">
           mdi-view-dashboard
         </v-icon>
         Painel
@@ -51,23 +50,69 @@
     </v-btn>
 
   </v-app-bar>
+
+  <v-app-bar  flat v-if="isMobile">
+    <v-btn icon @click="drawer = !drawer">
+      <v-icon>mdi-menu</v-icon>
+      <template v-slot:activator="{ props }">
+        <v-btn v-bind="props">Open</v-btn>
+      </template>
+
+    </v-btn>
+    <v-navigation-drawer v-model="drawer" temporary>
+      <v-list>
+        <v-list-item
+          v-for="item in items"
+          :key="item.title"
+          :to="item.to"
+          link
+        >
+          <v-list-item-icon>
+            <v-icon :icon="item.icon"></v-icon>
+          </v-list-item-icon>
+          <v-list-item-title>{{ item.title }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+  </v-app-bar>
 </template>
 
-<script setup>
-import { useRouter, useRoute } from 'vue-router'
+<script  lang="ts">
+import { useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app.ts'
 import { ref } from 'vue'
 
-const router = useRouter()
-const route = useRoute()
-const green = ref('#C1E328')
+export default {
+  name: 'AppBarComponent',
+  data() {
+    return {
+      drawer: ref(false),
+      items: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
+        { title: 'Empresas', icon: 'mdi-domain', to: '/empresas' },
+        { title: 'Gestores', icon: 'mdi-account-group', to: '/gestores' },
+      ],
+      green: '#C1E328',
+    }
+  },
+  computed: {
+    isMobile() {
+      return window.innerWidth < 768
+    },
+  },
+  methods: {
+    goTo(path) {
+      this.$router.push(path)
+    },
+    isActive(path) {
+      return this.$route.path === path
+    },
+  },
+  watch: {
+    isMobile() {
+      this.drawer = false
+    },
+  },
 
-// Função para navegação
-function goTo(path) {
-  router.push(path)
-}
-
-// Verifica se a rota atual é a ativa
-function isActive(path) {
-  return route.path === path
 }
 </script>

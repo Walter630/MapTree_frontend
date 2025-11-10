@@ -26,7 +26,7 @@ const showAppBar = computed(() => {
 
 <template>
   <!-- Só mostra o AppBar se não estiver em login/cadastro -->
-  <AppBarComponent v-if="showAppBar" />
+  <AppBarComponent v-if="showAppBar"  />
 
   <v-main :style="isMobile ? 'padding-bottom: 10px !important;' : ''">
     <router-view />

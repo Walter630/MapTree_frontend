@@ -14,6 +14,12 @@ import GestoresAdminoView from '@/components/AdminView/GestoresAdminoView.vue'
 import AdminPage from '@/pages/AdminPage.vue'
 import EmpresasAdminView from '@/components/AdminView/EmpresasAdminView.vue'
 
+//rotas gestor
+import GestorPage from '@/pages/GestorPage.vue'
+import MainComponentGestor from '@/components/GestorView/MainComponentGestor.vue'
+import FuncionarioGestorView from '@/components/GestorView/FuncionarioGestorView.vue'
+import CadastroFuncionario from '@/components/GestorView/CadastroFuncionario.vue'
+import RelatoriosGestorView from '@/components/GestorView/RelatoriosGestorView.vue'
 
 
 import RecoveryPage from '@/pages/RecoveryPage.vue'
@@ -93,8 +99,37 @@ const router = createRouter({
               component: EmpresasAdminView,
               meta: { requiresAuth: false },
             },
+
           ],
         },
+        {
+          path: 'gestor',
+          name: 'GestorPage',
+          component: GestorPage,
+          children: [
+            {
+              path: 'gestorMain',
+              name: 'GestorHome',
+              component: MainComponentGestor
+            },
+            {
+              path: 'funcionarios',
+              name: 'Funcionarios',
+              component: FuncionarioGestorView
+            },
+            {
+              path: 'cadastro-funcionario',
+              name: 'CadastroFuncionario',
+              component: CadastroFuncionario,
+              meta: { requiresAuth: false },
+            },
+            {
+              path: 'relatorios',
+              name: 'Relatorios',
+              component: RelatoriosGestorView
+            }
+          ]
+        }
       ],
     },
   ],
