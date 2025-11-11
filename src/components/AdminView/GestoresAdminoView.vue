@@ -7,15 +7,16 @@
           <div class="d-flex align-center mb-4">
             <span class="text-caption text-grey-darken-1">Meu Painel</span>
             <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-            <span class="text-caption font-weight-bold">Gestores</span>
+            <span class="text-caption font-weight-bold">#Gestores</span>
           </div>
+          <v-col cols="12" md="8">
+            <div>
+              <p style="color: #667085; font-size: 14px; font-weight: bold; margin: 0; margin-bottom: 10px;"
+                 class="text-medium-emphasis">Gestores</p>
+              <p style="margin: 0;">Gerencie usuários e suas permissões no sistema</p>
+            </div>
+          </v-col>
 
-          <div class="d-flex align-center">
-            <v-btn icon size="small" class="mr-2" @click="goBack">
-              <v-icon>mdi-chevron-left</v-icon>
-            </v-btn>
-            <span class="text-h5 font-weight-regular">Gestores</span>
-          </div>
         </v-col>
       </v-row>
 
@@ -27,20 +28,55 @@
             size="large"
             style="margin-top: 60px;"
             class="font-weight-bold text-black"
+            prepend-icon="mdi-plus"
             @click="addGestor"
           >
-            ADICIONAR
-            <v-icon end>mdi-plus</v-icon>
+            Novo Gestor
+
           </v-btn>
         </v-col>
+      </v-row>
 
-        <v-col cols="12" sm="9" md="10">
-          <v-row justify="end" align="center">
+
+      <!-- Cards de resumo -->
+      <v-row>
+        <v-col cols="12" md="7" style="margin: 20px; display: flex; flex-direction: row; gap: 30px;">
+          <v-card style="width: 264px; height: 174px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000;">
+            <v-card-title style="display: flex; justify-content: space-between;">Empresas<v-icon>mdi-domain</v-icon></v-card-title>
+            <v-card-text>
+              <p style="margin-top: 60px;" class="text-h5">90</p>
+              <p style="margin-top: 10px;">+ 3 este mês</p>
+            </v-card-text>
+          </v-card>
+
+          <v-card style="width: 264px; height: 174px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000;">
+            <v-card-title style="display: flex; justify-content: space-between;">Gestores<v-icon>mdi-account-group</v-icon></v-card-title>
+            <v-card-text>
+              <p style="margin-top: 60px;" class="text-h5">90</p>
+              <p style="margin-top: 10px;">+ 3 este mês</p>
+            </v-card-text>
+          </v-card>
+
+          <v-card style="width: 264px; height: 174px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000;">
+            <v-card-title style="display: flex; justify-content: space-between;">Espécies<v-icon>mdi-sprout</v-icon></v-card-title>
+            <v-card-text>
+              <p style="margin-top: 60px;" class="text-h5">90</p>
+              <p style="margin-top: 10px;">+ 3 este mês</p>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- Filtros de busca -->
+
+        <v-col cols="12" style="margin: 20px; display: flex; flex-direction: row; gap: 30px; justify-content: space-between; background-color: #CDCDCD">
+          <v-icon>mdi-filters</v-icon> <p class="text-medium-emphasis text-h6">Filtros</p>
+          <v-row align="center" class="pa-4" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
             <v-col cols="12" sm="4" md="3" lg="2">
               <v-select
                 v-model="filterConta"
                 :items="contas"
-                label="Conta"
+                label="Empresa"
                 variant="outlined"
                 density="compact"
                 hide-details
@@ -48,6 +84,19 @@
               />
             </v-col>
 
+
+
+            <v-col cols="12" sm="4" md="4" lg="3">
+              <v-text-field
+                v-model="search"
+                label="Nome"
+
+                variant="outlined"
+                density="compact"
+                hide-details
+                clearable
+              />
+            </v-col>
             <v-col cols="12" sm="4" md="3" lg="2">
               <v-select
                 v-model="filterCidade"
@@ -59,19 +108,6 @@
                 prepend-inner-icon="mdi-city-variant-outline"
               />
             </v-col>
-
-            <v-col cols="12" sm="4" md="4" lg="3">
-              <v-text-field
-                v-model="search"
-                label="Buscar"
-                append-inner-icon="mdi-magnify"
-                variant="outlined"
-                density="compact"
-                hide-details
-                clearable
-              />
-            </v-col>
-
             <v-col cols="auto" class="pl-0">
               <v-btn
                 color="black"
@@ -84,9 +120,8 @@
             </v-col>
           </v-row>
         </v-col>
-      </v-row>
 
-      <!-- Tabela -->
+        <!-- Tabela -->
       <v-row class="mt-4">
         <v-col cols="12">
           <v-data-table

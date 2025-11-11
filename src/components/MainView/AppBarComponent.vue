@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar color="white" flat v-if="!isMobile">
+  <v-app-bar color="white" flat >
     <img src="@/assets/LogomaptreeHeaderpng.png" alt="Logo" style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px;">
     <v-spacer></v-spacer>
     <v-toolbar-items class="d-flex justify-center " style="margin-top: 10px;">
@@ -93,12 +93,23 @@ export default {
         { title: 'Gestores', icon: 'mdi-account-group', to: '/gestores' },
       ],
       green: '#C1E328',
+      roles: [
+        'admin',
+        'manager',
+        'user',
+      ]
     }
   },
   computed: {
     isMobile() {
       return window.innerWidth < 768
     },
+    isRoles() {
+      const store = useAppStore()
+      const userRole = store.userRole
+      return this.roles.includes(userRole)
+    },
+
   },
   methods: {
     goTo(path) {
@@ -107,11 +118,19 @@ export default {
     isActive(path) {
       return this.$route.path === path
     },
+
   },
   watch: {
     isMobile() {
       this.drawer = false
     },
+    isRoles() {
+      this.roles = [
+        'admin',
+        'manager',
+        'user',
+      ]
+    }
   },
 
 }
