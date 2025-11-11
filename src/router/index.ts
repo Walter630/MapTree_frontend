@@ -13,6 +13,9 @@ import MainComponentAdmin from '@/components/AdminView/MainComponentAdmin.vue'
 import GestoresAdminoView from '@/components/AdminView/GestoresAdminoView.vue'
 import AdminPage from '@/pages/AdminPage.vue'
 import EmpresasAdminView from '@/components/AdminView/EmpresasAdminView.vue'
+import CadastroEmpresaAdminView from '@/components/AdminView/CadastroEmpresaAdminView.vue'
+import CadastroGestoresAdminView from '@/components/AdminView/CadastroGestoresAdminView.vue'
+
 
 //rotas gestor
 import GestorPage from '@/pages/GestorPage.vue'
@@ -99,7 +102,18 @@ const router = createRouter({
               component: EmpresasAdminView,
               meta: { requiresAuth: false },
             },
-
+            {
+              path: 'cadastro-empresa',
+              name: 'CadastroEmpresa',
+              component: CadastroEmpresaAdminView,
+              meta: { requiresAuth: false },
+            },
+            {
+              path: 'cadastro-gestores',
+              name: 'CadastroGestores',
+              component: CadastroGestoresAdminView,
+              meta: { requiresAuth: false },
+            },
           ],
         },
         {

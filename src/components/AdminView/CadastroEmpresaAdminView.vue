@@ -1,0 +1,230 @@
+<template>
+  <v-container class="cadastro-funcionario-container" >
+    <div class="text-caption grey--text text--darken-1" style="margin-bottom: 20px; color: #667085;">
+      Meu Painel > Funcionários > #CadastrarEmpresas
+    </div>
+    <v-row class="mb-5 align-center">
+
+      <v-col cols="12" sm="auto" class="py-0">
+        <v-btn icon @click="goBack" class="mr-2">
+          <v-icon>mdi-arrow-left</v-icon>
+        </v-btn>
+
+      </v-col>
+
+      <v-col cols="12" sm="auto"  class="py-1">
+
+        <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367; margin-top: 20px; ">
+          Cadastro de Empresas
+        </h1>
+        <p class="text-subtitle-1 grey--text">
+          Cadastre Os Empresas E Suas Funções.
+        </p>
+      </v-col>
+    </v-row>
+
+
+
+    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px; " >
+      <v-row >
+        <v-col cols="12" md="6" >
+          <p>Nome do Empresa</p>
+          <v-text-field
+            v-model="formData.nome"
+            :rules="[rules.required]"
+            label="Nome do Funcionário"
+            placeholder="Digite o nome"
+            outlined
+            dense
+          ></v-text-field>
+          <p>Email</p>
+          <v-text-field
+            v-model="formData.email"
+            :rules="[rules.required, rules.email]"
+            label="Email"
+            placeholder="Digite o email"
+            outlined
+            dense
+          >
+            <template v-slot:label>
+              Email <span class="grey--text">— Endereço de Email</span>
+            </template>
+          </v-text-field>
+          <p>CNPJ</p>
+          <v-text-field
+            v-model="formData.cnpj"
+            :rules="[rules.required]"
+            label="CNPJ"
+            placeholder="Digite o CNPJ"
+            type="text"
+            outlined
+            dense
+          ></v-text-field>
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <p>Numero do Contato</p>
+          <v-text-field
+            v-model="formData.contato"
+            :rules="[rules.required, rules.contactFormat]"
+            label="Número de Contato"
+            placeholder="(88) 00000-0000"
+            outlined
+            dense
+            mask="(##) #####-####"
+          >
+            <template v-slot:prepend-inner>
+              <div class="d-flex align-center mr-2">
+                <span class="mr-2">+1</span>
+                <v-divider vertical></v-divider>
+              </div>
+            </template>
+
+          </v-text-field>
+          <p>Plano</p>
+          <v-select
+            v-model="formData.plano"
+            :items="planos"
+            :rules="[rules.required]"
+            label="Plano"
+            placeholder="Plano"
+            outlined
+            dense
+          ></v-select>
+          <p>Status</p>
+          <v-select
+            v-model="formData.status"
+            :items="status"
+            :rules="[rules.required]"
+            label="status"
+            placeholder="Ativo"
+            outlined
+            dense
+          ></v-select>
+
+        </v-col>
+      </v-row>
+
+      <v-row class="mt-4">
+        <v-col cols="12" class="d-flex justify-center">
+          <v-btn
+            :disabled="!valid"
+            color="#A7D129"
+            dark
+            large
+            class="mr-4"
+            @click="submitForm"
+          >
+            SALVAR
+          </v-btn>
+
+          <v-btn
+            color="black"
+            dark
+            large
+            @click="cancelForm"
+          >
+            CANCELAR
+          </v-btn>
+        </v-col>
+      </v-row>
+    </v-form>
+  </v-container>
+</template>
+
+<script lang="ts">
+export default {
+  name: 'CadastroFuncionario',
+  data() {
+    return {
+      valid: false,
+      search: '',
+      formData: {
+        nome: '',
+        email: '',
+        cnpj: '',
+        contato: '',
+        status: '',
+        plano: '',
+      },
+      status: ['Ativo', 'Inativo'],
+      planos: ['Plano 1', 'Plano 2', 'Plano 3', 'Plano 4'],
+      rules: {
+        required: value => !!value || 'Campo obrigatório.',
+        email: value => {
+          const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+          return pattern.test(value) || 'Email inválido.'
+        },
+        minPassword: v => v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
+        // Uma regra de validação básica para o formato de contato (pode ser ajustada)
+        contactFormat: v => (v && v.replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).'
+      },
+    };
+  },
+  methods: {
+    goBack() {
+      // Lógica para voltar, como this.$router.go(-1) ou um evento de emit
+      console.log('Ação de Voltar');
+    },
+    performSearch() {
+      // Lógica de pesquisa
+      console.log('Pesquisar por:', this.search);
+    },
+    clearSearch() {
+      this.search = '';
+    },
+    async submitForm() {
+      // A função validate() do v-form retorna um objeto de promessa
+      const { valid } = await this.$refs.form.validate();
+
+      if (valid) {
+        console.log('Formulário Válido, enviando dados:', this.formData);
+        // Lógica de envio de dados para a API/Backend
+        alert('Funcionário Cadastrado com Sucesso!');
+        this.resetForm();
+      } else {
+        console.log('Formulário Inválido');
+      }
+    },
+    resetForm() {
+      this.$refs.form.reset();
+      this.formData = {
+        nome: '',
+        email: '',
+        cnpj: '',
+        contato: '',
+        status: '',
+        plano: '',
+      };
+    },
+    cancelForm() {
+      // Lógica para cancelar, como resetar o formulário ou redirecionar
+      console.log('Ação de Cancelar');
+      this.resetForm();
+    },
+  },
+};
+</script>
+
+<style scoped>
+/* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
+.cadastro-funcionario-container {
+  max-width: 1200px;
+  margin-top: 20px;
+  padding: 24px;
+
+}
+
+/* Ajuste para o campo de contato, simulando o campo de código de país como parte do input */
+.v-text-field:deep(.v-input__prepend-inner) .v-divider {
+  height: 70%; /* Altura da linha vertical */
+  margin-right: 8px;
+  margin-left: -4px; /* Move um pouco para a esquerda */
+}
+
+/* Estilo para ajustar o alinhamento da label "Email - Endereço de Email" */
+.v-text-field:deep(.v-label) span {
+  font-size: 0.75rem; /* Menor que a label principal */
+  font-weight: 400;
+}
+</style>
