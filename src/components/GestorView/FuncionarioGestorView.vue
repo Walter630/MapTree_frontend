@@ -9,54 +9,16 @@
         </div>
 
         <div class="d-flex align-center mb-4">
-          <v-btn icon size="small" class="mr-2" @click="goBack">
+          <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
             <v-icon>mdi-chevron-left</v-icon>
           </v-btn>
           <div>
             <span class="text-h5 font-weight-regular" style="color: blue">FUNCIONÁRIOS</span>
-            <p class="text-body-2 text-grey-darken-1">Gerencie Os Funcionários E Suas Atribuições.</p>
+            <p class="text-body-2 text-grey-darken-1" style="margin-top: 10px">Gerencie Os Funcionários E Suas Atribuições.</p>
           </div>
         </div>
-        <v-row justify="end" align="center">
-          <v-col cols="12" sm="4" md="3" lg="3">
-            <v-select
-              v-model="filterGerente"
-              :items="gerentes"
-              label="Gerente"
-              variant="outlined"
-              density="compact"
-              hide-details
-              prepend-inner-icon="mdi-account-tie"
-            />
-          </v-col>
-
-          <v-col cols="12" sm="4" md="3" lg="3">
-            <v-text-field
-              v-model="search"
-              label="Buscar"
-              append-inner-icon="mdi-magnify"
-              variant="outlined"
-              density="compact"
-              hide-details
-              clearable
-            />
-          </v-col>
-
-          <v-col cols="auto" class="pl-0">
-            <v-btn
-              color="black"
-              class="text-white"
-              height="40"
-              @click="applyFilters"
-            >
-              BUSCAR
-            </v-btn>
-          </v-col>
-        </v-row>
       </v-col>
-      <v-col cols="12" sm="9" md="9" lg="12">
 
-      </v-col>
     </v-row>
 
     <v-row class="mt-4" align="center">
@@ -64,11 +26,12 @@
         <v-btn
           color="#C6F513"
           size="large"
+          prepend-icon="mdi-plus"
           class="font-weight-bold text-black"
           @click="$router.push('/gestor/cadastro-funcionario')"
         >
           ADICIONAR FUNCIONÁRIO
-          <v-icon end>mdi-plus</v-icon>
+
         </v-btn>
       </v-col>
 

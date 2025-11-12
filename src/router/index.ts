@@ -23,6 +23,8 @@ import MainComponentGestor from '@/components/GestorView/MainComponentGestor.vue
 import FuncionarioGestorView from '@/components/GestorView/FuncionarioGestorView.vue'
 import CadastroFuncionario from '@/components/GestorView/CadastroFuncionario.vue'
 import RelatoriosGestorView from '@/components/GestorView/RelatoriosGestorView.vue'
+import NotificacoesGestorView from '@/components/GestorView/NotificacoesGestorView.vue'
+
 
 
 import RecoveryPage from '@/pages/RecoveryPage.vue'
@@ -141,6 +143,11 @@ const router = createRouter({
               path: 'relatorios',
               name: 'Relatorios',
               component: RelatoriosGestorView
+            },
+            {
+              path: 'notifications',
+              name: 'Notifications',
+              component: NotificacoesGestorView
             }
           ]
         }

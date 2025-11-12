@@ -5,16 +5,16 @@
     </div>
     <v-row class="mb-5 align-center">
       <v-col cols="12" sm="auto" class="py-0">
-        <v-btn icon @click="goBack" class="mr-2" size="small" >
+        <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
       </v-col>
 
       <v-col cols="12" sm="auto" class="py-0">
-        <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367;">
+        <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367; ">
           Relatórios Gerenciais
         </h1>
-        <p class="text-subtitle-1 grey--text">
+        <p class="text-subtitle-1 grey--text" style="margin-top: 10px;">
           Visualize, Filtre E Distribua Relatórios Técnicos Detalhados.
         </p>
       </v-col>
@@ -37,9 +37,9 @@
       </v-col>
     </v-row>
 
-    <v-divider class="mb-5"></v-divider>
 
-    <v-card class="pa-4 mb-6" outlined tile style="box-shadow: none;">
+
+    <v-card class="pa-4 mb-6" outlined tile style="box-shadow: none; background-color: #F6F6F6; ">
       <v-row align="center">
         <v-col cols="12" class="d-flex align-center pb-2 pt-0">
           <v-icon class="mr-2">mdi-filter-variant</v-icon>
@@ -112,9 +112,9 @@
       </v-row>
     </v-card>
 
-    <v-row class="mb-6">
+    <v-row class="mb-6" style="margin-top: 40px">
       <v-col cols="12" md="6">
-        <v-card class="pa-4" outlined tile >
+        <v-card class="pa-4" outlined tile style="background-color: #F6F6F6; border: 1px solid #DADADA; box-shadow: none">
           <h3 class="text-h6 mb-3 font-weight-regular">Podas Realizadas por Período</h3>
 
           <div class="chart-simulation-bar-wrapper">
@@ -144,7 +144,7 @@
       </v-col>
 
       <v-col cols="12" md="6">
-        <v-card class="pa-4" outlined tile>
+        <v-card class="pa-4" outlined tile style="background-color: #F6F6F6; border: 1px solid #DADADA; box-shadow: none">
           <h3 class="text-h6 mb-3 font-weight-regular">Distribuição por Tipo de Poda</h3>
           <div class="d-flex align-center justify-center py-2" style="height: 250px;">
             <div class="pie-chart-mock mr-8">
@@ -166,7 +166,7 @@
       </v-col>
     </v-row>
 
-    <v-card class="pa-4" outlined tile style="box-shadow: none;">
+    <v-card class="pa-4" outlined tile style="box-shadow: none; background-color: #F6F6F6; ">
       <h3 class="text-h6 mb-3 font-weight-regular">Resumo das Atividades Executadas</h3>
 
       <v-list dense class="py-0 resumo-list">
@@ -308,7 +308,6 @@ export default {
 
 <style scoped>
 .relatorios-gerenciais-container {
-  max-width: 1200px;
   margin: auto;
   padding: 24px;
 }

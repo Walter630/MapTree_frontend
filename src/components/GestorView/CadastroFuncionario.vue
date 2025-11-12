@@ -6,7 +6,7 @@
     <v-row class="mb-5 align-center">
 
       <v-col cols="12" sm="auto" class="py-0">
-        <v-btn icon @click="goBack" class="mr-2">
+        <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
 
@@ -26,8 +26,8 @@
 
 
     <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px; " >
-      <v-row >
-        <v-col cols="12" md="6" >
+      <v-row style="display: flex; justify-content: center; gap: 15px">
+        <v-col cols="12" md="4" >
           <p>Nome do Funcionario</p>
           <v-text-field
             v-model="formData.nome"
@@ -72,7 +72,7 @@
           ></v-select>
         </v-col>
 
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="4">
           <p>Numero do Contato</p>
           <v-text-field
             v-model="formData.contato"
@@ -163,7 +163,7 @@ export default {
   methods: {
     goBack() {
       // Lógica para voltar, como this.$router.go(-1) ou um evento de emit
-      console.log('Ação de Voltar');
+      this.$router.push("/gestor/funcionarios")
     },
     performSearch() {
       // Lógica de pesquisa
@@ -208,7 +208,7 @@ export default {
 <style scoped>
 /* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
 .cadastro-funcionario-container {
-  max-width: 1200px;
+
   margin-top: 20px;
   padding: 24px;
 

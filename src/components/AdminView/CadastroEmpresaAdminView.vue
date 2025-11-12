@@ -6,18 +6,15 @@
     <v-row class="mb-5 align-center">
 
       <v-col cols="12" sm="auto" class="py-0">
-        <v-btn icon @click="goBack" class="mr-2">
-          <v-icon>mdi-arrow-left</v-icon>
+        <v-btn  class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
+          <v-icon>mdi-chevron-left</v-icon>
         </v-btn>
-
       </v-col>
-
       <v-col cols="12" sm="auto"  class="py-1">
-
         <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367; margin-top: 20px; ">
           Cadastro de Empresas
         </h1>
-        <p class="text-subtitle-1 grey--text">
+        <p class="text-subtitle-1 grey--text" style="margin-top: 10px">
           Cadastre Os Empresas E Suas Funções.
         </p>
       </v-col>
@@ -25,17 +22,15 @@
 
 
 
-    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px; " >
-      <v-row >
-        <v-col cols="12" md="6" >
+    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px;" >
+      <v-row style="display: flex; justify-content: center">
+        <v-col cols="12" md="4" style="display: flex; flex-direction: column; gap: 16px; justify-content: center">
           <p>Nome do Empresa</p>
           <v-text-field
             v-model="formData.nome"
             :rules="[rules.required]"
             label="Nome do Funcionário"
             placeholder="Digite o nome"
-            outlined
-            dense
           ></v-text-field>
           <p>Email</p>
           <v-text-field
@@ -62,7 +57,7 @@
           ></v-text-field>
         </v-col>
 
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="4" style="display: flex; flex-direction: column; gap: 16px; justify-content: center">
           <p>Numero do Contato</p>
           <v-text-field
             v-model="formData.contato"
@@ -105,7 +100,7 @@
         </v-col>
       </v-row>
 
-      <v-row class="mt-4">
+      <v-row class="mt-8">
         <v-col cols="12" class="d-flex justify-center">
           <v-btn
             :disabled="!valid"
@@ -209,7 +204,7 @@ export default {
 <style scoped>
 /* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
 .cadastro-funcionario-container {
-  max-width: 1200px;
+
   margin-top: 20px;
   padding: 24px;
 

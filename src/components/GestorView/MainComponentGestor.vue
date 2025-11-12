@@ -1,25 +1,27 @@
 <template>
-  <v-container class="pa-6" style="margin: 30px; padding: 20px;">
-    <v-row align="center" justify="space-between" class="mb-4">
-      <v-col cols="12" md="6" class="py-0">
+  <v-container class="pa-8" fluid>
+    <!-- Cabeçalho -->
+    <v-row align="center" justify="space-between" class="mb-8">
+      <v-col cols="12" md="6">
         <p class="text-caption text-grey-darken-1 mb-1">Meu Painel</p>
-        <p class="text-h6 font-weight-regular mb-0">Olá, Gertar Silva, Aqui Está o Resumo de Suas Operações.</p>
+        <p class="text-h6 font-weight-regular mb-0">
+          Olá, Gestor Silva, Aqui Está o Resumo de Suas Operações.
+        </p>
       </v-col>
 
-      <v-col cols="12" md="6" class="d-flex justify-end py-0">
-        <div style="width: 300px; max-width: 100%;">
+      <v-col cols="12" md="6" class="d-flex justify-end">
+        <div style="width: 400px; max-width: 100%;">
           <v-text-field
             v-model="search"
             placeholder="Pesquisar"
-            hide-details
-            density="compact"
+            density="comfortable"
             variant="outlined"
             prepend-inner-icon="mdi-magnify"
-            class="search-field"
+            hide-details
           >
             <template #append-inner>
               <v-btn
-                style="background-color: black; color: white; height: 40px; margin-right: -12px;"
+                style="background-color: black; color: white; height: 40px; border-radius: 8px;"
                 @click="performSearch"
                 flat
               >
@@ -31,95 +33,97 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-4" style="margin-top: 20px;">
-      <v-col cols="12" sm="6" lg="3">
-        <v-card class="pa-4 card-metric" style="border: 1px solid #E0E0E0" flat>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <p class="text-subtitle-1 font-weight-medium mb-0">Árvores Cadastradas</p>
-            <v-icon small>mdi-content-duplicate</v-icon>
+    <!-- Cards métricos -->
+    <v-row class="mb-6" dense>
+      <v-col cols="12" sm="6" md="3" v-for="(card, i) in metricCards" :key="i">
+        <v-card class="pa-5 metric-card"  flat>
+          <div class="d-flex justify-space-between align-center mb-3">
+            <p class="text-subtitle-1 font-weight-medium mb-0">{{ card.title }}</p>
+            <v-icon color="grey-darken-2" size="20">{{ card.icon }}</v-icon>
           </div>
-          <p class="text-h4 font-weight-bold mb-1">90</p>
-          <p class="text-caption ">+ 3 este mês</p>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" sm="6" lg="3">
-        <v-card class="pa-4 card-metric" style="border: 1px solid #E0E0E0" flat>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <p class="text-subtitle-1 font-weight-medium mb-0">Podas Agendadas</p>
-            <v-icon small>mdi-home-plus-outline</v-icon>
-          </div>
-          <p class="text-h4 font-weight-bold mb-1">240</p>
-          <p class="text-caption ">+ 7 este mês</p>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" sm="6" lg="3">
-        <v-card class="pa-4 card-metric" style="border: 1px solid #E0E0E0" flat>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <p class="text-subtitle-1 font-weight-medium mb-0">Áreas Críticas</p>
-            <v-icon small>mdi-heart-broken-outline</v-icon>
-          </div>
-          <p class="text-h4 font-weight-bold mb-1">156</p>
-          <p class="text-caption ">3 requerem atenção imediata</p>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" sm="6" lg="3">
-        <v-card class="pa-4 card-metric" style="border: 1px solid #E0E0E0" flat>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <p class="text-subtitle-1 font-weight-medium mb-0">Espécies</p>
-            <v-icon small>mdi-sprout</v-icon>
-          </div>
-          <p class="text-h4 font-weight-bold mb-1">156</p>
-          <p class="text-caption ">catalogadas</p>
+          <p class="text-h4 font-weight-bold mb-1">{{ card.value }}</p>
+          <p class="text-caption text-grey-darken-1">{{ card.subtext }}</p>
         </v-card>
       </v-col>
     </v-row>
 
-    <v-row class="mt-4">
-      <v-col cols="12" lg="8">
-        <v-card flat height="350px" class="pa-4" style="border: 1px solid #E0E0E0"></v-card>
+    <!-- Região em risco + Podas por mês + Árvores em risco -->
+    <v-row class="mb-6" dense>
+      <v-col cols="12" md="5" lg="5">
+        <v-card class="pa-4" flat style="background-color: #F6F6F6; border: 1px solid #CDCDCD; border-radius: 12px;">
+          <p class="text-subtitle-1 font-weight-bold mb-3 d-flex align-center">
+            <v-icon class="mr-2">mdi-map-marker-alert-outline</v-icon>
+            Região em risco
+          </p>
+          <v-img
+
+            height="270"
+            cover
+            class="rounded-lg"
+          ></v-img>
+        </v-card>
       </v-col>
 
-      <v-col cols="12" lg="4">
-        <v-card flat class="pa-4" style="border: 1px solid #E0E0E0">
+      <v-col cols="12" md="3" lg="3">
+        <v-card class="pa-4" flat style="background-color: #F6F6F6; border: 1px solid #CDCDCD; border-radius: 12px;">
           <p class="text-subtitle-1 font-weight-bold mb-3 d-flex align-center">
-            <v-icon  class="mr-2">mdi-alert-outline</v-icon>
-            Árvores em Risco
+            <v-icon class="mr-2">mdi-chart-bar</v-icon>
+            Podas por mês
+          </p>
+          <v-img
+
+            height="270"
+            contain
+            class="rounded-lg"
+          ></v-img>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" md="4" lg="4">
+        <v-card class="pa-4" flat style="background-color: #F6F6F6; border: 1px solid #CDCDCD; border-radius: 12px;">
+          <p class="text-subtitle-1 font-weight-bold mb-3 d-flex align-center">
+            <v-icon class="mr-2">mdi-alert-outline</v-icon>
+            Árvores em risco
           </p>
 
-          <v-card class="pa-3 mb-2" color="red-lighten-5" style="border: 1px solid #E0E0E0" flat >
-            <p class="text-subtitle-2 font-weight-medium">Rua das acácias 234</p>
-            <p class="text-caption text-grey-darken-1 mb-1">Tel - 3.2m de rede</p>
+          <v-card
+            v-for="(alert, i) in alerts"
+            :key="i"
+            class="pa-3 mb-2 rounded-lg"
+            :color="alert.color"
+            style="border: 1px solid #E0E0E0; box-shadow: none"
+          >
+            <p class="text-subtitle-2 font-weight-medium">{{ alert.address }}</p>
+            <p class="text-caption text-grey-darken-1 mb-1">{{ alert.distance }}</p>
             <p class="text-caption text-red-darken-2 font-weight-medium">Poda urgente</p>
-          </v-card>
 
-          <v-card class="pa-3 mb-2" color="orange-lighten-5" style="border: 1px solid #E0E0E0" flat>
-            <p class="text-subtitle-2 font-weight-medium">Rua das acácias 234</p>
-            <p class="text-caption text-grey-darken-1 mb-1">Tel - 3.2m de rede</p>
-            <p class="text-caption text-red-darken-2 font-weight-medium">Poda urgente</p>
           </v-card>
-
-          <v-card class="pa-3" color="orange-lighten-5" style="border: 1px solid #E0E0E0" flat>
-            <p class="text-subtitle-2 font-weight-medium">Rua das acácias 234</p>
-            <p class="text-caption text-grey-darken-1 mb-1">Tel - 3.2m de rede</p>
-            <p class="text-caption text-red-darken-2 font-weight-medium">Poda urgente</p>
-          </v-card>
-
         </v-card>
       </v-col>
     </v-row>
 
-    <v-row class="mt-4">
-      <v-col cols="12" lg="6">
-        <v-card flat height="300px" style="border: 1px solid #E0E0E0" class="pa-4"></v-card>
+    <!-- Espécies por localidade + Últimos relatórios -->
+    <v-row dense>
+      <v-col cols="12" md="6">
+        <v-card flat class="pa-4" style="background-color: #F6F6F6; border: 1px solid #CDCDCD; border-radius: 12px;">
+          <p class="text-subtitle-1 font-weight-bold mb-3 d-flex align-center">
+            <v-icon class="mr-2">mdi-leaf-maple</v-icon>
+            Espécies por localidade
+          </p>
+          <v-img
+
+            height="270"
+            cover
+            class="rounded-lg"
+          ></v-img>
+        </v-card>
       </v-col>
 
-      <v-col cols="12" lg="6">
-        <v-card flat class="pa-4" style="border: 1px solid #E0E0E0">
-          <p class="text-subtitle-1 font-weight-bold mb-4">Últimos Relatórios de Poda</p>
-
+      <v-col cols="12" md="6">
+        <v-card flat class="pa-4" style="background-color: #F6F6F6; border: 1px solid #CDCDCD; border-radius: 12px;">
+          <p class="text-subtitle-1 font-weight-bold mb-4">
+            Últimos Relatórios de Poda
+          </p>
           <v-data-table
             :headers="reportHeaders"
             :items="reportItems"
@@ -128,7 +132,13 @@
             class="report-table"
           >
             <template #item.status="{ item }">
-              <v-chip :color="getStatusColor(item.status)" size="small" label class="font-weight-medium" style="border: 1px solid #E0E0E0; border-radius: 5px;"  >
+              <v-chip
+                :color="getStatusColor(item.status)"
+                size="small"
+                label
+                class="font-weight-medium"
+                style="border: 1px solid #E0E0E0; border-radius: 6px;"
+              >
                 {{ item.status }}
               </v-chip>
             </template>
@@ -140,82 +150,117 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue';
-// Importações de vue-router e stores removidas, pois não são essenciais para o layout.
-
-interface ReportItem {
-  localizacao: string;
-  status: 'Pendente' | 'Em Progresso' | 'Concluída';
-  acao: string;
-}
+import { defineComponent, ref } from "vue";
 
 export default defineComponent({
-  name: 'HomeGestorView',
-  data() {
-    return {
-      search: ref(''),
+  name: "HomeGestorView",
+  setup() {
+    const search = ref("");
 
-      // Dados para a Tabela de Relatórios
-      reportHeaders: [
-        { title: 'Localização', key: 'localizacao', sortable: false },
-        { title: 'Status', key: 'status', sortable: false },
-        { title: 'Ações', key: 'acao', sortable: false, align: 'end' },
-      ],
-      reportItems: [
-        { localizacao: 'Rua das Flores, 123 \n 2024-11-08', status: 'Pendente', acao: '0465478' },
-        { localizacao: 'Av. Central, 456 \n 2024-11-07', status: 'Em Progresso', acao: '4T456Y5' },
-        { localizacao: 'Praça da Paz, s/n \n 2024-11-06', status: 'Concluída', acao: '0345T7576' },
-      ] as ReportItem[],
+    const metricCards = [
+      {
+        title: "Árvores Cadastradas",
+        value: "90",
+        subtext: "+3 este mês",
+        icon: "mdi-content-duplicate",
+      },
+      {
+        title: "Podas Agendadas",
+        value: "240",
+        subtext: "+7 este mês",
+        icon: "mdi-home-plus-outline",
+      },
+      {
+        title: "Áreas Críticas",
+        value: "156",
+        subtext: "3 requerem atenção imediata",
+        icon: "mdi-heart-broken-outline",
+      },
+      {
+        title: "Espécies",
+        value: "156",
+        subtext: "Catalogadas",
+        icon: "mdi-sprout",
+      },
+    ];
+
+    const alerts = [
+      {
+        address: "Rua das acácias 234",
+        distance: "Ipê - 3.2m de rede",
+        color: "red-lighten-5",
+      },
+      {
+        address: "Rua das acácias 234",
+        distance: "Ipê - 3.2m de rede",
+        color: "#B3E8A3",
+      },
+      {
+        address: "Rua das acácias 234",
+        distance: "Ipê - 3.2m de rede",
+        color: "#FDFD98",
+      },
+    ];
+
+    const reportHeaders = [
+      { title: "Localização", key: "localizacao" },
+      { title: "Status", key: "status" },
+      { title: "Árvore", key: "acao" },
+    ];
+
+    const reportItems = [
+      { localizacao: "Rua das Flores, 123\n2024-11-08", status: "Pendente", acao: "0483478" },
+      { localizacao: "Av. Central, 456\n2024-11-07", status: "Em Progresso", acao: "4T456Y5" },
+      { localizacao: "Praça da Paz, s/n\n2024-11-09", status: "Concluída", acao: "0345T7578" },
+    ];
+
+    const performSearch = () => {
+      console.log("Pesquisando:", search.value);
     };
-  },
-  methods: {
-    // Função para simular a pesquisa
-    performSearch() {
-      console.log('Pesquisando por:', this.search);
-    },
 
-    // Função para retornar a cor do chip de status
-    getStatusColor(status: string): string {
+    const getStatusColor = (status: string) => {
       switch (status) {
-        case 'Pendente':
-          return 'yellow-lighten-4';
-        case 'Em Progresso':
-          return 'blue-lighten-4';
-        case 'Concluída':
-          return 'green-lighten-4';
+        case "Pendente":
+          return "background-color: #AFCDFF";
+        case "Em Progresso":
+          return "background-color: #AFCDFF";
+        case "Concluída":
+          return "background-color: #B3E8A3";
         default:
-          return 'grey-lighten-4';
+          return "background-color: #B3E8A3";
       }
-    },
-    // Removida a função clearSearch, pois a busca é direta
+    };
+
+    return {
+      search,
+      metricCards,
+      alerts,
+      reportHeaders,
+      reportItems,
+      performSearch,
+      getStatusColor,
+    };
   },
 });
 </script>
 
 <style scoped>
-/* Estilos para cards de métricas */
-.card-metric {
-  /* Borda sutil para separar, semelhante à imagem */
-  border: 1px solid #f0f0f0;
-  /* Fundo ligeiramente off-white */
-  background-color: #FAFAFA;
+.metric-card {
+  border: 1px solid #CDCDCD;
+  background-color: #F6F6F6;
+  border-radius: 12px;
+  transition: box-shadow 0.2s ease;
 }
 
-/* Ajuste para o campo de busca ficar na mesma linha que o botão */
-.search-field :deep(.v-input__append-inner) {
-  align-items: center;
-  margin-top: 0 !important;
-  margin-right: 0 !important; /* Remove margem padrão */
-  padding-left: 8px; /* Espaçamento entre o ícone e o botão */
+.report-table :deep(td) {
+  border: none !important;
 }
 
-/* Estilo para remover bordas da tabela de relatórios */
-.report-table :deep(.v-table) {
-  border-style: none !important;
+.report-table :deep(tr) {
+  border-bottom: 1px solid #E0E0E0 !important;
 }
 
-.report-table :deep(th) {
-  /* Oculta o cabeçalho se hide-default-header estiver em uso, mas se precisar forçar: */
-  display: none;
+.text-caption {
+  line-height: 1.2;
 }
 </style>

@@ -6,8 +6,8 @@
     <v-row class="mb-5 align-center">
 
       <v-col cols="12" sm="auto" class="py-0">
-        <v-btn icon @click="goBack" class="mr-2">
-          <v-icon>mdi-arrow-left</v-icon>
+        <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
+          <v-icon>mdi-chevron-left</v-icon>
         </v-btn>
 
       </v-col>
@@ -27,16 +27,15 @@
 
 
     <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px; " >
-      <v-row >
-        <v-col cols="12" md="6" >
+      <v-row style="display: flex; justify-content: center">
+        <v-col cols="12" md="4" style="display: flex; flex-direction: column; gap: 15px; justify-content: center">
           <p>Nome do Gestor</p>
           <v-text-field
             v-model="formData.nome"
             :rules="[rules.required]"
             label="Nome do Funcionário"
             placeholder="Digite o nome"
-            outlined
-            dense
+
           ></v-text-field>
           <p>Email</p>
           <v-text-field
@@ -63,15 +62,15 @@
           ></v-text-field>
         </v-col>
 
-        <v-col cols="12" md="6">
+
+        <v-col cols="12" md="4" style=" gap: 15px;" >
           <p>Numero do Contato</p>
           <v-text-field
             v-model="formData.contato"
             :rules="[rules.required, rules.contactFormat]"
             label="Número de Contato"
             placeholder="(88) 00000-0000"
-            outlined
-            dense
+
             mask="(##) #####-####"
           >
             <template v-slot:prepend-inner>
@@ -197,7 +196,6 @@ export default {
 <style scoped>
 /* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
 .cadastro-funcionario-container {
-  max-width: 1200px;
   margin-top: 20px;
   padding: 24px;
 }

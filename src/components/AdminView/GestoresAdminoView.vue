@@ -1,5 +1,4 @@
 <template>
-
     <v-container class="pa-6">
       <!-- Cabeçalho -->
       <v-row>
@@ -16,7 +15,6 @@
               <p style="margin: 0;">Gerencie usuários e suas permissões no sistema</p>
             </div>
           </v-col>
-
         </v-col>
       </v-row>
 
@@ -32,7 +30,6 @@
             @click="addGestor"
           >
             Novo Gestor
-
           </v-btn>
         </v-col>
       </v-row>
@@ -68,7 +65,6 @@
       </v-row>
 
       <!-- Filtros de busca -->
-
         <v-col cols="12" style="margin: 20px; display: flex; flex-direction: row; gap: 30px; justify-content: space-between; background-color: #CDCDCD">
           <v-icon>mdi-filters</v-icon> <p class="text-medium-emphasis text-h6">Filtros</p>
           <v-row align="center" class="pa-4" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
@@ -83,14 +79,10 @@
                 prepend-inner-icon="mdi-map-marker-outline"
               />
             </v-col>
-
-
-
             <v-col cols="12" sm="4" md="4" lg="3">
               <v-text-field
                 v-model="search"
                 label="Nome"
-
                 variant="outlined"
                 density="compact"
                 hide-details
@@ -168,11 +160,11 @@
         />
       </v-row>
     </v-container>
-
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 interface Gestor {
   id: string;
@@ -190,6 +182,7 @@ export default defineComponent({
     // Estado da página atual e tamanho da página
     const page = ref(1)
     const itemsPerPage = 5 // Número de gestores por página
+    const router = useRouter()
 
     // Dados simulados
     const gestores = ref<Gestor[]>([
@@ -241,7 +234,7 @@ export default defineComponent({
       console.log('Voltar')
     }
     function addGestor() {
-      console.log('Adicionar Gestor')
+      router.push('/admin/cadastro-gestores')
     }
     function applyFilters() {
       console.log('Filtros aplicados')
