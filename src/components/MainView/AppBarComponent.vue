@@ -1,137 +1,165 @@
 <template>
-  <v-app-bar color="white" flat >
-    <img src="@/assets/LogomaptreeHeaderpng.png" alt="Logo" style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px;">
-    <v-spacer></v-spacer>
-    <v-toolbar-items class="d-flex justify-center " style="margin-top: 10px;">
-      <!-- Painel -->
-      <v-btn
-        variant="text"
-        style="margin-right: 10px;"
-        @click="goTo('/')"
-      >
-        <v-icon :color="isActive('/') ? green : 'black'">
-          mdi-view-dashboard
-        </v-icon>
-        Painel
-      </v-btn>
+  <!-- DESKTOP -->
+  <v-app-bar color="white" flat v-if="!isMobile">
 
-      <!-- Empresas -->
-      <v-btn
-        variant="text"
-        style="margin-right: 10px;"
-        :color="isActive('/empresas') ? 'black' : 'grey-darken-2'"
-        @click="goTo('/empresas')"
-      >
-        <v-icon :color="isActive('/empresas') ? green : 'black'">
-          mdi-domain
-        </v-icon>
-        Empresas
-      </v-btn>
+    <!-- Logo -->
+    <img
+      src="@/assets/LogomaptreeHeaderpng.png"
+      alt="Logo"
+      style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px;"
+    />
 
-      <!-- Gestores -->
+    <v-spacer />
+
+    <!-- MENU -->
+    <v-toolbar-items class="d-flex justify-center" style="margin-top: 10px;">
       <v-btn
+        v-for="item in currentMenu"
+        :key="item.to"
         variant="text"
         style="margin-right: 10px;"
-        :color="isActive('/gestores') ? 'black' : 'grey-darken-2'"
-        @click="goTo('/gestores')"
+        :color="isActive(item.to) ? 'black' : 'grey-darken-2'"
+        @click="goTo(item.to)"
       >
-        <v-icon :color="isActive('/gestores') ? green : 'black'">
-          mdi-account-group
+        <v-icon size="24" :color="isActive(item.to) ? green : 'black'">
+          {{ item.icon }}
         </v-icon>
-        Gestores
+
+        {{ item.title }}
       </v-btn>
     </v-toolbar-items>
 
     <v-spacer />
 
     <!-- Perfil -->
-    <v-btn style="margin-right: 10px; color: black; border-radius: 50%; margin-top: 10px;">
-      <img src="@/assets/Logomaptreeverde.png" alt="Perfil" style="width: 40px; height: 40px; border-radius: 50%;">
+    <v-btn style="margin-right: 10px; color: black; margin-top: 10px;">
+      <img
+        src="@/assets/Logomaptreeverde.png"
+        alt="Perfil"
+        style="width: 40px; height: 40px; border-radius: 50%;"
+      />
     </v-btn>
 
   </v-app-bar>
 
-  <v-app-bar  flat v-if="isMobile">
+  <!-- MOBILE -->
+  <v-app-bar flat v-else>
     <v-btn icon @click="drawer = !drawer">
       <v-icon>mdi-menu</v-icon>
-      <template v-slot:activator="{ props }">
-        <v-btn v-bind="props">Open</v-btn>
-      </template>
-
     </v-btn>
+
     <v-navigation-drawer v-model="drawer" temporary>
       <v-list>
         <v-list-item
-          v-for="item in items"
-          :key="item.title"
-          :to="item.to"
-          link
+          v-for="item in currentMenu"
+          :key="item.to"
+          @click="goTo(item.to)"
         >
           <v-list-item-icon>
-            <v-icon :icon="item.icon"></v-icon>
+            <v-icon>{{ item.icon }}</v-icon>
           </v-list-item-icon>
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
+          <v-list-item-title>
+            {{ item.title }}
+          </v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
   </v-app-bar>
 </template>
 
-<script  lang="ts">
-import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app.ts'
-import { ref } from 'vue'
+<script lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 export default {
   name: 'AppBarComponent',
-  data() {
-    return {
-      drawer: ref(false),
-      items: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
-        { title: 'Empresas', icon: 'mdi-domain', to: '/empresas' },
-        { title: 'Gestores', icon: 'mdi-account-group', to: '/gestores' },
+  setup() {
+    const route = useRoute()
+    const router = useRouter()
+
+    const drawer = ref(false)
+    const isMobile = ref(false)
+    const green = '#C1E328'
+
+    // 🔥 MENUS BASEADOS NAS SUAS ROTAS
+    const menus = {
+      admin: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
+        { title: 'Empresas', icon: 'mdi-domain', to: '/admin/empresas' },
+        { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/gestores' },
       ],
-      green: '#C1E328',
-      roles: [
-        'admin',
-        'manager',
-        'user',
+
+      gestor: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/gestor/gestorMain' },
+        { title: 'Funcionários', icon: 'mdi-account-group', to: '/gestor/funcionarios' },
+        { title: 'Relatórios', icon: 'mdi-file-chart', to: '/gestor/relatorios' },
+        //aq fica as podas
+      ],
+
+      user: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
+        { title: 'Podas', icon: 'mdi-content-cut', to: '/podas' },
+        { title: 'Relatórios', icon: 'mdi-file-chart', to: '/relatorios' }
+      ],
+
+      guest: [
+        { title: 'Login', icon: 'mdi-login', to: '/login' },
+        { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/cadastro' }
       ]
     }
-  },
-  computed: {
-    isMobile() {
-      return window.innerWidth < 768
-    },
-    isRoles() {
-      const store = useAppStore()
-      const userRole = store.userRole
-      return this.roles.includes(userRole)
-    },
 
-  },
-  methods: {
-    goTo(path) {
-      this.$router.push(path)
-    },
-    isActive(path) {
-      return this.$route.path === path
-    },
+    // 🔥 DETECTAR MENU APENAS PELA ROTA → SEM ROLE
+    const currentMenu = computed(() => {
+      const path = route.path
 
-  },
-  watch: {
-    isMobile() {
-      this.drawer = false
-    },
-    isRoles() {
-      this.roles = [
-        'admin',
-        'manager',
-        'user',
-      ]
+      if (path.startsWith('/admin')) return menus.admin
+      if (path.startsWith('/gestor')) return menus.gestor
+
+      // Usuário comum
+      if (path === '/' || path.startsWith('/podas') || path.startsWith('/relatorios')) {
+        return menus.user
+      }
+
+      // Visitante
+      if (
+        path.startsWith('/login') ||
+        path.startsWith('/cadastro') ||
+        path.startsWith('/recovery')
+      ) {
+        return menus.guest
+      }
+
+      return menus.guest
+    })
+
+    const isActive = (path: string) => route.path === path
+
+    const goTo = (path: string) => {
+      router.push(path)
+      drawer.value = false
     }
-  },
 
+    const checkMobile = () => {
+      isMobile.value = window.innerWidth < 960
+    }
+
+    onMounted(() => {
+      checkMobile()
+      window.addEventListener('resize', checkMobile)
+    })
+
+    watch(() => route.path, () => {
+      drawer.value = false
+    })
+
+    return {
+      drawer,
+      green,
+      currentMenu,
+      isMobile,
+      isActive,
+      goTo
+    }
+  }
 }
 </script>

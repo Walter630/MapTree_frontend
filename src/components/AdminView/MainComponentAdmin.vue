@@ -5,147 +5,159 @@ import { ref } from 'vue'
 
 export default {
   name: 'MainComponent',
-  data() {
-    return {
-      search: ref(''),
-      router: useRouter(),
-      store: useAppStore(),
-      empresas: [
-        {
-          nome: 'EcoEnergia Sul',
-          gestor: 'Carlos Silva',
-          data: '2024-11-08',
-          status: 'Ativa',
-          cor: '#A4F5A1'
-        },
-        {
-          nome: 'Verde Luz Nordeste',
-          gestor: 'Ana Santos',
-          data: '2024-11-07',
-          status: 'Ativa',
-          cor: '#A4F5A1'
-        },
-        {
-          nome: 'PowerTree Centro',
-          gestor: 'João Costa',
-          data: '2024-11-09',
-          status: 'Pendente',
-          cor: '#FFFDA1'
-        }
-      ]
-    }
-  },
-  methods: {
-    clearSearch() {
-      this.search = ''
-    }
+  setup() {
+    const search = ref('')
+    const router = useRouter()
+    const store = useAppStore()
+
+
+    const empresas = ref([
+      {
+        nome: 'EcoEnergia Sul',
+        gestor: 'Carlos Silva',
+        data: '2024-11-08',
+        status: 'Ativa',
+        cor: '#D5F8D1'
+      },
+      {
+        nome: 'Verde Luz Nordeste',
+        gestor: 'Ana Santos',
+        data: '2024-11-07',
+        status: 'Ativa',
+        cor: '#D5F8D1'
+      },
+      {
+        nome: 'PowerTree Centro',
+        gestor: 'João Costa',
+        data: '2024-11-09',
+        status: 'Pendente',
+        cor: '#FFF8B3'
+      }
+    ])
+
+    const clearSearch = () => search.value = ''
+
+    return { search, router, store, empresas, clearSearch }
   }
 }
 </script>
-
 <template>
-  <v-container style="margin: 30px; padding: 20px;">
+  <v-container style="margin-top: 40px;">
+    <!-- Cabeçalho -->
     <v-row align="center" justify="space-between">
-      <!-- Texto -->
-      <v-col cols="12" md="8">
-        <div>
-          <p style="color: #667085; font-size: 14px; font-weight: bold; margin: 0; margin-bottom: 10px;"
-             class="text-medium-emphasis">Meu Painel</p>
-          <p style="margin: 0;">Olá, administrador, aqui está o resumo de suas operações.</p>
-        </div>
+      <v-col cols="12" md="7">
+        <p style="color: #858585; font-size: 14px; margin-bottom: 6px;">Meu Painel</p>
+        <p style="font-size: 15px;">
+          Olá, Administrador, Aqui Está O Resumo De Suas Operações.
+        </p>
       </v-col>
 
-      <!-- Barra de pesquisa -->
       <v-col cols="12" md="4" class="d-flex justify-end">
         <v-text-field
+          v-model="search"
           placeholder="Buscar"
           hide-details
-          density="compact"
+          density="comfortable"
           variant="outlined"
-          style="width: 473px; height: 56px; align-items: center;"
+          style="width: 350px;"
           prepend-inner-icon="mdi-magnify"
         >
           <template #append-inner>
-            <v-icon @click="clearSearch">mdi-close-circle</v-icon>
-            <v-btn style="background-color: black; color: white;">Buscar</v-btn>
+            <v-icon @click="clearSearch" class="mr-2" style="cursor: pointer;">
+              mdi-close-circle
+            </v-icon>
+            <v-btn style="background:black; color:white; height:35px;">
+              Buscar
+            </v-btn>
           </template>
         </v-text-field>
       </v-col>
     </v-row>
 
-    <!-- Cards de resumo -->
-    <v-row>
-      <v-col cols="12" md="7" style="margin: 20px; display: flex; flex-direction: row; gap: 30px;">
-        <v-card style="width: 264px; height: 174px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000;">
-          <v-card-title style="display: flex; justify-content: space-between;">Empresas<v-icon>mdi-domain</v-icon></v-card-title>
-          <v-card-text>
-            <p style="margin-top: 60px;" class="text-h5">90</p>
-            <p style="margin-top: 10px;">+ 3 este mês</p>
-          </v-card-text>
+    <!-- Cards de Resumo -->
+    <v-row style="margin-top: 25px;" class="d-flex" justify="start" no-gutters>
+      <v-col cols="12" md="3" class="mr-4">
+        <v-card class="cardResumo">
+          <div class="cardHeader">
+            <span>Empresas</span>
+            <v-icon>mdi-domain</v-icon>
+          </div>
+          <p class="cardNumero">90</p>
+          <p class="cardInfo">+3 este mês</p>
         </v-card>
+      </v-col>
 
-        <v-card style="width: 264px; height: 174px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000;">
-          <v-card-title style="display: flex; justify-content: space-between;">Gestores<v-icon>mdi-account-group</v-icon></v-card-title>
-          <v-card-text>
-            <p style="margin-top: 60px;" class="text-h5">90</p>
-            <p style="margin-top: 10px;">+ 3 este mês</p>
-          </v-card-text>
+      <v-col cols="12" md="3" class="mr-4">
+        <v-card class="cardResumo">
+          <div class="cardHeader">
+            <span>Gestores</span>
+            <v-icon>mdi-account-group</v-icon>
+          </div>
+          <p class="cardNumero">240</p>
+          <p class="cardInfo">+7 este mês</p>
         </v-card>
+      </v-col>
 
-        <v-card style="width: 264px; height: 174px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000;">
-          <v-card-title style="display: flex; justify-content: space-between;">Espécies<v-icon>mdi-sprout</v-icon></v-card-title>
-          <v-card-text>
-            <p style="margin-top: 60px;" class="text-h5">90</p>
-            <p style="margin-top: 10px;">+ 3 este mês</p>
-          </v-card-text>
+      <v-col cols="12" md="3">
+        <v-card class="cardResumo">
+          <div class="cardHeader">
+            <span>Espécies</span>
+            <v-icon>mdi-sprout</v-icon>
+          </div>
+          <p class="cardNumero">156</p>
+          <p class="cardInfo">Catalogadas</p>
         </v-card>
       </v-col>
     </v-row>
 
-    <!-- Segunda linha de cards -->
-    <v-row>
+    <!-- Segunda Linha -->
+    <v-row style="margin-top: 35px;">
+      <!-- Distribuição de Planos -->
       <v-col cols="12" md="6">
-        <v-card style="width: 573px; height: 370px; background-color: #CDCDCD; border-radius: 10px; box-shadow: none; border: 1px solid #000000; padding: 20px;">
-          <h5 style="font-weight: 600; font-size: 16px; margin-bottom: 20px;">Distribuição de Planos</h5>
-          <v-card-text class="card-center">Nenhuma ação realizada</v-card-text>
+        <v-card class="cardBox">
+          <h4 class="titleBox">Distribuição de Planos</h4>
+
+          <div class="centerBox">
+            Nenhuma Ação Realizada
+          </div>
         </v-card>
       </v-col>
 
-      <!-- Novo card: Empresas Cadastradas Recentemente -->
+      <!-- Empresas Cadastradas -->
       <v-col cols="12" md="6">
-        <v-card style="width: 573px; min-height: 370px; background-color: #FFFFFF; border-radius: 10px; box-shadow: none; border: 1px solid #000000; padding: 20px;">
-          <h5 style="font-weight: 600; font-size: 16px; margin-bottom: 20px;">Empresas Cadastradas Recentemente</h5>
+        <v-card class="cardBox">
+          <h4 class="titleBox">Empresas Cadastradas Recentemente</h4>
 
-          <v-row style="font-weight: bold; font-size: 14px; color: #555;">
+          <v-row class="headerTable">
             <v-col cols="4">Empresa</v-col>
             <v-col cols="4">Gestor</v-col>
             <v-col cols="4">Status</v-col>
           </v-row>
 
-
-
-          <div v-for="(empresa, index) in empresas" :key="index" style="margin-top: 15px;">
+          <div
+            v-for="(empresa, i) in empresas"
+            :key="i"
+            class="linhaEmpresa"
+          >
             <v-row align="center">
-              <v-col cols="4">
+              <v-col cols="4" >
                 <div>{{ empresa.nome }}</div>
-                <div style="font-size: 12px; color: #777;">{{ empresa.data }}</div>
+                <div class="dataEmpresa">{{ empresa.data }}</div>
               </v-col>
+
               <v-col cols="4">{{ empresa.gestor }}</v-col>
+
               <v-col cols="4">
                 <span
-                  :style="{
-                    backgroundColor: empresa.cor,
-                    borderRadius: '12px',
-                    padding: '4px 12px',
-                    fontSize: '13px'
-                  }"
+                  class="badgeStatus"
+                  :style="{ backgroundColor: empresa.cor }"
                 >
                   {{ empresa.status }}
                 </span>
               </v-col>
             </v-row>
 
-            <v-divider v-if="index < empresas.length - 1" style="margin-top: 5px;"></v-divider>
+            <v-divider v-if="i < empresas.length - 1"></v-divider>
           </div>
         </v-card>
       </v-col>
@@ -154,11 +166,72 @@ export default {
 </template>
 
 <style scoped>
-.card-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  text-align: center;
+.cardResumo {
+background: white;
+border: 1px solid #E5E5E5;
+height: 150px;
+border-radius: 8px;
+padding: 15px;
+}
+
+.cardHeader {
+display: flex;
+justify-content: space-between;
+font-weight: 600;
+}
+
+.cardNumero {
+font-size: 26px;
+margin-top: 25px;
+font-weight: bold;
+}
+
+.cardInfo {
+margin-top: 5px;
+font-size: 13px;
+color: #777;
+}
+
+.cardBox {
+background: white;
+border: 1px solid #E5E5E5;
+border-radius: 8px;
+padding: 20px;
+min-height: 350px;
+}
+
+.titleBox {
+font-size: 16px;
+font-weight: 600;
+margin-bottom: 20px;
+}
+
+.centerBox {
+display: flex;
+align-items: center;
+justify-content: center;
+height: 220px;
+color: #555;
+}
+
+.headerTable {
+font-weight: bold;
+padding-bottom: 5px;
+color: #444;
+}
+
+.dataEmpresa {
+font-size: 12px;
+color: #999;
+}
+
+.badgeStatus {
+padding: 5px 14px;
+border-radius: 12px;
+font-size: 13px;
+display: inline-block;
+}
+.linhaEmpresa {
+padding: 15px 0 2px;
 }
 </style>

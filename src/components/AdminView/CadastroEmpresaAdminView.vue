@@ -1,225 +1,232 @@
 <template>
-  <v-container class="cadastro-funcionario-container" >
-    <div class="text-caption grey--text text--darken-1" style="margin-bottom: 20px; color: #667085;">
-      Meu Painel > Funcionários > #CadastrarEmpresas
-    </div>
-    <v-row class="mb-5 align-center">
+  <v-container class="py-8" style="max-width: 1100px">
 
-      <v-col cols="12" sm="auto" class="py-0">
-        <v-btn  class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
-          <v-icon>mdi-chevron-left</v-icon>
+    <!-- Breadcrumb -->
+    <p class="text-caption" style="color: #667085; margin-bottom: 20px">
+      Meu Painel > Empresas > #CadastrarEmpresas
+    </p>
+
+    <!-- Header -->
+    <v-row class="align-center mb-6">
+      <v-col cols="auto">
+        <v-btn
+          style="border: 1px solid #D0D5DD; height: 48px; width: 48px; background-color: #F9FAFB"
+          class="rounded-lg"
+          @click="goBack"
+        >
+          <v-icon color="#344054">mdi-chevron-left</v-icon>
         </v-btn>
       </v-col>
-      <v-col cols="12" sm="auto"  class="py-1">
-        <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367; margin-top: 20px; ">
+
+      <v-col>
+        <h1 style="color: #101828; font-size: 24px; font-weight: 600; margin-bottom: 4px">
           Cadastro de Empresas
         </h1>
-        <p class="text-subtitle-1 grey--text" style="margin-top: 10px">
-          Cadastre Os Empresas E Suas Funções.
+        <p style="color: #667085; font-size: 16px">
+          Cadastre as empresas e seus dados principais.
         </p>
       </v-col>
     </v-row>
 
+    <!-- CARD DO FORMULÁRIO -->
+    <v-card
+      elevation="1"
+      class="pa-8 rounded-xl"
+      style="border: 1px solid #EAECF0; background: white;"
+    >
+      <v-form ref="form" v-model="valid" lazy-validation>
 
+        <v-row>
+          <!-- COLUNA 1 -->
+          <v-col cols="12" md="6" class="d-flex flex-column gap-4">
 
-    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px;" >
-      <v-row style="display: flex; justify-content: center">
-        <v-col cols="12" md="4" style="display: flex; flex-direction: column; gap: 16px; justify-content: center">
-          <p>Nome do Empresa</p>
-          <v-text-field
-            v-model="formData.nome"
-            :rules="[rules.required]"
-            label="Nome do Funcionário"
-            placeholder="Digite o nome"
-          ></v-text-field>
-          <p>Email</p>
-          <v-text-field
-            v-model="formData.email"
-            :rules="[rules.required, rules.email]"
-            label="Email"
-            placeholder="Digite o email"
-            outlined
-            dense
-          >
-            <template v-slot:label>
-              Email <span class="grey--text">— Endereço de Email</span>
-            </template>
-          </v-text-field>
-          <p>CNPJ</p>
-          <v-text-field
-            v-model="formData.cnpj"
-            :rules="[rules.required]"
-            label="CNPJ"
-            placeholder="Digite o CNPJ"
-            type="text"
-            outlined
-            dense
-          ></v-text-field>
-        </v-col>
+            <div>
+              <label class="field-label">Nome da Empresa</label>
+              <v-text-field
+                v-model="formData.nome"
+                :rules="[rules.required]"
+                placeholder="Digite o nome"
+                class="custom-field"
+                density="comfortable"
+              ></v-text-field>
+            </div>
 
-        <v-col cols="12" md="4" style="display: flex; flex-direction: column; gap: 16px; justify-content: center">
-          <p>Numero do Contato</p>
-          <v-text-field
-            v-model="formData.contato"
-            :rules="[rules.required, rules.contactFormat]"
-            label="Número de Contato"
-            placeholder="(88) 00000-0000"
-            outlined
-            dense
-            mask="(##) #####-####"
-          >
-            <template v-slot:prepend-inner>
-              <div class="d-flex align-center mr-2">
-                <span class="mr-2">+1</span>
-                <v-divider vertical></v-divider>
-              </div>
-            </template>
+            <div>
+              <label class="field-label">Email</label>
+              <v-text-field
+                v-model="formData.email"
+                :rules="[rules.required, rules.email]"
+                placeholder="Digite o email"
+                class="custom-field"
+                density="comfortable"
+              ></v-text-field>
+            </div>
 
-          </v-text-field>
-          <p>Plano</p>
-          <v-select
-            v-model="formData.plano"
-            :items="planos"
-            :rules="[rules.required]"
-            label="Plano"
-            placeholder="Plano"
-            outlined
-            dense
-          ></v-select>
-          <p>Status</p>
-          <v-select
-            v-model="formData.status"
-            :items="status"
-            :rules="[rules.required]"
-            label="status"
-            placeholder="Ativo"
-            outlined
-            dense
-          ></v-select>
+            <div>
+              <label class="field-label">CNPJ</label>
+              <v-text-field
+                v-model="formData.cnpj"
+                :rules="[rules.required]"
+                placeholder="Digite o CNPJ"
+                class="custom-field"
+                density="comfortable"
+              ></v-text-field>
+            </div>
 
-        </v-col>
-      </v-row>
+          </v-col>
 
-      <v-row class="mt-8">
-        <v-col cols="12" class="d-flex justify-center">
-          <v-btn
-            :disabled="!valid"
-            color="#A7D129"
-            dark
-            large
-            class="mr-4"
-            @click="submitForm"
-          >
-            SALVAR
-          </v-btn>
+          <!-- COLUNA 2 -->
+          <v-col cols="12" md="6" class="d-flex flex-column gap-4">
 
-          <v-btn
-            color="black"
-            dark
-            large
-            @click="cancelForm"
-          >
-            CANCELAR
-          </v-btn>
-        </v-col>
-      </v-row>
-    </v-form>
+            <div>
+              <label class="field-label">Número do Contato</label>
+              <v-text-field
+                v-model="formData.contato"
+                :rules="[rules.required, rules.contactFormat]"
+                placeholder="(88) 00000-0000"
+                class="custom-field"
+                density="comfortable"
+                mask="(##) #####-####"
+              >
+                <template #prepend-inner>
+                  <div class="d-flex align-center mr-2">
+                    <span class="mr-2" style="color: #667085">+55</span>
+                    <v-divider vertical></v-divider>
+                  </div>
+                </template>
+              </v-text-field>
+            </div>
+
+            <div>
+              <label class="field-label">Plano</label>
+              <v-select
+                v-model="formData.plano"
+                :items="planos"
+                :rules="[rules.required]"
+                placeholder="Selecione um plano"
+                class="custom-field"
+                density="comfortable"
+              ></v-select>
+            </div>
+
+            <div>
+              <label class="field-label">Status</label>
+              <v-select
+                v-model="formData.status"
+                :items="status"
+                :rules="[rules.required]"
+                placeholder="Selecione o status"
+                class="custom-field"
+                density="comfortable"
+              ></v-select>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- BOTÕES -->
+        <v-row class="mt-6">
+          <v-col cols="12" class="d-flex justify-center">
+            <v-btn
+              :disabled="!valid"
+              color="#4CAF50"
+              style="color: white; font-weight: 600; width: 180px; height: 48px"
+              class="rounded-lg"
+              @click="submitForm"
+            >
+              SALVAR
+            </v-btn>
+
+            <v-btn
+              color="#344054"
+              class="ml-4 rounded-lg"
+              style="color: white; width: 180px; height: 48px"
+              @click="cancelForm"
+            >
+              CANCELAR
+            </v-btn>
+          </v-col>
+        </v-row>
+
+      </v-form>
+    </v-card>
   </v-container>
 </template>
 
 <script lang="ts">
 export default {
-  name: 'CadastroFuncionario',
+  name: 'CadastroEmpresas',
+
   data() {
     return {
       valid: false,
-      search: '',
+
       formData: {
         nome: '',
         email: '',
         cnpj: '',
         contato: '',
         status: '',
-        plano: '',
+        plano: ''
       },
+
       status: ['Ativo', 'Inativo'],
       planos: ['Plano 1', 'Plano 2', 'Plano 3', 'Plano 4'],
+
       rules: {
-        required: value => !!value || 'Campo obrigatório.',
-        email: value => {
-          const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-          return pattern.test(value) || 'Email inválido.'
-        },
-        minPassword: v => v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
-        // Uma regra de validação básica para o formato de contato (pode ser ajustada)
-        contactFormat: v => (v && v.replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).'
-      },
+        required: v => !!v || "Campo obrigatório.",
+        email: v => /.+@.+\..+/.test(v) || "Email inválido.",
+        contactFormat: v =>
+          (v && v.replace(/[^0-9]/g, "").length >= 10) ||
+          "Contato deve ter pelo menos 10 dígitos."
+      }
     };
   },
+
   methods: {
     goBack() {
-      // Lógica para voltar, como this.$router.go(-1) ou um evento de emit
-      console.log('Ação de Voltar');
+      this.$router.go(-1);
     },
-    performSearch() {
-      // Lógica de pesquisa
-      console.log('Pesquisar por:', this.search);
-    },
-    clearSearch() {
-      this.search = '';
-    },
+
     async submitForm() {
-      // A função validate() do v-form retorna um objeto de promessa
       const { valid } = await this.$refs.form.validate();
 
-      if (valid) {
-        console.log('Formulário Válido, enviando dados:', this.formData);
-        // Lógica de envio de dados para a API/Backend
-        alert('Funcionário Cadastrado com Sucesso!');
-        this.resetForm();
-      } else {
-        console.log('Formulário Inválido');
-      }
+      if (!valid) return;
+
+      console.log("Enviando dados:", this.formData);
+      alert("Empresa cadastrada com sucesso!");
+      this.resetForm();
     },
+
     resetForm() {
-      this.$refs.form.reset();
       this.formData = {
         nome: '',
         email: '',
         cnpj: '',
         contato: '',
         status: '',
-        plano: '',
+        plano: ''
       };
     },
+
     cancelForm() {
-      // Lógica para cancelar, como resetar o formulário ou redirecionar
-      console.log('Ação de Cancelar');
       this.resetForm();
-    },
-  },
+    }
+  }
 };
 </script>
 
 <style scoped>
-/* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
-.cadastro-funcionario-container {
-
-  margin-top: 20px;
-  padding: 24px;
-
+.field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #344054;
+  margin-bottom: 6px;
+  display: block;
 }
 
-/* Ajuste para o campo de contato, simulando o campo de código de país como parte do input */
-.v-text-field:deep(.v-input__prepend-inner) .v-divider {
-  height: 70%; /* Altura da linha vertical */
-  margin-right: 8px;
-  margin-left: -4px; /* Move um pouco para a esquerda */
-}
-
-/* Estilo para ajustar o alinhamento da label "Email - Endereço de Email" */
-.v-text-field:deep(.v-label) span {
-  font-size: 0.75rem; /* Menor que a label principal */
-  font-weight: 400;
+.custom-field :deep(.v-field__field) {
+  background: #F9FAFB;
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
 }
 </style>
