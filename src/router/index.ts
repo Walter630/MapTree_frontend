@@ -31,6 +31,7 @@ import RecoveryPage from '@/pages/RecoveryPage.vue'
 
 // Store
 import { useAppStore } from '@/stores/app.ts'
+import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -148,9 +149,22 @@ const router = createRouter({
               path: 'notifications',
               name: 'Notifications',
               component: NotificacoesGestorView
+            },
+
+          ],
+         },
+          {
+          path: 'funcionario-terceirizado',
+          name: 'FuncionarioTerceirizado',
+          component: MainFuncionarioTerc,
+          children: [
+            {
+              path: '',
+              name: 'FuncionarioTerceirizadoHome',
+              component: MainFuncionarioTerc
             }
-          ]
-        }
+          ],
+          },
       ],
     },
   ],

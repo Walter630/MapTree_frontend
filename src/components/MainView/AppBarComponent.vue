@@ -21,7 +21,7 @@
         :color="isActive(item.to) ? 'black' : 'grey-darken-2'"
         @click="goTo(item.to)"
       >
-        <v-icon size="24" :color="isActive(item.to) ? green : 'black'">
+        <v-icon size="24" style="margin-right: 5px;" :color="isActive(item.to) ? green : 'black'">
           {{ item.icon }}
         </v-icon>
 
@@ -30,15 +30,19 @@
     </v-toolbar-items>
 
     <v-spacer />
+    <v-btn icon :color="isActive('/gestor/notifications') ? green : 'grey-darken-2'" style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;" @click="goTo('/gestor/notifications')">
+      <v-icon>mdi-bell-outline</v-icon>
+    </v-btn>
 
     <!-- Perfil -->
-    <v-btn style="margin-right: 10px; color: black; margin-top: 10px;">
+    <v-avatar size="45" color="grey-darken-2" @click="goTo('')">
       <img
         src="@/assets/Logomaptreeverde.png"
         alt="Perfil"
-        style="width: 40px; height: 40px; border-radius: 50%;"
+        style="width: 45px; height: 45px; border-radius: 50%;"
       />
-    </v-btn>
+
+    </v-avatar>
 
   </v-app-bar>
 
@@ -102,6 +106,12 @@ export default {
         { title: 'Relatórios', icon: 'mdi-file-chart', to: '/relatorios' }
       ],
 
+      funcionario_terceirizado: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
+        { title: 'Podas', icon: 'mdi-content-cut', to: '/funcionario_terceirizado/podas' },
+        { title: 'rotas', icon: 'mdi-file-chart', to: '/funcionario_terceirizado/relatorios' }
+      ],
+
       guest: [
         { title: 'Login', icon: 'mdi-login', to: '/login' },
         { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/cadastro' }
@@ -114,11 +124,13 @@ export default {
 
       if (path.startsWith('/admin')) return menus.admin
       if (path.startsWith('/gestor')) return menus.gestor
+      if (path.startsWith('/funcionario-terceirizado')) return menus.funcionario_terceirizado
 
       // Usuário comum
       if (path === '/' || path.startsWith('/podas') || path.startsWith('/relatorios')) {
         return menus.user
       }
+
 
       // Visitante
       if (
