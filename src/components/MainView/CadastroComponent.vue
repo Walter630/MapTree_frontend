@@ -15,7 +15,33 @@
           <v-form ref="form" v-model="valid" lazy-validation>
             <p>Nome</p>
             <v-text-field
-              v-model="nome"
+              v-model="formData.name"
+              color="green"
+              class="mb-4"
+              dense
+              hide-details
+              label="Nome"
+              variant="outlined"
+              placeholder="Digite seu nome"
+              required
+            ></v-text-field>
+
+            <p>CPF</p>
+            <v-text-field
+              v-model="formData.cpf"
+              color="green"
+              class="mb-4"
+              dense
+              hide-details
+              label="Nome"
+              variant="outlined"
+              placeholder="Digite seu nome"
+              required
+            ></v-text-field>
+
+            <p>Telefone</p>
+            <v-text-field
+              v-model="formData.phone"
               color="green"
               class="mb-4"
               dense
@@ -28,7 +54,7 @@
 
             <p>Email</p>
             <v-text-field
-              v-model="username"
+              v-model="formData.email"
               class="mb-4"
               color="green"
               dense
@@ -41,7 +67,7 @@
 
             <p>Senha</p>
             <v-text-field
-              v-model="password"
+              v-model="formData.password"
               class="mb-4"
               color="green"
               dense
@@ -105,17 +131,21 @@
   </v-container>
 </template>
 
-<script>
-import { useAppStore } from '@/stores/app.ts'
+<script lang="ts">
+import type { User } from '@/plugins/apiConnect.ts'
 
 export default {
   name: 'CadastroComponent',
-
   data() {
     return {
-      nome: '',
-      username: '',
-      password: '',
+      formData: {
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        cpf: '',
+        isActive: true,
+      },
       showPassword: false,
       valid: true,
       isMobile: window.innerWidth < 768,
@@ -123,7 +153,6 @@ export default {
   },
 
   mounted() {
-    const store = useAppStore()
     window.addEventListener('resize', this.checkMobile)
   },
 
@@ -132,7 +161,19 @@ export default {
   },
 
   methods: {
-    registrar() {},
+    async registrar() {
+      try {
+        const response = await this.$api.post<User>('/auth/register', this.formData);
+        if (response.status === 201) {
+          this.$router.push('/login')
+        } else {
+          console.log('Erro no registro: ', response);
+        }
+      } catch (error) {
+        console.error('Erro no registro: ', error);
+        alert('Erro no registro: ' + error)
+      }
+    },
     checkMobile() {
       this.isMobile = window.innerWidth < 768
     },
