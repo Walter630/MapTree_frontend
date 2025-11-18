@@ -8,12 +8,12 @@
           <span class="text-caption font-weight-bold">#Funcionários</span>
         </div>
 
-        <div class="d-flex align-center mb-4">
-          <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
+        <div class="d-flex align-center mb-4 mt-6">
+          <v-btn class="mr-4" style="box-shadow: none; border: 1px solid #D0D5DD; height: 56px; border-radius: 8px; background-color: #FFFFFF; width: 56px" @click="goBack">
             <v-icon>mdi-chevron-left</v-icon>
           </v-btn>
           <div>
-            <span class="text-h5 font-weight-regular" style="color: blue">FUNCIONÁRIOS</span>
+            <span class="text-h5 font-weight-regular" style="color: #2F3367">FUNCIONÁRIOS</span>
             <p class="text-body-2 text-grey-darken-1" style="margin-top: 10px">Gerencie Os Funcionários E Suas Atribuições.</p>
           </div>
         </div>

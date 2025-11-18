@@ -27,19 +27,19 @@
         </div>
 
         <!-- Novo Gestor abaixo do título -->
-        <div class="mt-3">
-          <v-btn
-            class="btn-new-gestor"
-            color="#C6F513"
-            elevation="1"
-            rounded
-            small
-            prepend-icon="mdi-plus"
-            @click="addGestor"
-          >
-            Novo Gestor
-          </v-btn>
-        </div>
+        <v-row class="mt-3">
+          <v-col cols="12">
+            <v-btn
+              color="#C6F513"
+              size="large"
+              class="font-weight-bold text-black text-none new-empresa-btn"
+              prepend-icon="mdi-plus"
+              @click="addGestor"
+            >
+              Novo Gestor
+            </v-btn>
+          </v-col>
+        </v-row>
       </v-col>
     </v-row>
 
@@ -305,7 +305,7 @@ function deleteItem(item: Gestor) {
   console.log('Excluir', item)
 }
 function goBack() {
-  this.$router.push('/admin/AdminHome')
+  router.push('/admin/AdminHome')
 }
 
 // Status helpers
@@ -371,7 +371,6 @@ function statusClass(status = '') {
 .cards-row {
   margin-top: 8px;
   box-shadow: none;
-  elevation: 0;
   background-color: #f4f4f4 ;
 }
 .summary-card {
@@ -384,13 +383,11 @@ function statusClass(status = '') {
   flex-direction: column;
   justify-content: flex-start;
   position: relative;
-  elevation: 0;
 }
 .card-head {
   display: flex;
   justify-content: space-between;
   align-items: start;
-  elevation: 0;
 }
 .summary-head {
   display: flex;
@@ -398,7 +395,6 @@ function statusClass(status = '') {
   align-items: center;
   font-weight: 600;
   color: #333;
-  elevation: 0;
 }
 .corner-icon {
   position: absolute;
@@ -471,24 +467,6 @@ function statusClass(status = '') {
 .action-icon {
   cursor: pointer;
   color: #6b7280;
-}
-
-/* Status chips */
-.status-active {
-  color: #166534;
-  font-weight: 600;
-}
-.status-pending {
-  color: #7a5f00;
-  font-weight: 600;
-}
-.status-default {
-  color: #374151;
-}
-
-/* Pagination */
-.v-pagination {
-  margin-top: 6px;
 }
 
 /* Responsive tweaks */

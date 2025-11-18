@@ -90,10 +90,10 @@ export default {
       ],
 
       gestor: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/gestor/gestorMain' },
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/gestor' },
         { title: 'Funcionários', icon: 'mdi-account-group', to: '/gestor/funcionarios' },
         { title: 'Relatórios', icon: 'mdi-file-chart', to: '/gestor/relatorios' },
-        //aq fica as podas
+        { title: 'Podas', icon: 'mdi-leaf'}
       ],
 
       user: [

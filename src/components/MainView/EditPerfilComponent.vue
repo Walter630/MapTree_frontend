@@ -5,11 +5,9 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const nome = ref('')
-const email = ref('')
-const senha = ref('')
 
 function salvarPerfil () {
-  alert('Mensagem enviada para ' + nome.value, email.value, senha.value)
+  alert('Mensagem enviada para ' + nome.value)
   router.push('/login')
 }
 function cancelar () {

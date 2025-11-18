@@ -5,7 +5,7 @@
     </div>
     <v-row class="mb-5 align-center">
       <v-col cols="12" sm="auto" class="py-0">
-        <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
+        <v-btn class="mr-4" style="box-shadow: none; border: 1px solid #DADADA ; height: 56px; border-radius: 8px; background-color: #F6F6F6; width: 56px" @click="goBack">
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
       </v-col>
@@ -19,27 +19,35 @@
         </p>
       </v-col>
 
-      <v-col cols="12" sm="4" offset-sm="3" md="3" offset-md="5" class="d-flex justify-end py-0 search-bar-container">
-        <v-text-field
-          v-model="search"
-          label="Ciclano"
-          append-icon="mdi-magnify"
-          clearable
-          single-line
-          hide-details
-          outlined
-          dense
-          class="mr-2 custom-search-field"
-        ></v-text-field>
-        <v-btn color="black" dark @click="performSearch">
-          Buscar
-        </v-btn>
+      <v-col cols="12" sm="6" md="6" class="d-flex justify-end py-0 search-bar-container">
+        <div style="width: 400px; max-width: 100%;">
+          <v-text-field
+            v-model="search"
+            placeholder="Pesquisar"
+            density="comfortable"
+            variant="outlined"
+            prepend-inner-icon="mdi-magnify"
+            hide-details
+            class="search-input"
+          >
+            <template #append-inner>
+              <v-btn
+                class="search-button"
+                @click="performSearch"
+                flat
+                color="black"
+              >
+                Buscar
+              </v-btn>
+            </template>
+          </v-text-field>
+        </div>
       </v-col>
     </v-row>
 
 
 
-    <v-card class="pa-4 mb-6" outlined tile style="box-shadow: none; background-color: #F6F6F6; ">
+    <v-card class="pa-4 mb-6 mt-9" outlined tile style="box-shadow: none; background-color: #F6F6F6; ">
       <v-row align="center">
         <v-col cols="12" class="d-flex align-center pb-2 pt-0">
           <v-icon class="mr-2">mdi-filter-variant</v-icon>
@@ -153,7 +161,7 @@
               <div class="pie-text-overlay pie-overlay-blue">25%</div>
             </div>
             <div class="chart-legend">
-              <div v-for="(leg, i) in pieLegend" :key="i" class="d-flex align-center mb-1">
+              <div v-for="(leg, i) in pieLegend" :key="i" class="d-flex align-center mb-2">
                 <div :style="{ backgroundColor: leg.color }" class="legend-box mr-2"></div>
                 <div>
                   <span class="text-caption font-weight-bold">{{ leg.value }}</span><br>
@@ -226,9 +234,9 @@
   </v-container>
 </template>
 
-<script>
+<script lang="ts">
 export default {
-  name: 'RelatoriosGerenciais',
+  name: 'RelatoriosGestorView',
   data() {
     return {
       search: '',
@@ -366,8 +374,8 @@ export default {
 
 /* --- Estilos para Simulação de Gráfico de Pizza (Donut) --- */
 .pie-chart-mock {
-  width: 150px;
-  height: 150px;
+  width: 300px;
+  height: 280px;
   border-radius: 50%;
   position: relative;
   /* Proporções: 40% Escuro, 35% Verde Claro, 25% Verde Sombra */
@@ -379,7 +387,7 @@ export default {
       /* 25% Preventiva (Verde Sombra) - Vai até 100% */
     #6A994E 75% 100%
   );
-  box-shadow: 0 0 0 20px white inset; /* Simula o furo do donut */
+  box-shadow: 0 0 0 10px white inset; /* Simula o furo do donut */
 }
 
 /* Posiciona os textos de percentual DENTRO do gráfico (aproximadamente) */

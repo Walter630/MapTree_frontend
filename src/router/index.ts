@@ -124,7 +124,7 @@ const router = createRouter({
           component: GestorPage,
           children: [
             {
-              path: 'gestorMain',
+              path: '',
               name: 'GestorHome',
               component: MainComponentGestor
             },
