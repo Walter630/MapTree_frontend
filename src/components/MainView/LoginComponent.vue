@@ -1,10 +1,9 @@
 <template>
   <v-container class="login-container" fluid>
-    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh;">
+    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh">
       <!-- Coluna do formulário -->
       <v-col class="form-section" cols="12" md="4">
         <div class="content-wrapper">
-
           <!-- ✅ LOGO NO TOPO ESQUERDO -->
           <div class="logo-container">
             <img src="/icons/LogoMapTree.png" alt="Logo" class="logo-img" />
@@ -42,7 +41,9 @@
                 :type="showPassword ? 'text' : 'password'"
               >
                 <template #append-inner>
-                  <v-icon @click="showPassword = !showPassword">{{ showPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+                  <v-icon @click="showPassword = !showPassword">{{
+                    showPassword ? 'mdi-eye-off' : 'mdi-eye'
+                  }}</v-icon>
                 </template>
               </v-text-field>
 
@@ -50,7 +51,7 @@
                 block
                 class="mb-2"
                 color="#C6F513"
-                style="display: flex; align-items: center; flex-direction: row;"
+                style="display: flex; align-items: center; flex-direction: row"
                 append-icon="mdi-arrow-right"
                 @click="login"
               >
@@ -58,10 +59,12 @@
               </v-btn>
 
               <div class="text-left mb-2">
-                <a class="forgot-password" @click="$router.push('/recovery')">Esqueceu sua senha?</a>
+                <a class="forgot-password" @click="$router.push('/recovery')"
+                  >Esqueceu sua senha?</a
+                >
               </div>
               <div>
-                <hr class="hr">
+                <hr class="hr" />
               </div>
 
               <v-btn block class="mb-2 google-btn" @click="loginWithGoogle">
@@ -71,18 +74,29 @@
                   height="24"
                   src="https://www.svgrepo.com/show/475656/google-color.svg"
                   width="24"
-                >
+                />
                 Continuar com Google
               </v-btn>
 
               <v-btn block class="mb-2 facebook-btn" @click="loginFacebook">
-                <img class="mr-2" height="22" src="https://www.svgrepo.com/show/475656/facebook-color.svg" width="22">
+                <img
+                  class="mr-2"
+                  height="22"
+                  :src="getFacebookLogo"
+                  width="22"
+                  alt="facebook-action-login"
+                />
                 Continuar com Facebook
               </v-btn>
 
               <div class="text-center mt-4">
                 Não possui uma conta?
-                <a class="register-link" style="color: blue; text-decoration: none;" @click="$router.push('/cadastro')">Cadastre-se</a>
+                <a
+                  class="register-link"
+                  style="color: blue; text-decoration: none"
+                  @click="$router.push('/cadastro')"
+                  >Cadastre-se</a
+                >
                 <v-icon color="blue">mdi-chevron-right</v-icon>
               </div>
             </v-form>
@@ -104,13 +118,77 @@
         :style="isMobile ? 'display: none;' : 'padding: 20px; text-align: center;'"
       >
         <div class="info-text">
-          <h1>Gestão<br>inteligente de<br>vegetação</h1>
+          <h1>Gestão<br />inteligente de<br />vegetação</h1>
         </div>
         <div class="bottom-logo">MapTree</div>
       </v-col>
     </v-row>
   </v-container>
 </template>
+
+<script lang="ts">
+import { defineComponent } from 'vue'
+import facebookLogo from '@/assets/facebook-logo.png'
+import { type LoginRequest, type LoginResponse } from '@/plugins/apiConnect.ts'
+
+export default defineComponent({
+  name: 'LoginComponent',
+  data() {
+    return {
+      username: '',
+      password: '',
+      showPassword: false,
+      valid: false,
+      isMobile: false,
+    }
+  },
+  mounted() {
+    this.checkIsMobile()
+    window.addEventListener('resize', this.checkIsMobile)
+  },
+  beforeUnmount() {
+    window.removeEventListener('resize', this.checkIsMobile)
+  },
+  methods: {
+    checkIsMobile() {
+      this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
+    },
+    async login() {
+      try {
+        const response = await this.$api.post<LoginResponse>('/auth/login', {
+          email: this.username,
+          password: this.password,
+        } as LoginRequest)
+
+        if (response.data) {
+          // Save access token (refresh token comes via HTTP-only cookie)
+          this.$api.setToken(response.data.accessToken)
+          console.log('Login successful:', response.data.accessToken)
+          return response.data.accessToken
+        }
+
+        return null
+      } catch (error) {
+        console.error('Login failed:', error)
+        throw error
+      }
+    },
+    loginWithGoogle() {
+      // Lógica de login com Google aqui
+      console.log('Login com Google')
+    },
+    loginFacebook() {
+      // Lógica de login com Facebook aqui
+      console.log('Login com Facebook')
+    },
+  },
+  computed: {
+    getFacebookLogo() {
+      return facebookLogo
+    },
+  },
+})
+</script>
 
 <style scoped>
 /* Mantendo tudo o que você já tinha */
@@ -176,7 +254,7 @@
 }
 
 .info-section {
-  background-color: #C6F513;
+  background-color: #c6f513;
   display: flex;
   position: relative;
   align-items: center;
