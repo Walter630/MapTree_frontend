@@ -30,7 +30,7 @@
     </v-toolbar-items>
 
     <v-spacer />
-    <v-btn icon :color="isActive('/gestor/notifications') ? green : 'grey-darken-2'" style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;" @click="goTo('/gestor/notifications')">
+    <v-btn icon :color="isActive('/gestor/notifications') ? green : 'black'" style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;" @click="goTo('/gestor/notifications')">
       <v-icon>mdi-bell-outline</v-icon>
     </v-btn>
 

@@ -1,4 +1,4 @@
-  <template>
+<template>
     <v-container class="pa-8" >
       <v-row align="center" justify="space-between" class="mb-8">
         <v-col cols="12" md="6">
@@ -52,7 +52,7 @@
 
       <v-row class="mb-6" dense>
         <v-col cols="12" md="8">
-          <v-card class="pa-4" flat style="border: 1px solid #CDCDCD; background-color: white; border-radius: 12px;">
+          <v-card class="pa-4" flat style="border: 1px solid #CDCDCD; background-color: white; border-radius: 12px; height: 607px; width: 100%">
             <p class="text-subtitle-1 font-weight-medium mb-3 d-flex align-center">
               <v-icon size="18" class="mr-2">mdi-map-marker-path</v-icon>
               Rota de Poda do Dia
@@ -60,11 +60,11 @@
 
             <p class="text-caption text-grey-darken-1 mb-3">4 locais para visitar hoje</p>
 
-            <div style="position: relative;">
+            <div style="position: relative; height: 398px; width: 100%;">
               <PruningMap :tasks="tasks" />
 
               <div class="map-overlay-status">
-                <span class="completion-tag">45%</span>
+
               </div>
             </div>
 
@@ -104,10 +104,10 @@
                 </v-chip>
               </div>
               <p class="text-caption text-grey-darken-1 mb-1">{{ task.details }}</p>
-
+              <v-divider/>
               <v-btn
                 v-if="task.status === 'agendada'"
-                color="black"
+                color="#C1E32899"
                 size="small"
                 flat
                 class="font-weight-bold task-action-btn"
@@ -119,12 +119,12 @@
                 <v-progress-linear
                   model-value="60"
                   height="6"
-                  color="green"
+                  color="#FDFD98"
                   rounded
                   class="mr-3"
                 ></v-progress-linear>
                 <v-btn
-                  color="black"
+                  color="#C1E32899"
                   size="small"
                   flat
                   class="font-weight-bold task-action-btn"
@@ -133,8 +133,7 @@
                   Concluir
                 </v-btn>
               </div>
-              <p v-else-if="task.status === 'concluida'" class="text-caption font-weight-medium mt-2" style="color: green;">
-                <v-icon size="14" class="mr-1">mdi-check-circle</v-icon>
+              <p v-else-if="task.status === 'concluida'" class="text-caption font-weight-medium mt-2" style="background-color: #B3E8A3; height: 24px; width: 100px; border-radius: 9px; text-align: center;">
                 Concluída
               </p>
             </div>
@@ -178,7 +177,7 @@
             </p>
 
             <div class="d-flex justify-center align-center chart-container" style="margin-top: 20px; margin-bottom: 20px;">
-              <DonutChart :data="chartDataset" />
+              <DonutChart :data="chartData" />
             </div>
 
             <div class="d-flex justify-center flex-wrap mt-4 pt-2" style="gap: 12px;">
@@ -208,8 +207,8 @@
 
   <script lang="ts">
   import { defineComponent, ref, computed } from "vue";
-  import DonutChart from "./DonutChart.vue";
-  import PruningMap from './PruningMap.vue';
+  import DonutChart from "./GraficosView/DonutChart.vue";
+  import PruningMap from './MapsView/PruningMap.vue';
 
   // Interfaces de tipagem
   interface MetricCard {
@@ -271,22 +270,6 @@
       };
 
       const tasks = ref<Task[]>([
-        {
-          address: "Rua das Flores, 123",
-          details: "Ipê - 3.2m da rede | 09:00 - 2.2 km",
-          status: 'agendada',
-          tag: { text: "Alta", color: "#C80C34", bgColor: "#FBE0E3" },
-          lat: -23.5505,
-          lng: -46.6333,
-        },
-        {
-          address: "Av. Central, 456",
-          details: "Eucalipto - 1.5m da rede | 10:30 - 3.5 km",
-          status: 'em_progresso',
-          tag: { text: "Média", color: "#A58C00", bgColor: "#FDFD98" },
-          lat: -23.5600,
-          lng: -46.6450,
-        },
 
       ]);
 
