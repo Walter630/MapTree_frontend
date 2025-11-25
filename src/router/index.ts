@@ -1,36 +1,36 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+// Public pages
 import MainComponent from '@/components/MainView/MainComponent.vue'
-import MensageEmailComponent from '@/components/MainView/MensageEmailComponent.vue'
+import EmailMessageComponent from '@/components/MainView/MensageEmailComponent.vue'
 import LoginPage from '@/pages/LoginPage.vue'
-import ResetSenhaComponent from '@/components/MainView/ResetSenhaComponent.vue'
-import CadastroComponent from '@/components/MainView/CadastroComponent.vue'
-// Importação de Componentes de Rotas
+import ResetPasswordComponent from '@/components/MainView/ResetSenhaComponent.vue'
+import RegisterComponent from '@/components/MainView/CadastroComponent.vue'
 import MainPage from '@/pages/MainPage.vue'
-
-//rotas admin
-import MainComponentAdmin from '@/components/AdminView/MainComponentAdmin.vue'
-import GestoresAdminoView from '@/components/AdminView/GestoresAdminoView.vue'
-import AdminPage from '@/pages/AdminPage.vue'
-import EmpresasAdminView from '@/components/AdminView/EmpresasAdminView.vue'
-import CadastroEmpresaAdminView from '@/components/AdminView/CadastroEmpresaAdminView.vue'
-import CadastroGestoresAdminView from '@/components/AdminView/CadastroGestoresAdminView.vue'
-
-
-//rotas gestor
-import GestorPage from '@/pages/GestorPage.vue'
-import MainComponentGestor from '@/components/GestorView/MainComponentGestor.vue'
-import FuncionarioGestorView from '@/components/GestorView/FuncionarioGestorView.vue'
-import CadastroFuncionario from '@/components/GestorView/CadastroFuncionario.vue'
-import RelatoriosGestorView from '@/components/GestorView/RelatoriosGestorView.vue'
-import NotificacoesGestorView from '@/components/GestorView/NotificacoesGestorView.vue'
-
-
-
 import RecoveryPage from '@/pages/RecoveryPage.vue'
+
+// Admin routes
+import AdminMainComponent from '@/components/AdminView/MainComponentAdmin.vue'
+import AdminManagersView from '@/components/AdminView/AdminManagersView.vue'
+import AdminPage from '@/pages/AdminPage.vue'
+import AdminCompaniesView from '@/components/AdminView/AdminCompaniesView.vue'
+import AdminRegisterCompanyView from '@/components/AdminView/AdminRegisterCompanyView.vue'
+import AdminRegisterManagersView from '@/components/AdminView/AdminRegisterManagersView.vue'
+
+// Manager routes
+import ManagerPage from '@/pages/GestorPage.vue'
+import ManagerMainComponent from '@/components/GestorView/ManagerMainComponent.vue'
+import ManagerEmployeesView from '@/components/GestorView/ManagerEmployeesView.vue'
+import RegisterEmployee from '@/components/GestorView/RegisterEmployee.vue'
+import ManagerReportsView from '@/components/GestorView/ManagerReportsView.vue'
+import ManagerNotificationsView from '@/components/GestorView/ManagerNotificationsView.vue'
+
+// Outsourced employee
+import OutsourcedEmployeeMain from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
 
 // Store
 import { useAppStore } from '@/stores/app.ts'
+import { apiConnect } from '@/plugins/apiConnect.ts'
 import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
 
 const router = createRouter({
@@ -40,173 +40,110 @@ const router = createRouter({
       path: '/',
       component: MainPage,
       children: [
-        {
-          path: '',
-          name: 'Main',
-          component: MainComponent,
-          meta: { requiresAuth: true },
-        },
-        {
-          path: 'logout',
-          name: 'Logout',
-          component: MainComponent,
-          meta: { requiresAuth: false },
-        },
-        {
-          path: 'login',
-          name: 'Login',
-          component: LoginPage,
-          meta: { requiresAuth: false },
-        },
-        {
-          path: 'cadastro',
-          name: 'Cadastro',
-          component: CadastroComponent,
-          meta: { requiresAuth: false },
-        },
-        {
-          path: 'recovery',
-          name: 'recovery',
-          component: RecoveryPage,
-          meta: { requiresAuth: false },
-        },
-        {
-          path: 'recovery-code',
-          name: 'recovery-code',
-          component: MensageEmailComponent,
-          meta: { requiresAuth: false },
-        },
-        {
-          path: 'reset-senha',
-          name: 'reset-senha',
-          component: ResetSenhaComponent,
-          meta: { requiresAuth: false },
-        },
+        { path: '', name: 'Main', component: MainComponent, meta: { requiresAuth: true } },
+
+        // Public routes
+        { path: 'login', name: 'Login', component: LoginPage },
+        { path: 'register', name: 'Register', component: RegisterComponent },
+        { path: 'recovery', name: 'Recovery', component: RecoveryPage },
+        { path: 'recovery-code', name: 'RecoveryCode', component: EmailMessageComponent },
+        { path: 'reset-password', name: 'ResetPassword', component: ResetPasswordComponent },
+        { path: 'logout', name: 'Logout', component: MainComponent },
+
+        /* ============================
+           ADMIN ROUTES
+        ============================= */
         {
           path: 'admin',
-          name: 'Admin',
           component: AdminPage,
+          meta: { requiresAuth: true, role: 'ADMIN' },
           children: [
-            {
-              path: '',
-              name: 'AdminHome',
-              component: MainComponentAdmin,
-              meta: { requiresAuth: false },
-            },
-            {
-              path: 'gestores',
-              name: 'Gestores',
-              component: GestoresAdminoView,
-              meta: { requiresAuth: false },
-            },
-            {
-              path: 'empresas',
-              name: 'Empresas',
-              component: EmpresasAdminView,
-              meta: { requiresAuth: false },
-            },
-            {
-              path: 'cadastro-empresa',
-              name: 'CadastroEmpresa',
-              component: CadastroEmpresaAdminView,
-              meta: { requiresAuth: false },
-            },
-            {
-              path: 'cadastro-gestores',
-              name: 'CadastroGestores',
-              component: CadastroGestoresAdminView,
-              meta: { requiresAuth: false },
-            },
+            { path: '', name: 'AdminHome', component: AdminMainComponent },
+            { path: 'managers', name: 'AdminManagers', component: AdminManagersView },
+            { path: 'companies', name: 'AdminCompanies', component: AdminCompaniesView },
+            { path: 'register-company', name: 'AdminRegisterCompany', component: AdminRegisterCompanyView },
+            { path: 'register-managers', name: 'AdminRegisterManagers', component: AdminRegisterManagersView },
+          ],
+        },
+
+        /* ============================
+           MANAGER ROUTES (GESTOR)
+        ============================= */
+        {
+          path: 'manager',
+          component: ManagerPage,
+          meta: { requiresAuth: true, role: 'MANAGER' },
+          children: [
+            { path: '', name: 'ManagerHome', component: ManagerMainComponent },
+            { path: 'employees', name: 'ManagerEmployees', component: ManagerEmployeesView },
+            { path: 'register-employee', name: 'RegisterEmployee', component: RegisterEmployee },
+            { path: 'reports', name: 'ManagerReports', component: ManagerReportsView },
+            { path: 'notifications', name: 'ManagerNotifications', component: ManagerNotificationsView },
+          ],
+        },
+
+        /* ============================
+           OUTSOURCED EMPLOYEE
+        ============================= */
+        {
+          path: 'outsourced-employee',
+          component: OutsourcedEmployeeMain,
+          meta: { requiresAuth: true, role: 'OUTSOURCED' },
+          children: [
+            { path: '', name: 'OutsourcedEmployeeHome', component: MainFuncionarioTerc },
           ],
         },
         {
-          path: 'gestor',
-          name: 'GestorPage',
-          component: GestorPage,
-          children: [
-            {
-              path: '',
-              name: 'GestorHome',
-              component: MainComponentGestor
-            },
-            {
-              path: 'funcionarios',
-              name: 'Funcionarios',
-              component: FuncionarioGestorView
-            },
-            {
-              path: 'cadastro-funcionario',
-              name: 'CadastroFuncionario',
-              component: CadastroFuncionario,
-              meta: { requiresAuth: false },
-            },
-            {
-              path: 'relatorios',
-              name: 'Relatorios',
-              component: RelatoriosGestorView
-            },
-            {
-              path: 'notifications',
-              name: 'Notifications',
-              component: NotificacoesGestorView
-            },
-
-          ],
-         },
-          {
-          path: 'funcionario-terceirizado',
-          name: 'FuncionarioTerceirizado',
+          path: 'employees',
+          name: 'Employees',
           component: MainFuncionarioTerc,
-          children: [
-            {
-              path: '',
-              name: 'FuncionarioTerceirizadoHome',
-              component: MainFuncionarioTerc
-            }
-          ],
-          },
+          meta: { requiresAuth: true, role: 'USER' },
+        }
       ],
     },
   ],
 })
+/*
+/* ============================
+   BEFORE EACH (AUTH GUARD)
+=============================== */
+/*
+router.beforeEach((to, from, next) => {
+  const store = useAppStore()
 
-// router.beforeEach((to, from, next) => {
-// localStorage.removeItem('user-data')
-// const store = useAppStore()
-// const auth = store.getAuthInstance
+  const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
+  const requiredRole = to.meta.role
 
-// let alreadyCalled = false // Controlador para evitar chamadas duplicadas
+  const isLogged = apiConnect.isAuthenticated()
+  const user = store.user // aqui assume que você guarda user após login
 
-// onAuthStateChanged(auth, (user) => {
-// if (alreadyCalled) return // Se já foi chamado, não continua
-// alreadyCalled = true // Marca como já chamado
+  // 1. Usuário não autenticado e rota exige auth
+  if (requiresAuth && !isLogged) {
+    return next({ name: 'Login' })
+  }
 
-// if (user && to.matched.some((record) => record.meta.requiresAuth)) {
-//   // Usuário está logado e a rota requer autenticação
-//   next()
-// } else if (!user && to.matched.some((record) => record.meta.requiresAuth)) {
-//   // Usuário não está logado e a rota requer autenticação
-//  next({ name: 'Admin Login' })
-// } else {
-//   // Rota não requer autenticação
-//   next()
-// }
-// })
-// })
+  // 2. Rota exige role específica
+  if (requiredRole && user?.role !== requiredRole) {
+    return next({ name: 'Main' }) // Sem permissão
+  }
 
-// router.afterEach((to) => {
-// document.title = to.name.toString() + ' — MapTree'
-// const store = useAppStore()
-// setTimeout(() => {
-//  store.setLoadingPage(false)
-// }, 500)
+  next()
+})*/
 
-// setTimeout(() => {
-//   window.scrollTo({
-//    top: 0,
-// behavior: 'smooth'
-//   })
-// }, 600)
-// })
+/* ============================
+        AFTER EACH
+=============================== */
+/*
+router.afterEach((to) => {
+  const store = useAppStore()
+
+  document.title = `${to.name?.toString() ?? 'App'} — MapTree`
+
+  setTimeout(() => store.setLoadingPage(false), 500)
+
+  setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, 600)
+})*/
 
 export default router

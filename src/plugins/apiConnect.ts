@@ -32,6 +32,16 @@ export interface LoginResponse {
   user: User
 }
 
+export interface Company {
+  id: string
+  name: string
+  taxId: string        // CNPJ ou CPF da empresa
+  isOutsourced: boolean     //se é terceirizada
+  managerId: string
+  isActive: boolean
+}
+
+
 class ApiConnect {
   private axiosInstance: AxiosInstance
   private isRefreshing = false

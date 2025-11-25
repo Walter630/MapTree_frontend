@@ -1,6 +1,6 @@
 <template>
   <!-- DESKTOP -->
-  <v-app-bar color="white" flat v-if="!isMobile">
+  <v-app-bar color="white" flat v-if="!isMobile" style="margin: 1px 0">
 
     <!-- Logo -->
     <img
@@ -30,12 +30,12 @@
     </v-toolbar-items>
 
     <v-spacer />
-    <v-btn icon :color="isActive('/gestor/notifications') ? green : 'black'" style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;" @click="goTo('/gestor/notifications')">
+    <v-btn icon :color="isActive('/notifications') ? green : 'black'" style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;" @click="goTo('/gestor/notifications')">
       <v-icon>mdi-bell-outline</v-icon>
     </v-btn>
 
     <!-- Perfil -->
-    <v-avatar size="45" color="grey-darken-2" @click="goTo('')">
+    <v-avatar size="45" color="grey-darken-2" style="margin-right: 20px;" @click="goTo('')">
       <img
         src="@/assets/Logomaptreeverde.png"
         alt="Perfil"
@@ -70,78 +70,67 @@
     </v-navigation-drawer>
   </v-app-bar>
 </template>
-
 <script lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app'
+
+interface MenuItem {
+  title: string
+  icon: string
+  to: string
+}
 
 export default {
   name: 'AppBarComponent',
+
   setup() {
+    const store = useAppStore()
     const route = useRoute()
     const router = useRouter()
 
     const drawer = ref(false)
-    const isMobile = ref(false)
     const green = '#C1E328'
 
-    // 🔥 MENUS BASEADOS NAS SUAS ROTAS
-    const menus = {
-      admin: [
+    // 🔥 MENUS POR ROLE
+    const menus: Record<string, MenuItem[]> = {
+      ADMIN: [
         { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
-        { title: 'Empresas', icon: 'mdi-domain', to: '/admin/empresas' },
-        { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/gestores' },
+        { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
+        { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
       ],
 
-      gestor: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/gestor' },
-        { title: 'Funcionários', icon: 'mdi-account-group', to: '/gestor/funcionarios' },
-        { title: 'Relatórios', icon: 'mdi-file-chart', to: '/gestor/relatorios' },
-        { title: 'Podas', icon: 'mdi-leaf'}
+      MANAGER: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
+        { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
+        { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
       ],
 
-      user: [
+      USER: [
         { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
         { title: 'Podas', icon: 'mdi-content-cut', to: '/podas' },
         { title: 'Relatórios', icon: 'mdi-file-chart', to: '/relatorios' }
       ],
 
-      funcionario_terceirizado: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
-        { title: 'Podas', icon: 'mdi-content-cut', to: '/funcionario_terceirizado/podas' },
-        { title: 'rotas', icon: 'mdi-file-chart', to: '/funcionario_terceirizado/relatorios' }
+      USER_CREDENCIADO: [
+        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/credenciado' },
+        { title: 'Rotas', icon: 'mdi-map', to: '/credenciado/rotas' },
+        { title: 'Podas', icon: 'mdi-leaf', to: '/credenciado/podas' },
       ],
 
-      guest: [
+      GUEST: [
         { title: 'Login', icon: 'mdi-login', to: '/login' },
-        { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/cadastro' }
-      ]
+        { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' }
+      ],
     }
 
-    // 🔥 DETECTAR MENU APENAS PELA ROTA → SEM ROLE
-    const currentMenu = computed(() => {
-      const path = route.path
+    // 🔥 MENU BASEADO NO USUÁRIO LOGADO
+    const currentMenu = computed<MenuItem[]>(() => {
+      const role = store.user?.role
 
-      if (path.startsWith('/admin')) return menus.admin
-      if (path.startsWith('/gestor')) return menus.gestor
-      if (path.startsWith('/funcionario-terceirizado')) return menus.funcionario_terceirizado
+      if (!role) return menus.GUEST
 
-      // Usuário comum
-      if (path === '/' || path.startsWith('/podas') || path.startsWith('/relatorios')) {
-        return menus.user
-      }
-
-
-      // Visitante
-      if (
-        path.startsWith('/login') ||
-        path.startsWith('/cadastro') ||
-        path.startsWith('/recovery')
-      ) {
-        return menus.guest
-      }
-
-      return menus.guest
+      return menus[role] ?? menus.GUEST
     })
 
     const isActive = (path: string) => route.path === path
@@ -151,8 +140,11 @@ export default {
       drawer.value = false
     }
 
+    // MOBILE
+    const isMobile = computed(() => store.isMobile)
+
     const checkMobile = () => {
-      isMobile.value = window.innerWidth < 960
+      store.setIsMobile(window.innerWidth < 960)
     }
 
     onMounted(() => {

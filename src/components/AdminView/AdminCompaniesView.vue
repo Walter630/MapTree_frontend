@@ -5,7 +5,7 @@
         <div class="d-flex align-center mb-6">
           <span class="text-caption text-grey-darken-1">Meu Painel</span>
           <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" style="color: #2F3367;">#Empresas</span>
+          <span class="text-caption font-weight-bold" style="color: #2f3367">#Empresas</span>
         </div>
 
         <div class="d-flex align-center">
@@ -55,8 +55,13 @@
           <v-icon class="mr-2 filter-icon">mdi-filter-variant</v-icon>
           <p class="filter-text">Filtros</p>
         </div>
-        <v-row align="center" no-gutters>
-          <v-col cols="12" sm="4" md="3" class="pr-4">
+        <v-row
+          align="center"
+          no-gutters
+          style="display: flex; align-items: center; justify-content: space-between"
+        >
+          <v-col cols="12" sm="4" md="2" class="pr-4">
+            <p class="mb-2">Empresa</p>
             <v-select
               v-model="filterEmpresa"
               :items="contas"
@@ -68,7 +73,9 @@
               class="filter-field"
             />
           </v-col>
-          <v-col cols="12" sm="4" md="3" class="pr-4">
+
+          <v-col cols="12" sm="4" md="2" class="pr-4">
+            <p class="mb-2">Nome</p>
             <v-text-field
               v-model="search"
               label="Nome"
@@ -80,7 +87,9 @@
               class="filter-field"
             />
           </v-col>
-          <v-col cols="12" sm="4" md="3" class="pr-4">
+
+          <v-col cols="12" sm="4" md="2" class="pr-4">
+            <p class="mb-2">Cidade</p>
             <v-select
               v-model="filterCidade"
               :items="cidades"
@@ -93,12 +102,7 @@
             />
           </v-col>
           <v-col cols="auto">
-            <v-btn
-              color="black"
-              class="text-white buscar-btn"
-              height="40"
-              @click="applyFilters"
-            >
+            <v-btn color="black" class="text-white buscar-btn" height="40" @click="applyFilters">
               BUSCAR
             </v-btn>
           </v-col>
@@ -109,6 +113,7 @@
     <v-row class="mt-8">
       <v-col cols="12" class="pa-0">
         <p class="table-title-text mb-4">Empresas Cadastradas</p>
+        {{ getCompanies() }}
         <v-data-table
           :headers="headers"
           :items="empresas"
@@ -140,20 +145,23 @@
           </template>
 
           <template #item.acoes="{ item }">
-            <v-icon size="small" class="mr-2 action-icon" @click="editItem(item)">mdi-square-edit-outline</v-icon>
-            <v-icon size="small" class="action-icon" @click="deleteItem(item)">mdi-trash-can-outline</v-icon>
+            <v-icon size="small" class="mr-2 action-icon" @click="editItem(item)"
+              >mdi-square-edit-outline</v-icon
+            >
+            <v-icon size="small" class="action-icon" @click="deleteItem(item)"
+              >mdi-trash-can-outline</v-icon
+            >
           </template>
-
         </v-data-table>
       </v-col>
     </v-row>
   </v-container>
-
 </template>
 
 <script lang="ts">
 import { defineComponent } from 'vue'
 import router from '@/router'
+import { apiConnect, type Company } from '@/plugins/apiConnect.ts'
 
 interface Empresa {
   id: string;
@@ -212,11 +220,21 @@ export default defineComponent({
       }
     },
 
+    async getCompanies(): Promise<Company[]> {
+      try {
+        const response = await this.$api.get<Company[]>('/organizations')
+        return response.data
+      } catch (error) {
+        console.error('Failed to fetch companies:', error)
+        return []
+      }
+    },
+
     goBack() {
       console.log('Voltar para a página anterior')
     },
     addEmpresa() {
-      router.push('/admin/cadastro-empresa')
+      router.push('/admin/register-company')
     },
     applyFilters() {
       console.log('Filtros aplicados:', this.filterEmpresa, this.search, this.filterCidade)
@@ -236,8 +254,8 @@ export default defineComponent({
 
 /* Container mais compacto */
 .empresas-container {
-  max-width: 1200px;
-  padding-top: 20px !important;
+  margin-top: 20px;
+  padding: 24px;
 }
 
 /* Título + voltar */
@@ -262,7 +280,7 @@ export default defineComponent({
 /* Botão Novo Empresa — estilo Gestores */
 .new-empresa-btn {
   height: 42px !important;
-  background: #C6F513 !important;
+  background: #c6f513 !important;
   border-radius: 8px;
   margin-top: -10px !important;
   margin-bottom: 10px !important;
@@ -279,9 +297,15 @@ export default defineComponent({
   min-height: 120px !important;
 }
 
-.summary-title { font-size: 13px; }
-.summary-value { font-size: 26px; }
-.summary-note { font-size: 12px; }
+.summary-title {
+  font-size: 13px;
+}
+.summary-value {
+  font-size: 26px;
+}
+.summary-note {
+  font-size: 12px;
+}
 
 /* ---- FILTROS ---- */
 
@@ -289,7 +313,7 @@ export default defineComponent({
   border-radius: 8px;
   padding: 18px !important;
   margin-top: 20px !important;
-  background: #F9FAFB !important;
+  background: #f9fafb !important;
 }
 
 .filter-field {
@@ -299,7 +323,7 @@ export default defineComponent({
 .buscar-btn {
   height: 38px !important;
   border-radius: 8px;
-  padding: 0 18px !important;
+  padding: 0 13px !important;
 }
 
 /* ---- TABELA ---- */

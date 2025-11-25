@@ -1,28 +1,25 @@
 // Utilities
 import { defineStore } from 'pinia'
-import type { User } from '@/plugins/apiConnect.ts'
+import type { User } from '@/plugins/apiConnect'
 
 export const useAppStore = defineStore('app', {
   state: () => ({
-    //
-    user: {},
-    loadingPage: false,
-    auth: null,
+    user: null as User | null,
     isMobile: false,
-    logout: false,
+    loadingPage: false,
   }),
+
   actions: {
-    setUser (user: User) {
+    setUser(user: User | null) {
       this.user = user
     },
-    setLoadingPage (loading: boolean) {
-      this.loadingPage = loading
+
+    setIsMobile(value: boolean) {
+      this.isMobile = value
     },
-    setIsMobile (isMobile: boolean) {
-      this.isMobile = isMobile
-    },
-    logout () {
-      this.user = {};
+
+    setLoadingPage(value: boolean) {
+      this.loadingPage = value
     },
   },
 })

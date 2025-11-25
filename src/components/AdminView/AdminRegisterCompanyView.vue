@@ -1,16 +1,24 @@
 <template>
-  <v-container class="py-8" style="max-width: 1100px">
+  <v-container class="cadastro-funcionario-container">
 
-    <!-- Breadcrumb -->
-    <p class="text-caption" style="color: #667085; margin-bottom: 20px">
-      Meu Painel > Empresas > #CadastrarEmpresas
-    </p>
+    <v-row>
+      <v-col cols="12">
+        <div class="d-flex align-center mb-2">
+          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
+          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
+          <span class="text-caption font-weight-bold" @click="goBack">Empresas</span>
+          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
+          <span class="text-caption font-weight-bold" color="#2F3367">#CadastrarEmpresas</span>
+        </div>
+      </v-col>
+
+    </v-row>
 
     <!-- Header -->
-    <v-row class="align-center mb-6">
-      <v-col cols="auto">
+    <v-row class="mb-6" style="align-items: center; margin: 0 0">
+      <v-col cols="auto" class="d-flex align-center" style="margin-right: auto">
         <v-btn
-          style="border: 1px solid #D0D5DD; height: 48px; width: 48px; background-color: #F9FAFB"
+          style="border: 1px solid #d0d5dd; height: 48px; width: 48px; background-color: #f9fafb"
           class="rounded-lg"
           @click="goBack"
         >
@@ -22,62 +30,53 @@
         <h1 style="color: #101828; font-size: 24px; font-weight: 600; margin-bottom: 4px">
           Cadastro de Empresas
         </h1>
-        <p style="color: #667085; font-size: 16px">
-          Cadastre as empresas e seus dados principais.
-        </p>
+        <p style="color: #667085; font-size: 16px">Cadastre as empresas e seus dados principais.</p>
       </v-col>
     </v-row>
 
     <!-- CARD DO FORMULÁRIO -->
     <v-card
-      elevation="1"
-      class="pa-8 rounded-xl"
-      style="border: 1px solid #EAECF0; background: white;"
+      elevation="0"
+      class="pa-8"
+      style="background: white; margin: 0 0"
     >
       <v-form ref="form" v-model="valid" lazy-validation>
-
         <v-row>
           <!-- COLUNA 1 -->
           <v-col cols="12" md="6" class="d-flex flex-column gap-4">
-
             <div>
               <label class="field-label">Nome da Empresa</label>
               <v-text-field
-                v-model="formData.nome"
-                :rules="[rules.required]"
+                v-model="name"
                 placeholder="Digite o nome"
                 class="custom-field"
-                density="comfortable"
-              ></v-text-field>
-            </div>
-
-            <div>
-              <label class="field-label">Email</label>
-              <v-text-field
-                v-model="formData.email"
-                :rules="[rules.required, rules.email]"
-                placeholder="Digite o email"
-                class="custom-field"
-                density="comfortable"
               ></v-text-field>
             </div>
 
             <div>
               <label class="field-label">CNPJ</label>
               <v-text-field
-                v-model="formData.cnpj"
-                :rules="[rules.required]"
+                v-model="taxId"
                 placeholder="Digite o CNPJ"
                 class="custom-field"
                 density="comfortable"
               ></v-text-field>
             </div>
 
+            <div>
+              <label class="field-label">Gerente</label>
+              <v-text-field
+                v-model="managerId"
+                placeholder="Digite o gerente"
+                class="custom-field"
+                density="comfortable"
+              ></v-text-field>
+            </div>
           </v-col>
+        </v-row>
 
           <!-- COLUNA 2 -->
-          <v-col cols="12" md="6" class="d-flex flex-column gap-4">
-
+          <!--<v-col cols="12" md="6" class="d-flex flex-column gap-4">
             <div>
               <label class="field-label">Número do Contato</label>
               <v-text-field
@@ -121,7 +120,7 @@
               ></v-select>
             </div>
           </v-col>
-        </v-row>
+        </v-row>-->
 
         <!-- BOTÕES -->
         <v-row class="mt-6">
@@ -131,7 +130,7 @@
               color="#4CAF50"
               style="color: white; font-weight: 600; width: 180px; height: 48px"
               class="rounded-lg"
-              @click="submitForm"
+              @click="createCompany"
             >
               SALVAR
             </v-btn>
@@ -146,76 +145,67 @@
             </v-btn>
           </v-col>
         </v-row>
-
       </v-form>
     </v-card>
   </v-container>
 </template>
 
 <script lang="ts">
-export default {
-  name: 'CadastroEmpresas',
+import { defineComponent } from 'vue'
+import { type Company } from '@/plugins/apiConnect.ts'
 
+export default defineComponent ({
   data() {
     return {
-      valid: false,
-
-      formData: {
-        nome: '',
-        email: '',
-        cnpj: '',
-        contato: '',
-        status: '',
-        plano: ''
-      },
-
-      status: ['Ativo', 'Inativo'],
-      planos: ['Plano 1', 'Plano 2', 'Plano 3', 'Plano 4'],
-
-      rules: {
-        required: v => !!v || "Campo obrigatório.",
-        email: v => /.+@.+\..+/.test(v) || "Email inválido.",
-        contactFormat: v =>
-          (v && v.replace(/[^0-9]/g, "").length >= 10) ||
-          "Contato deve ter pelo menos 10 dígitos."
-      }
-    };
+      name: '',
+      taxId: '',
+      isOutsourced: false,
+      managerId: '',
+      isActive: true,
+      valid: true,
+      isMobile: false,
+    }
   },
 
-  methods: {
-    goBack() {
-      this.$router.go(-1);
+    mounted() {
+      this.checkIsMobile()
+      window.addEventListener('resize', this.checkIsMobile)
     },
-
-    async submitForm() {
-      const { valid } = await this.$refs.form.validate();
-
-      if (!valid) return;
-
-      console.log("Enviando dados:", this.formData);
-      alert("Empresa cadastrada com sucesso!");
-      this.resetForm();
+    beforeUnmount() {
+      window.removeEventListener('resize', this.checkIsMobile)
     },
+    methods: {
+      checkIsMobile() {
+        this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
+      },
+      goBack() {
+        this.$router.push("/admin/companies");
+      },
 
-    resetForm() {
-      this.formData = {
-        nome: '',
-        email: '',
-        cnpj: '',
-        contato: '',
-        status: '',
-        plano: ''
-      };
-    },
+      async createCompany(companyData: Omit<Company, 'id'>): Promise<Company | null> {
+        try {
+          const response = await this.$api.post<Company>('/organizations', companyData)
+          return response.data
+        } catch (error) {
+          console.error('Failed to create company:', error)
+          throw error
+        }
+      },
 
-    cancelForm() {
-      this.resetForm();
+      cancelForm() {
+        this.$router.push("/admin/companies");
+      },
+
     }
-  }
-};
+})
 </script>
 
 <style scoped>
+/* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
+.cadastro-funcionario-container {
+  margin-top: 20px;
+  padding: 24px;
+}
 .field-label {
   font-size: 14px;
   font-weight: 500;
@@ -225,8 +215,8 @@ export default {
 }
 
 .custom-field :deep(.v-field__field) {
-  background: #F9FAFB;
-  border: 1px solid #D0D5DD;
+  background: #f9fafb;
+  border: 1px solid #d0d5dd;
   border-radius: 8px;
 }
 </style>

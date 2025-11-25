@@ -1,2 +1,2 @@
-// This file intentionally left blank to allow @types/leaflet to provide typings
+  // This file intentionally left blank to allow @types/leaflet to provide typings
 

@@ -1,8 +1,17 @@
 <template>
   <v-container class="cadastro-funcionario-container">
-    <div class="text-caption" style="margin-bottom: 20px; color: #667085;">
-      Meu Painel > Funcionários > #CadastrarGestores
-    </div>
+    <v-row>
+      <v-col cols="12">
+        <div class="d-flex align-center mb-2">
+          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
+          <v-icon small class="mx-1 text-grey-darken-1" color="#2F3367">mdi-chevron-right</v-icon>
+          <span class="text-caption font-weight-bold"  @click="goBack">Empresas</span>
+          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
+          <span class="text-caption font-weight-bold" >#CadastrarEmpresas</span>
+        </div>
+      </v-col>
+
+    </v-row>
     <v-row class="mb-5 align-center">
       <v-col cols="auto" class="py-0">
         <v-btn icon depressed style="box-shadow: none; border: 1px solid #D0D5DD; height: 56px; width: 56px; border-radius: 8px; background-color: #FFF;" @click="goBack">
@@ -25,14 +34,9 @@
           <div class="input-group">
             <p class="input-label">Nome do Gestor</p>
             <v-text-field
-              v-model="formData.nome"
+              v-model="formData.name"
               :rules="[rules.required]"
               placeholder="Digite o nome"
-              flat
-              solo
-              dense
-              background-color="#FFFFFF"
-              class="custom-text-field"
             ></v-text-field>
           </div>
           <div class="input-group">
@@ -41,11 +45,6 @@
               v-model="formData.email"
               :rules="[rules.required, rules.email]"
               placeholder="Digite o email"
-              flat
-              solo
-              dense
-              background-color="#FFFFFF"
-              class="custom-text-field"
             >
               <template v-slot:label>
                 <span style="color: #667085; font-size: 0.875rem;">Endereço de Email</span>
@@ -55,15 +54,11 @@
           <div class="input-group">
             <p class="input-label">Senha</p>
             <v-text-field
-              v-model="formData.senha"
+              v-model="formData.password"
               :rules="[rules.required, rules.minPassword]"
               placeholder="Digite a senha"
               type="password"
-              flat
-              solo
-              dense
-              background-color="#FFFFFF"
-              class="custom-text-field"
+
             ></v-text-field>
           </div>
         </v-col>
@@ -72,15 +67,11 @@
           <div class="input-group">
             <p class="input-label">Número de Contato</p>
             <v-text-field
-              v-model="formData.contato"
+              v-model="formData.phone"
               :rules="[rules.required, rules.contactFormat]"
               placeholder="555-555-1234"
               mask="###-###-####"
-              flat
-              solo
-              dense
-              background-color="#FFFFFF"
-              class="custom-text-field contact-field"
+
             >
               <template v-slot:prepend-inner>
                 <div class="d-flex align-center mr-2">
@@ -97,11 +88,7 @@
               :items="empresas"
               :rules="[rules.required]"
               placeholder="Nome da Empresa"
-              flat
-              solo
-              dense
-              background-color="#FFFFFF"
-              class="custom-text-field"
+
             ></v-select>
           </div>
         </v-col>
@@ -136,17 +123,22 @@
 </template>
 
 <script lang="ts">
+import type { User } from '@/plugins/apiConnect.ts'
+
 export default {
   name: 'CadastroFuncionario',
   data() {
     return {
       valid: false,
       formData: {
-        nome: '',
+        name: '',
         email: '',
-        senha: '',
-        contato: '',
-        empresa: null,
+        phone: '',
+        password: '',
+        cpf: '',
+        empresa: '',
+        role: 'manager',
+        isActive: true,
       },
       empresas: ['Empresa 1', 'Empresa 2', 'Empresa 3', 'Empresa 4'],
       rules: {
@@ -162,8 +154,21 @@ export default {
   },
   methods: {
     goBack() {
-      this.$router.push('/admin/gestores')
+      this.$router.push('/admin/managers')
       // this.$router.go(-1);
+    },
+    async registrar() {
+      try {
+        const response = await this.$api.post<User>('/auth/register', this.formData);
+        if (response.status === 201) {
+          this.$router.push('/admin/managers')
+        } else {
+          console.log('Erro no registro: ', response);
+        }
+      } catch (error) {
+        console.error('Erro no registro: ', error);
+        alert('Erro no registro: ' + error)
+      }
     },
     async submitForm() {
       const { valid } = await (this.$refs.form as HTMLFormElement).validate();
@@ -179,11 +184,12 @@ export default {
     resetForm() {
       (this.$refs.form as HTMLFormElement).reset();
       this.formData = {
-        nome: '',
+        name: '',
         email: '',
-        senha: '',
-        contato: '',
-        empresa: null,
+        cpf: '',
+        password: '',
+        phone: '',
+        empresa: '',
       };
     },
     cancelForm() {
@@ -196,9 +202,8 @@ export default {
 
 <style scoped>
 .cadastro-funcionario-container {
-  padding: 32px; /* Aumentado para dar mais respiro lateral */
-  background-color: #F9FAFB; /* Fundo mais claro para contrastar com os campos brancos */
-  min-height: 100vh; /* Para garantir que o fundo ocupe toda a altura */
+  margin-top: 20px;
+  padding: 24px;
 }
 
 .input-group {

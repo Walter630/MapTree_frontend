@@ -30,7 +30,7 @@
         <v-col cols="12" md="4" >
           <p>Nome do Funcionario</p>
           <v-text-field
-            v-model="formData.nome"
+            v-model="formData.name"
             :rules="[rules.required]"
             label="Nome do Funcionário"
             placeholder="Digite o nome"
@@ -52,7 +52,7 @@
           </v-text-field>
           <p>Senha</p>
           <v-text-field
-            v-model="formData.senha"
+            v-model="formData.password"
             :rules="[rules.required, rules.minPassword]"
             label="Senha"
             placeholder="Digite a senha"
@@ -60,22 +60,23 @@
             outlined
             dense
           ></v-text-field>
-          <p>Função</p>
-          <v-select
-            v-model="formData.funcao"
-            :items="funcoes"
-            :rules="[rules.required]"
-            label="Função"
-            placeholder="Poda"
-            outlined
-            dense
-          ></v-select>
+
         </v-col>
 
         <v-col cols="12" md="4">
+          <p>CPF</p>
+          <v-text-field
+            v-model="formData.cpf"
+            :rules="[rules.required]"
+            label="CPF"
+            placeholder="000.000.000-00"
+            outlined
+            dense
+            mask="###.###.###-##"
+          ></v-text-field>
           <p>Numero do Contato</p>
           <v-text-field
-            v-model="formData.contato"
+            v-model="formData.phone"
             :rules="[rules.required, rules.contactFormat]"
             label="Número de Contato"
             placeholder="(88) 00000-0000"
@@ -91,16 +92,6 @@
             </template>
 
           </v-text-field>
-          <p>Cidade</p>
-          <v-select
-            v-model="formData.cidade"
-            :items="cidades"
-            :rules="[rules.required]"
-            label="Cidade"
-            placeholder="Fortaleza, Ce"
-            outlined
-            dense
-          ></v-select>
         </v-col>
       </v-row>
 
@@ -112,7 +103,7 @@
             dark
             large
             class="mr-4"
-            @click="submitForm"
+            @click="registrar"
           >
             SALVAR
           </v-btn>
@@ -132,20 +123,22 @@
 </template>
 
 <script lang="ts">
+import type { User } from '@/plugins/apiConnect.ts'
+
 export default {
   name: 'CadastroFuncionario',
   data() {
     return {
+      formData: {
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        cpf: '',
+
+      },
       valid: false,
       search: '',
-      formData: {
-        nome: '',
-        email: '',
-        senha: '',
-        funcao: null,
-        contato: '',
-        cidade: null,
-      },
       funcoes: ['Poda', 'Plantio', 'Irrigação', 'Administrativo'],
       cidades: ['Fortaleza, Ce', 'Limoeiro do Norte, Ce', 'Aquiraz, Ce', 'Eusébio, Ce'],
       rules: {
@@ -164,6 +157,19 @@ export default {
     goBack() {
       // Lógica para voltar, como this.$router.go(-1) ou um evento de emit
       this.$router.push("/gestor/funcionarios")
+    },
+    async registrar() {
+      try {
+        const response = await this.$api.post<User>('/users', this.formData);
+        if (response.status === 201) {
+          this.$router.push('/manager/employees')
+        } else {
+          console.log('Erro no registro: ', response);
+        }
+      } catch (error) {
+        console.error('Erro no registro: ', error);
+        alert('Erro no registro: ' + error)
+      }
     },
     performSearch() {
       // Lógica de pesquisa
@@ -188,12 +194,11 @@ export default {
     resetForm() {
       this.$refs.form.reset();
       this.formData = {
-        nome: '',
+        name: '',
         email: '',
-        senha: '',
-        funcao: null,
-        contato: '',
-        cidade: null,
+        password: '',
+        cpf: '',
+        phone: '',
       };
     },
     cancelForm() {
@@ -208,10 +213,8 @@ export default {
 <style scoped>
 /* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
 .cadastro-funcionario-container {
-
   margin-top: 20px;
   padding: 24px;
-
 }
 
 /* Ajuste para o campo de contato, simulando o campo de código de país como parte do input */

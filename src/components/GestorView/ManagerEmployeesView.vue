@@ -28,7 +28,7 @@
           size="large"
           prepend-icon="mdi-plus"
           class="font-weight-bold text-black"
-          @click="$router.push('/gestor/cadastro-funcionario')"
+          @click="$router.push('/manager/register-employee')"
         >
           ADICIONAR FUNCIONÁRIO
 
