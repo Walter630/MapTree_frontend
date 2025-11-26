@@ -94,7 +94,7 @@
                 <a
                   class="register-link"
                   style="color: blue; text-decoration: none"
-                  @click="$router.push('/cadastro')"
+                  @click="$router.push('/register')"
                   >Cadastre-se</a
                 >
                 <v-icon color="blue">mdi-chevron-right</v-icon>
@@ -164,6 +164,7 @@ export default defineComponent({
           // Save access token (refresh token comes via HTTP-only cookie)
           this.$api.setToken(response.data.accessToken)
           console.log('Login successful:', response.data.accessToken)
+          this.$router.push('/admin')
           return response.data.accessToken
         }
 

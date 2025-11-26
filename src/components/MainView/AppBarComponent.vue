@@ -128,9 +128,9 @@ export default {
     const currentMenu = computed<MenuItem[]>(() => {
       const role = store.user?.role
 
-      if (!role) return menus.GUEST
+      if (!role) return menus.ADMIN
 
-      return menus[role] ?? menus.GUEST
+      return menus[role] ?? menus.ADMIN
     })
 
     const isActive = (path: string) => route.path === path

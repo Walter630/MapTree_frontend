@@ -13,7 +13,7 @@
           <h2 class="title">Bem-vindo(a)!</h2>
 
           <v-form ref="form" v-model="valid" lazy-validation>
-            <p>Nome da Empresa</p>
+            <p>Nome</p>
             <v-text-field
               v-model="formData.name"
               color="green"
@@ -26,10 +26,36 @@
               required
             ></v-text-field>
 
-            <p >Email Corporativo</p>
+            <p>CPF</p>
+            <v-text-field
+              v-model="formData.cpf"
+              color="green"
+              class="mb-4"
+              dense
+              hide-details
+              label="Nome"
+              variant="outlined"
+              placeholder="Digite seu nome"
+              required
+            ></v-text-field>
+
+            <p>Telefone</p>
+            <v-text-field
+              v-model="formData.phone"
+              color="green"
+              class="mb-4"
+              dense
+              hide-details
+              label="Nome"
+              variant="outlined"
+              placeholder="Digite seu nome"
+              required
+            ></v-text-field>
+
+            <p>Email</p>
             <v-text-field
               v-model="formData.email"
-              class="mb-5"
+              class="mb-4"
               color="green"
               dense
               hide-details

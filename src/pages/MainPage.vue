@@ -19,7 +19,7 @@ onUnmounted(() => window.removeEventListener('resize', checkMobile))
 
 // 🔹 Computed: mostra AppBar apenas quando NÃO estiver em login/cadastro
 const showAppBar = computed(() => {
-  const hiddenRoutes = ['/login', '/cadastro', '/recovery', '/reset', '/editPerfil', '/mensageEmail', '/resetSenha', '/recovery-code']
+  const hiddenRoutes = ['/login', '/register', '/recovery', '/reset', '/editPerfil', '/mensageEmail', '/resetSenha', '/recovery-code']
   return !hiddenRoutes.includes(route.path)
 })
 </script>

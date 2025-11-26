@@ -5,7 +5,7 @@ import MainComponent from '@/components/MainView/MainComponent.vue'
 import EmailMessageComponent from '@/components/MainView/MensageEmailComponent.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import ResetPasswordComponent from '@/components/MainView/ResetSenhaComponent.vue'
-import RegisterComponent from '@/components/MainView/CadastroComponent.vue'
+import RegisterComponent from '@/components/MainView/RegisterComponent.vue'
 import MainPage from '@/pages/MainPage.vue'
 import RecoveryPage from '@/pages/RecoveryPage.vue'
 

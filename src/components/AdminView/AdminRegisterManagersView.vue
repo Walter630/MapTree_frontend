@@ -102,7 +102,7 @@
             dark
             large
             class="mr-4 save-button"
-            @click="submitForm"
+            @click="registrar"
           >
             SALVAR
           </v-btn>
@@ -137,7 +137,7 @@ export default {
         password: '',
         cpf: '',
         empresa: '',
-        role: 'manager',
+        role: 'MANAGER',
         isActive: true,
       },
       empresas: ['Empresa 1', 'Empresa 2', 'Empresa 3', 'Empresa 4'],
@@ -159,7 +159,7 @@ export default {
     },
     async registrar() {
       try {
-        const response = await this.$api.post<User>('/auth/register', this.formData);
+        const response = await this.$api.post<User>('/users', this.formData);
         if (response.status === 201) {
           this.$router.push('/admin/managers')
         } else {

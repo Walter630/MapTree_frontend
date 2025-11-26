@@ -327,12 +327,12 @@ export default defineComponent({
 
     /** 🔹 Usuário logado */
     getCurrentUser() {
-      return this.$api?.user ?? {}
+      return this.$api?.isAuthenticated() ?? {}
     },
 
     /** 🔹 Criar novo gestor */
     addGestor() {
-      this.$router.push('/admin/register-manager')
+      this.$router.push('/admin/register-managers')
     },
 
     /** 🔹 Editar item */
@@ -344,6 +344,7 @@ export default defineComponent({
     deleteItem(item: Gestor) {
       if (confirm(`Deseja deletar ${item.nome}?`)) {
         this.gestores = this.gestores.filter(g => g.id !== item.id)
+        this.$api.delete(`/users/${item.id}`)
       }
     },
 
