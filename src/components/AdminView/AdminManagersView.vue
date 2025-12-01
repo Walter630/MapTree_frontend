@@ -179,12 +179,13 @@
             </div>
           </v-card-title>
           {{ getAllUsers() }}
+
           <v-data-table
             class="gestores-table"
             :headers="headers"
             :items="paginatedGestores"
             :items-per-page="itemsPerPage"
-            :page.sync="page"
+            :page="page"
             :search="search"
             hide-default-footer
           >
@@ -315,9 +316,21 @@ export default defineComponent({
 
   methods: {
     /** 🔹 Buscar todos usuários do backend */
+
     async getAllUsers(): Promise<User[] | null> {
       try {
         const response = await this.$api.get<User[]>('/users')
+        // Transform User[] to Gestor[]
+        this.gestores = response.data.map(user => ({
+          id: user.id,
+          nome: user.name,
+          empresa: '', // Map from appropriate field or set default
+          fotoUrl: '', // Map from appropriate field or set default
+          conta: '', // Map from appropriate field or set default
+          cidade: '', // Map from appropriate field or set default
+          status: 'Ativo', // Set default status
+        }))
+        console.log(response.data)
         return response.data
       } catch (error) {
         console.error('Failed to fetch users:', error)
@@ -420,15 +433,6 @@ export default defineComponent({
   border-radius: 8px;
   color: #374151;
 }
-
-/* Novo Gestor button (moved below title) */
-.btn-new-gestor {
-  min-width: 160px;
-  font-weight: 700;
-  color: #000;
-  text-transform: none;
-}
-
 /* Summary cards */
 .cards-row {
   margin-top: 8px;
@@ -484,16 +488,7 @@ export default defineComponent({
 }
 
 /* Filters */
-.filters-sheet {
-  background: #f6f6f6;
-  border-radius: 6px;
-  border: 1px solid #eee;
-  margin: 8px 0;
-  padding: 16px;
-}
-.filter-header {
-  color: #374151;
-}
+
 .filter-row .v-select,
 .filter-row .v-text-field {
   max-width: 100%;
@@ -519,7 +514,7 @@ export default defineComponent({
 }
 
 /* Table styles */
-.gestores-table .v-data-table__wrapper {
+.gestores-table {
   padding: 0 16px 16px 16px;
 }
 .id-cell {
@@ -539,10 +534,7 @@ export default defineComponent({
   .summary-card {
     min-height: 100px;
   }
-  .btn-new-gestor {
-    width: 100%;
-  }
-  .cards-row .v-col {
+  .cards-row  {
     margin-bottom: 12px;
   }
   .corner-icon {

@@ -52,15 +52,15 @@
             </v-text-field>
           </div>
           <div class="input-group">
-            <p class="input-label">Senha</p>
+            <p class="input-label">CPF</p>
             <v-text-field
-              v-model="formData.password"
-              :rules="[rules.required, rules.minPassword]"
-              placeholder="Digite a senha"
-              type="password"
-
+              v-model="formData.cpf"
+              :rules="[rules.required, rules.cpfFormat]"
+              placeholder="Digite o CPF"
+              mask="###.###.###-##"
             ></v-text-field>
           </div>
+
         </v-col>
 
         <v-col cols="12" md="4" class="d-flex flex-column" style="gap: 15px;">
@@ -88,8 +88,17 @@
               :items="empresas"
               :rules="[rules.required]"
               placeholder="Nome da Empresa"
-
             ></v-select>
+          </div>
+          <div class="input-group">
+            <p class="input-label">Senha</p>
+            <v-text-field
+              v-model="formData.password"
+              :rules="[rules.required, rules.minPassword]"
+              placeholder="Digite a senha"
+              type="password"
+
+            ></v-text-field>
           </div>
         </v-col>
       </v-row>
@@ -217,28 +226,28 @@ export default {
   font-weight: 500; /* Peso da fonte para as labels */
 }
 
-.custom-text-field.v-text-field--solo >>> .v-input__control,
-.custom-text-field.v-select--solo >>> .v-input__control {
+.custom-text-field.v-text-field--solo >>> ,
+.custom-text-field.v-select--solo >>> {
   min-height: 44px; /* Altura padrão para os campos */
 }
 
-.custom-text-field.v-text-field--solo >>> .v-input__slot,
-.custom-text-field.v-select--solo >>> .v-input__slot {
+.custom-text-field.v-text-field--solo >>> ,
+.custom-text-field.v-select--solo >>> {
   border: 1px solid #D0D5DD; /* Borda cinza clara */
   border-radius: 8px; /* Borda arredondada */
   background-color: #FFFFFF !important; /* Fundo branco */
-  box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05); /* Sombra sutil */
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); /* Sombra sutil */
   padding: 0 14px; /* Padding interno */
 }
 
 .custom-text-field.v-text-field--solo >>> .v-input__slot input,
-.custom-text-field.v-select--solo >>> .v-input__slot .v-select__selection {
+.custom-text-field.v-select--solo >>>  {
   color: #101828; /* Cor do texto do input */
   font-size: 1rem; /* Tamanho da fonte do texto */
 }
 
-.custom-text-field.v-text-field--solo >>> .v-label.v-label--active,
-.custom-text-field.v-select--solo >>> .v-label.v-label--active {
+.custom-text-field.v-text-field--solo >>> ,
+.custom-text-field.v-select--solo >>> {
   transform: translateY(-10px) scale(0.75); /* Ajuste para label flutuante */
   color: #667085 !important;
 }
@@ -252,13 +261,13 @@ export default {
 
 
 /* Prepend-inner do campo de contato */
-.contact-field >>> .v-input__prepend-inner {
+.contact-field >>>  {
   margin-top: 0; /* Alinha o prepend-inner verticalmente */
   align-items: center;
   height: 100%; /* Garante que o container ocupe toda a altura */
 }
 
-.contact-field >>> .v-input__prepend-inner .contact-divider {
+.contact-field >>>  {
   height: 24px; /* Altura da linha vertical */
   border-right: 1px solid #D0D5DD; /* Cor da linha */
   margin-right: 8px; /* Espaçamento entre a linha e o número */
@@ -277,7 +286,7 @@ export default {
   font-weight: 600;
   height: 44px !important;
   border-radius: 8px;
-  box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   padding: 0 18px;
 }
 
@@ -289,7 +298,7 @@ export default {
   height: 44px !important;
   border-radius: 8px;
   border: 1px solid #D0D5DD;
-  box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   padding: 0 18px;
 }
 </style>
