@@ -26,6 +26,10 @@ export interface User {
   name: string
   email: string
   role: UserRole
+  company?: {
+    id: string
+    name: string
+  }
 }
 
 export interface LoginRequest {

@@ -44,33 +44,30 @@ export default {
 <template>
   <v-container style="margin-top: 40px;">
     <!-- Cabeçalho -->
-    <v-row align="center" justify="space-between">
+    <v-row align="center" justify="space-between" class="mb-6">
       <v-col cols="12" md="7">
-        <p style="color: #858585; font-size: 14px; margin-bottom: 6px;">Meu Painel</p>
-        <p style="font-size: 15px;">
-          Olá, Administrador, Aqui Está O Resumo De Suas Operações.
-        </p>
+        <div class="d-flex align-center mb-6">
+          <span class="text-caption text-grey-darken-1">Meu Painel</span>
+
+
+        </div>
+        <p class="title-text">Olá, Administrador!</p>
+        <p class="subtitle-text">Aqui está o resumo de suas operações.</p>
       </v-col>
 
       <v-col cols="12" md="4" class="d-flex justify-end">
         <v-text-field
           v-model="search"
-          placeholder="Buscar"
+          placeholder="Buscar..."
           hide-details
           density="comfortable"
           variant="outlined"
-          style="width: 350px;"
+          style="max-width: 350px;"
           prepend-inner-icon="mdi-magnify"
-        >
-          <template #append-inner>
-            <v-icon @click="clearSearch" class="mr-2" style="cursor: pointer;">
-              mdi-close-circle
-            </v-icon>
-            <v-btn style="background:black; color:white; height:35px;">
-              Buscar
-            </v-btn>
-          </template>
-        </v-text-field>
+          clearable
+          @click:append="clearSearch"
+        />
+
       </v-col>
     </v-row>
 
@@ -167,11 +164,12 @@ export default {
 
 <style scoped>
 .cardResumo {
-background: white;
-border: 1px solid #E5E5E5;
-height: 150px;
-border-radius: 8px;
-padding: 15px;
+  background: #f4f4f4;
+  border: 1px solid #E5E5E5;
+  height: 150px;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: none;
 }
 
 .cardHeader {
@@ -193,7 +191,7 @@ color: #777;
 }
 
 .cardBox {
-background: white;
+background: #f4f4f4;
 border: 1px solid #E5E5E5;
 border-radius: 8px;
 padding: 20px;

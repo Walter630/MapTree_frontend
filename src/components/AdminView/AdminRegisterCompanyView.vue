@@ -3,15 +3,24 @@
 
     <v-row>
       <v-col cols="12">
-        <div class="d-flex align-center mb-2">
+        <div class="d-flex align-center mb-6">
           <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
           <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" @click="goBack">Empresas</span>
+          <span class="text-caption text-grey-darken-1" @click="goBack">Empresas</span>
           <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" color="#2F3367">#CadastrarEmpresas</span>
+          <span class="text-caption font-weight-bold" style="color: #2f3367">#CadastrarEmpresas</span>
+        </div>
+
+        <div class="d-flex align-center">
+          <v-btn icon depressed class="mr-3 back-btn" @click="goBack">
+            <v-icon>mdi-chevron-left</v-icon>
+          </v-btn>
+          <div>
+            <p class="title-text">Cadastrar Empresa</p>
+            <p class="subtitle-text">Insira as informações da nova empresa</p>
+          </div>
         </div>
       </v-col>
-
     </v-row>
 
     <!-- Header -->
@@ -63,64 +72,33 @@
               ></v-text-field>
             </div>
 
-            <div>
-              <label class="field-label">Gerente</label>
-              <v-text-field
-                v-model="managerId"
-                placeholder="Digite o gerente"
-                class="custom-field"
-                density="comfortable"
-              ></v-text-field>
-            </div>
+            <v-select
+              v-model="managerId"
+              :items="managers"
+              item-title="name"
+              item-value="id"
+              label="Selecione o Gerente"
+              class="custom-field"
+            ></v-select>
+
+
           </v-col>
-        </v-row>
+
 
           <!-- COLUNA 2 -->
-          <!--<v-col cols="12" md="6" class="d-flex flex-column gap-4">
-            <div>
-              <label class="field-label">Número do Contato</label>
-              <v-text-field
-                v-model="formData.contato"
-                :rules="[rules.required, rules.contactFormat]"
-                placeholder="(88) 00000-0000"
-                class="custom-field"
-                density="comfortable"
-                mask="(##) #####-####"
-              >
-                <template #prepend-inner>
-                  <div class="d-flex align-center mr-2">
-                    <span class="mr-2" style="color: #667085">+55</span>
-                    <v-divider vertical></v-divider>
-                  </div>
-                </template>
-              </v-text-field>
-            </div>
 
+          <v-col cols="12" md="6" class="d-flex flex-column gap-4">
             <div>
-              <label class="field-label">Plano</label>
+              <label class="field-label">Terceirizada</label>
               <v-select
-                v-model="formData.plano"
-                :items="planos"
-                :rules="[rules.required]"
-                placeholder="Selecione um plano"
-                class="custom-field"
-                density="comfortable"
+                v-model="isOutsourced"
+                :items="['Sim', 'Não']"
+                placeholder="Selecione"
               ></v-select>
             </div>
 
-            <div>
-              <label class="field-label">Status</label>
-              <v-select
-                v-model="formData.status"
-                :items="status"
-                :rules="[rules.required]"
-                placeholder="Selecione o status"
-                class="custom-field"
-                density="comfortable"
-              ></v-select>
-            </div>
           </v-col>
-        </v-row>-->
+        </v-row>
 
         <!-- BOTÕES -->
         <v-row class="mt-6">
@@ -130,7 +108,7 @@
               color="#4CAF50"
               style="color: white; font-weight: 600; width: 180px; height: 48px"
               class="rounded-lg"
-              @click="createCompany"
+              @click="saveCompany"
             >
               SALVAR
             </v-btn>
@@ -153,10 +131,13 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import { type Company } from '@/plugins/apiConnect.ts'
+import { type User } from '@/plugins/apiConnect.ts'
 
 export default defineComponent ({
   data() {
     return {
+      managers: [] as User[],
+
       name: '',
       taxId: '',
       isOutsourced: false,
@@ -170,8 +151,13 @@ export default defineComponent ({
     mounted() {
       this.checkIsMobile()
       window.addEventListener('resize', this.checkIsMobile)
+
+      // 👉 Buscar gestores
+      this.loadManagers()
     },
-    beforeUnmount() {
+
+
+  beforeUnmount() {
       window.removeEventListener('resize', this.checkIsMobile)
     },
     methods: {
@@ -182,15 +168,40 @@ export default defineComponent ({
         this.$router.push("/admin/companies");
       },
 
-      async createCompany(companyData: Omit<Company, 'id'>): Promise<Company | null> {
+      async loadManagers() {
         try {
-          const response = await this.$api.post<Company>('/organizations', companyData)
-          return response.data
-        } catch (error) {
-          console.error('Failed to create company:', error)
-          throw error
+          const response = await this.$api.get('/users')
+          this.managers = response.data
+        } catch (err) {
+          console.error("Erro ao carregar gestores:", err)
         }
       },
+
+
+      async createCompany(companyData: any) {
+        const response = await this.$api.post('/organizations', companyData)
+        return response.data
+      },
+
+
+      async saveCompany() {
+        try {
+          const payload = {
+            name: this.name,
+            taxId: this.taxId,
+            isOutsourced: this.isOutsourced === 'Sim',
+            managerId: this.managerId,
+            isActive: this.isActive,
+          }
+
+          await this.createCompany(payload)
+
+          this.$router.push('/admin/companies')
+        } catch (err) {
+          console.error(err)
+        }
+      },
+
 
       cancelForm() {
         this.$router.push("/admin/companies");

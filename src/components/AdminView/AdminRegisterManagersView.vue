@@ -30,13 +30,16 @@
 
     <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px;">
       <v-row justify="center">
-        <v-col cols="12" md="4" class="d-flex flex-column" style="gap: 15px;">
+        <v-col cols="12" md="4" class="d-flex flex-column">
           <div class="input-group">
             <p class="input-label">Nome do Gestor</p>
             <v-text-field
               v-model="formData.name"
               :rules="[rules.required]"
               placeholder="Digite o nome"
+              variant="outlined"
+
+              hide-details
             ></v-text-field>
           </div>
           <div class="input-group">
@@ -45,6 +48,8 @@
               v-model="formData.email"
               :rules="[rules.required, rules.email]"
               placeholder="Digite o email"
+              variant="outlined"
+              hide-details
             >
               <template v-slot:label>
                 <span style="color: #667085; font-size: 0.875rem;">Endereço de Email</span>
@@ -58,12 +63,14 @@
               :rules="[rules.required, rules.cpfFormat]"
               placeholder="Digite o CPF"
               mask="###.###.###-##"
+              variant="outlined"
+
+              hide-details
             ></v-text-field>
           </div>
-
         </v-col>
 
-        <v-col cols="12" md="4" class="d-flex flex-column" style="gap: 15px;">
+        <v-col cols="12" md="4" class="d-flex flex-column">
           <div class="input-group">
             <p class="input-label">Número de Contato</p>
             <v-text-field
@@ -71,7 +78,9 @@
               :rules="[rules.required, rules.contactFormat]"
               placeholder="555-555-1234"
               mask="###-###-####"
+              variant="outlined"
 
+              hide-details
             >
               <template v-slot:prepend-inner>
                 <div class="d-flex align-center mr-2">
@@ -86,8 +95,13 @@
             <v-select
               v-model="formData.empresa"
               :items="empresas"
-              :rules="[rules.required]"
+              item-title="name"
+              item-value="id"
               placeholder="Nome da Empresa"
+              :rules="[rules.required]"
+              variant="outlined"
+
+              hide-details
             ></v-select>
           </div>
           <div class="input-group">
@@ -97,11 +111,14 @@
               :rules="[rules.required, rules.minPassword]"
               placeholder="Digite a senha"
               type="password"
+              variant="outlined"
 
+              hide-details
             ></v-text-field>
           </div>
         </v-col>
       </v-row>
+
 
       <v-row class="mt-8">
         <v-col cols="12" class="d-flex justify-center">
@@ -132,7 +149,16 @@
 </template>
 
 <script lang="ts">
-import type { User } from '@/plugins/apiConnect.ts'
+import type { User, Company } from '@/plugins/apiConnect.ts'
+
+interface Empresa {
+  id: string;
+  name: string;
+  taxId: string;
+  isOutsourced: boolean     //se é terceirizada
+  managerId: string;
+  isActive?: boolean;
+}
 
 export default {
   name: 'CadastroFuncionario',
@@ -149,7 +175,9 @@ export default {
         role: 'MANAGER',
         isActive: true,
       },
-      empresas: ['Empresa 1', 'Empresa 2', 'Empresa 3', 'Empresa 4'],
+      empresas: [] as Empresa[],
+      allCompanies: [] as Empresa[],
+      // ... dentro do data()
       rules: {
         required: value => !!value || 'Campo obrigatório.',
         email: value => {
@@ -157,14 +185,36 @@ export default {
           return pattern.test(value) || 'Email inválido.'
         },
         minPassword: v => v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
-        contactFormat: v => (v && v.replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).'
+        contactFormat: v => (v && v.replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).',
+        // 👈 REGRA CPF ADICIONADA: Validação simples de 11 dígitos
+        cpfFormat: v => (v && v.replace(/[^0-9]/g, '').length === 11) || 'CPF inválido. Deve conter 11 dígitos.',
       },
+// ...
     };
+  },
+  mounted() {
+    this.getCompanies()
   },
   methods: {
     goBack() {
       this.$router.push('/admin/managers')
       // this.$router.go(-1);
+    },
+    async getCompanies() {
+      try {
+        const response = await this.$api.get<Company[]>('/organizations');
+        this.allCompanies = response.data.map(comp => ({
+          id: comp.id,
+          name: comp.name,
+          taxId: comp.taxId,
+          isOutsourced: comp.isOutsourced,
+          managerId: comp.managerId,
+          isActive: comp.isActive
+        }));
+        this.empresas = this.allCompanies.filter(comp => comp.isActive);
+      } catch (error) {
+        console.error('Erro ao buscar empresas: ', error);
+      }
     },
     async registrar() {
       try {
@@ -215,9 +265,6 @@ export default {
   padding: 24px;
 }
 
-.input-group {
-  margin-bottom: 20px; /* Espaçamento entre os grupos de input */
-}
 
 .input-label {
   font-size: 0.875rem; /* Tamanho da fonte das labels */
@@ -229,6 +276,7 @@ export default {
 .custom-text-field.v-text-field--solo >>> ,
 .custom-text-field.v-select--solo >>> {
   min-height: 44px; /* Altura padrão para os campos */
+
 }
 
 .custom-text-field.v-text-field--solo >>> ,
@@ -300,5 +348,15 @@ export default {
   border: 1px solid #D0D5DD;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   padding: 0 18px;
+}
+
+.input-group {
+  /* Mantido para agrupamento lógico, mas sem margin-bottom fixo */
+  width: 100%;
+  padding-bottom: 30px;
+}
+
+.v-col {
+  padding-bottom: 10px;
 }
 </style>

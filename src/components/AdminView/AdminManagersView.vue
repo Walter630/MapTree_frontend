@@ -3,17 +3,11 @@
     <!-- Breadcrumb / Header -->
     <v-row align="center" class="mb-2">
       <v-col cols="12">
-        <div class="breadcrumb d-flex align-center">
-          <span class="muted" @click="$router.push('/admin')">Meu Painel</span>
-          <v-icon small class="mx-1 muted">mdi-chevron-right</v-icon>
-          <span class="page-title">#Gestores</span>
+        <div class="d-flex align-center mb-6">
+          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
+          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
+          <span class="text-caption font-weight-bold" style="color: #2f3367">#Gestores</span>
         </div>
-      </v-col>
-    </v-row>
-
-    <!-- Title + back button + subtitle -->
-    <v-row align="center" class="mb-4">
-      <v-col cols="12" md="8">
         <div class="d-flex align-center mb-2">
           <!-- Back button (square) -->
           <v-btn icon class="back-btn mr-3" @click="goBack">
@@ -55,8 +49,7 @@
             <v-icon class="corner-icon" small>mdi-account-multiple</v-icon>
           </div>
 
-          <div class="summary-value">2,543</div>
-          <div class="summary-note">+ 12% vs mês anterior</div>
+          <div class="summary-value">{{ totalGestores }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
         </v-card>
       </v-col>
 
@@ -116,6 +109,8 @@
             <v-select
               v-model="filterEmpresa"
               :items="contas"
+              item-title="name"
+              item-value="id"
               label="Empresa"
               placeholder="Nome da Empresa"
               variant="outlined"
@@ -178,8 +173,6 @@
               <div class="table-subtitle">Gerencie os gestores cadastrados no sistema</div>
             </div>
           </v-card-title>
-          {{ getAllUsers() }}
-
           <v-data-table
             class="gestores-table"
             :headers="headers"
@@ -187,30 +180,31 @@
             :items-per-page="itemsPerPage"
             :page="page"
             :search="search"
+            @update:page="page = $event"
             hide-default-footer
           >
-            <template #item.id="{ item }">
+          <template #item.id="{ item }">
               <div class="id-cell">{{ item.id }}</div>
             </template>
 
             <template #item.nome="{ item }">
               <div class="d-flex align-center">
-                <v-avatar size="40" class="mr-3">
+                <v-avatar size="10" class="mr-2">
                   <v-img :src="item.fotoUrl" :alt="item.nome" cover />
                 </v-avatar>
                 <div>{{ item.nome }}</div>
               </div>
             </template>
 
-            <template #item.empresa="{ item }">
-              <div>{{ item.empresa }}</div>
+            <template #item.company="{ item }">
+              <div>{{ item.company }}</div>
             </template>
 
             <template #item.status="{ item }">
               <v-chip
                 :class="statusClass(item.status)"
                 small
-                style="min-width: 70px"
+                style="min-width: 20px"
                 :style="{ backgroundColor: statusBg(item.status) }"
               >
                 {{ item.status }}
@@ -241,100 +235,113 @@ import type { User } from '@/plugins/apiConnect.ts'
 interface Gestor {
   id: string
   nome: string
-  empresa: string
-  fotoUrl: string
-  conta: string
-  cidade: string
-  status?: string
+  company: string
+  status: string
+}
+
+// 👈 NOVA INTERFACE para o array de Filtro/Select
+interface EmpresaFiltro {
+  id: string
+  name: string
 }
 
 export default defineComponent({
   data() {
     return {
       gestores: [] as Gestor[],
+      totalGestores: 0, // 👈 Novo campo para a contagem dinâmica
 
+      // 👈 NOVAS PROPRIEDADES DE COMPARAÇÃO
+      comparacaoPercentual: '',
+      comparacaoCor: 'text-success', // ou 'text-danger'
       // filtros
       search: '',
       filterConta: null as string | null,
       filterCidade: null as string | null,
 
       // selects
-      contas: ['Empresa Alpha', 'Empresa Beta', 'Empresa Gamma'],
-      cidades: ['São Paulo', 'Rio de Janeiro', 'Belo Horizonte'],
+
+      contas: [] as EmpresaFiltro[], // Ou use 'any[]' se preferir não criar a interface
 
       // tabela
       itemsPerPage: 6,
       page: 1,
       headers: [
-        { title: 'ID', key: 'id', width: 80 },
+
         { title: 'Nome', key: 'nome' },
-        { title: 'Empresa', key: 'empresa' },
+        { title: 'Empresa', key: 'company' },
         { title: 'Status', key: 'status', width: 120 },
         { title: 'Ações', key: 'acoes', width: 120, sortable: false },
       ],
 
-      // mock inicial (evita erro)
-      allGestores: [
-        {
-          id: '1',
-          nome: 'João Carlos',
-          empresa: 'Empresa Alpha',
-          fotoUrl: 'https://i.pravatar.cc/150?img=1',
-          conta: 'Empresa Alpha',
-          cidade: 'São Paulo',
-          status: 'Ativo',
-        },
-        {
-          id: '2',
-          nome: 'Mariana Lopes',
-          empresa: 'Empresa Beta',
-          fotoUrl: 'https://i.pravatar.cc/150?img=2',
-          conta: 'Empresa Beta',
-          cidade: 'Rio de Janeiro',
-          status: 'Inativo',
-        },
-      ],
+      // backup para filtros
+      allGestores: [] as Gestor[],
     }
   },
 
   computed: {
-    paginatedGestores(): Gestor[] {
+    paginatedGestores() {
       const start = (this.page - 1) * this.itemsPerPage
       const end = start + this.itemsPerPage
-
       return this.gestores.slice(start, end)
     },
 
-    pageCount(): number {
+    pageCount() {
       return Math.ceil(this.gestores.length / this.itemsPerPage)
-    },
+    }
   },
 
   mounted() {
-    this.gestores = this.allGestores
+    this.getAllCompaniesAndUsers()
   },
 
   methods: {
-    /** 🔹 Buscar todos usuários do backend */
-
-    async getAllUsers(): Promise<User[] | null> {
+    async getAllCompaniesAndUsers(): Promise<void> {
+      await this.getAllCompanies(); // Garante que as empresas estejam carregadas
+      await this.getAllUsers();     // Em seguida, carrega os usuários
+    },
+    async getAllCompanies(): Promise<void> {
       try {
-        const response = await this.$api.get<User[]>('/users')
-        // Transform User[] to Gestor[]
-        this.gestores = response.data.map(user => ({
+        const response = await this.$api.get<User[]>('/organizations')
+        // Armazena a lista de empresas como OBJETOS { id, name }
+        this.contas = response.data.map((company) => ({
+          id: company.id,
+          name: company.name
+        }))
+      } catch (error) {
+        console.error('Erro ao buscar empresas:', error)
+      }
+    },
+    //usar computed
+    /** 🔹 Buscar usuários do backend */
+    async getAllUsers(): Promise<void> {
+      try {
+        const response = await this.$api.get<User[]>('/users') // Usando 'any' para flexibilidade
+
+        this.allGestores = response.data.map((user) => ({
           id: user.id,
           nome: user.name,
-          empresa: '', // Map from appropriate field or set default
-          fotoUrl: '', // Map from appropriate field or set default
-          conta: '', // Map from appropriate field or set default
-          cidade: '', // Map from appropriate field or set default
-          status: 'Ativo', // Set default status
+          email: user.email,
+
+          // Busca o objeto da empresa pelo ID (agora funciona pois 'this.contas' tem 'id' e 'name')
+          company: this.contas.find((company) => company.id === user.company?.id)?.name ?? '—',
+          status: 'Ativo',
         }))
-        console.log(response.data)
-        return response.data
+        // NOVO: Define o valor total
+        this.totalGestores = this.allGestores.length;
+        // exibir na tabela
+        this.gestores = [...this.allGestores]
       } catch (error) {
-        console.error('Failed to fetch users:', error)
-        return []
+        console.error('Erro ao buscar usuários:', error)
+      }
+    },
+
+    async editItem(item: Gestor) {
+      try {
+        const edit = await this.$api.get<User>(`/users/${item.id}`)
+        this.$router.push(`/admin/register-managers/${item.id}`)
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error)
       }
     },
 
@@ -348,10 +355,6 @@ export default defineComponent({
       this.$router.push('/admin/register-managers')
     },
 
-    /** 🔹 Editar item */
-    editItem(item: Gestor) {
-      alert(`Editar gestor: ${item.nome}`)
-    },
 
     /** 🔹 Excluir item */
     deleteItem(item: Gestor) {
@@ -364,8 +367,8 @@ export default defineComponent({
     /** 🔹 Aplicar filtros */
     applyFilters() {
       this.gestores = this.allGestores.filter(g => {
-        const matchName = this.search ? g.nome.toLowerCase().includes(this.search.toLowerCase()) : true
-        const matchConta = this.filterConta ? g.conta === this.filterConta : true
+        const matchName = this.search ? g.nome?.toLowerCase().includes(this.search.toLowerCase()) : true
+        const matchConta = this.filterConta ? g.empresa === this.filterConta : true
         const matchCidade = this.filterCidade ? g.cidade === this.filterCidade : true
         return matchName && matchConta && matchCidade
       })
@@ -373,19 +376,17 @@ export default defineComponent({
       this.page = 1
     },
 
-    /** 🔹 Voltar para página anterior */
+    /** 🔹 Voltar */
     goBack() {
       this.$router.back()
     },
 
     /** 🔹 Classes de status */
     statusClass(status: string) {
-      return {
-        'text-white': true,
-      }
+      return { 'text-white': true }
     },
 
-    /** 🔹 Cor de fundo do chip */
+    /** 🔹 Cor do chip */
     statusBg(status: string) {
       if (status === 'Ativo') return '#C6F513'
       if (status === 'Inativo') return '#e11d48'
@@ -431,7 +432,7 @@ export default defineComponent({
   min-width: 36px;
   min-height: 36px;
   border-radius: 8px;
-  color: #374151;
+
 }
 /* Summary cards */
 .cards-row {
@@ -449,6 +450,7 @@ export default defineComponent({
   flex-direction: column;
   justify-content: flex-start;
   position: relative;
+  box-shadow: none;
 }
 .card-head {
   display: flex;

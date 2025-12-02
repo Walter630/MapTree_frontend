@@ -3,7 +3,7 @@
     <v-row>
       <v-col cols="12">
         <div class="d-flex align-center mb-6">
-          <span class="text-caption text-grey-darken-1">Meu Painel</span>
+          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
           <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
           <span class="text-caption font-weight-bold" style="color: #2f3367">#Empresas</span>
         </div>
@@ -113,7 +113,7 @@
     <v-row class="mt-8">
       <v-col cols="12" class="pa-0">
         <p class="table-title-text mb-4">Empresas Cadastradas</p>
-        {{ getCompanies() }}
+
         <v-data-table
           :headers="headers"
           :items="empresas"
@@ -126,30 +126,30 @@
             <div class="text-subtitle-2 font-weight-regular table-id">{{ item.id }}</div>
           </template>
 
-          <template #item.nome="{ item }">
-            <div class="text-body-1 table-text">{{ item.nome }}</div>
+          <template #item.name="{ item }">
+            <div class="text-body-1 table-text">{{ item.name }}</div>
           </template>
 
-          <template #item.contato="{ item }">
-            <div class="text-body-1 table-text">{{ item.contato }}</div>
+          <template #item.taxId="{ item }">
+            <div class="text-body-1 table-text">{{ item.taxId }}</div>
           </template>
 
-          <template #item.plano="{ item }">
-            <div class="text-body-1 table-text">{{ item.plano }}</div>
+          <template #item.managerId="{ item }">
+            <div class="text-body-1 table-text">{{ item.managerId }}</div>
           </template>
 
-          <template #item.status="{ item }">
-            <v-chip :color="getStatusColor(item.status)" class="font-weight-bold status-chip" label>
-              {{ item.status }}
+          <template #item.isActive="{ item }">
+            <v-chip color="green" class="font-weight-bold status-chip">
+              {{ item.isActive }}
             </v-chip>
           </template>
 
           <template #item.acoes="{ item }">
             <v-icon size="small" class="mr-2 action-icon" @click="editItem(item)"
-              >mdi-square-edit-outline</v-icon
+            >mdi-square-edit-outline</v-icon
             >
             <v-icon size="small" class="action-icon" @click="deleteItem(item)"
-              >mdi-trash-can-outline</v-icon
+            >mdi-trash-can-outline</v-icon
             >
           </template>
         </v-data-table>
@@ -161,89 +161,107 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import router from '@/router'
-import { apiConnect, type Company } from '@/plugins/apiConnect.ts'
+import type { Company } from '@/plugins/apiConnect.ts'
 
 interface Empresa {
   id: string;
-  nome: string;
-  contato: string;
-  plano: string;
-  status: 'Ativa' | 'Pendente' | 'Inativa' | 'Suspensa'; // Estados simulados
+  name: string;
+  taxId: string;
+  isOutsourced: boolean     //se é terceirizada
+  managerId: string;
+  isActive?: boolean;
 }
 
 export default defineComponent({
   name: 'EmpresasAdminView',
 
-  data: () => ({
-    filterEmpresa: null, // Novo filtro para "Empresa"
-    filterCidade: null, // Novo filtro para "Cidade"
-    search: '', // Busca pelo Nome
-    contas: ['EcoEnergia Sul', 'Verde Luz Nordeste', 'PowerTree Centro'], // Opções de filtro de Empresa
-    cidades: ['Rio de Janeiro', 'São Paulo', 'Fortaleza'], // Opções de filtro de Cidade
+  data() {
+    return {
+      empresas: [] as Empresa[],
+      totalEmpresas: 0,
+      filterEmpresa: null,
+      filterCidade: null,
+      search: '',
+      contas: ['EcoEnergia Sul', 'Verde Luz Nordeste', 'PowerTree Centro'],
+      cidades: ['Rio de Janeiro', 'São Paulo', 'Fortaleza'],
+      page: 1,
+      itemsPerPage: 10,
+      summaryCards: [
+        { title: 'Total de Empresas', icon: 'mdi-domain', value: '2,543', note: '↑ 12% vs mês anterior', noteClass: 'text-success' },
+        { title: 'Ativas', icon: 'mdi-alert-circle-outline', value: '18', note: 'Requerem atenção', noteClass: 'text-error' },
+        { title: 'Planos Premium', icon: 'mdi-information-outline', value: '94%', note: '↑ 2% vs última semana', noteClass: 'text-success' },
+        { title: 'Suspensas', icon: 'mdi-information-outline', value: '0', note: '↓ 2% vs última semana', noteClass: 'text-success' }, // Ajustado para o ícone e nota da imagem
+      ],
 
-    summaryCards: [
-      { title: 'Total de Empresas', icon: 'mdi-domain', value: '2,543', note: '↑ 12% vs mês anterior', noteClass: 'text-success' },
-      { title: 'Ativas', icon: 'mdi-alert-circle-outline', value: '18', note: 'Requerem atenção', noteClass: 'text-error' },
-      { title: 'Planos Premium', icon: 'mdi-information-outline', value: '94%', note: '↑ 2% vs última semana', noteClass: 'text-success' },
-      { title: 'Suspensas', icon: 'mdi-information-outline', value: '0', note: '↓ 2% vs última semana', noteClass: 'text-success' }, // Ajustado para o ícone e nota da imagem
-    ],
+      // Headers ajustados para a imagem
+      headers: [
 
-    // Headers ajustados para a imagem
-    headers: [
-      { title: 'Id', align: 'start', sortable: true, key: 'id' },
-      { title: 'Nome', key: 'nome', sortable: true },
-      { title: 'Contato', key: 'contato', sortable: false },
-      { title: 'Plano', key: 'plano', sortable: false },
-      { title: 'Status', key: 'status', sortable: true },
-      { title: 'Ações', key: 'acoes', sortable: false, align: 'end' },
-    ],
+        { title: 'Nome', key: 'name', sortable: true },
+        { title: 'CNPJ', key: 'taxId', sortable: true },
+        { title: 'Gestor', key: 'managerId', sortable: true },
+        { title: 'Status', key: 'isActive', sortable: true },
+        { title: 'Ações', key: 'acoes', sortable: false, align: 'end' },
+      ],
+      // backup para filtros
+      allCompanies: [] as Empresa[],
+      // Dados da Tabela simulando os estados da imagem
+    }
+  },
+  computed: {
+    paginatedEmpresas() {
+      const start = (this.page - 1) * this.itemsPerPage
+      const end = start + this.itemsPerPage
+      return this.empresas.slice(start, end)
+    },
 
-    // Dados da Tabela simulando os estados da imagem
-    empresas: [
-      { id: '#35R4Y57U6', nome: 'EcoEnergia Sul', contato: 'Fulano De Tal', plano: 'Fulano De Tal', status: 'Ativa' },
-      { id: '#35R4Y57U6', nome: 'Verde Luz Nordeste', contato: 'Fulano De Tal', plano: 'Fulano De Tal', status: 'Pendente' },
-      { id: '#35R4Y57U6', nome: 'PowerTree Centro', contato: 'Fulano De Tal', plano: 'Fulano De Tal', status: 'Ativa' },
-      { id: '#35R4Y57U6', nome: 'Elétrica Verde SP', contato: 'Fulano De Tal', plano: 'Fulano De Tal', status: 'Ativa' },
-      { id: '#35R4Y57U6', nome: 'Energialimpa RJ', contato: 'Fulano De Tal', plano: 'Fulano De Tal', status: 'Ativa' },
-    ] as Empresa[],
-  }),
+    pageCount() {
+      return Math.ceil(this.empresas.length / this.itemsPerPage)
+    }
+  },
+  mounted() {
+    this.getCompanies()
+  },
 
   methods: {
     // Função auxiliar para retornar a cor do v-chip com base no Status
-    getStatusColor(status: string): string {
-      switch (status) {
-        case 'Ativa': return '#DFF7D9'; // Verde claro
-        case 'Pendente': return '#FFF8B3'; // Amarelo claro
-        case 'Suspensa': return '#FDECF0'; // Vermelho/Rosa claro
-        case 'Inativa': return '#EEEEEE'; // Cinza claro
-        default: return '#EEEEEE';
-      }
-    },
 
-    async getCompanies(): Promise<Company[]> {
+
+    async getCompanies(): Promise<void> {
       try {
-        const response = await this.$api.get<Company[]>('/organizations')
-        return response.data
+        const res = await this.$api.get<Company[]>('/organizations')
+        this.allCompanies = res.data.map(company => ({
+          id: company.id,
+          name: company.name,
+          taxId: company.taxId,
+          isOutsourced: company.isOutsourced,
+          managerId: company.managerId,
+          isActive: company.isActive, // Transforma Boolean em String visual
+        }))
+        this.totalEmpresas = this.allCompanies.length
+        console.log(this.allCompanies)
+        // exibir na tabela
+        this.empresas = [...this.allCompanies]
       } catch (error) {
         console.error('Failed to fetch companies:', error)
-        return []
+
       }
     },
 
     goBack() {
-      console.log('Voltar para a página anterior')
+      this.$router.push('/admin')
     },
     addEmpresa() {
-      router.push('/admin/register-company')
+      this.$router.push('/admin/register-company')
     },
     applyFilters() {
       console.log('Filtros aplicados:', this.filterEmpresa, this.search, this.filterCidade)
     },
     editItem(item: Empresa) {
-      console.log('Editar Empresa:', item)
+      this.$router.push(`/admin/edit-company/${item.id}`)
     },
     deleteItem(item: Empresa) {
-      console.log('Excluir Empresa:', item)
+      this.$api.delete(`/organizations/${item.id}`)
+      this.getCompanies()
     },
   },
 })
@@ -288,23 +306,31 @@ export default defineComponent({
 
 /* ---- CARDS RESUMO ---- */
 
-.summary-cards-row {
-  margin-top: 10px !important;
-}
-
 .summary-card {
-  padding: 18px !important;
-  min-height: 120px !important;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 120px;
+  display: flex;
+  background-color: #f4f4f4;
+  flex-direction: column;
+  justify-content: flex-start;
+  position: relative;
+  box-shadow: none;
 }
 
 .summary-title {
   font-size: 13px;
 }
 .summary-value {
-  font-size: 26px;
+  margin-top: 22px;
+  font-size: 28px;
+  font-weight: 700;
 }
 .summary-note {
-  font-size: 12px;
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 /* ---- FILTROS ---- */
