@@ -12,6 +12,7 @@ import pinia from '../stores'
 // Plugins
 import vuetify from './vuetify'
 import apiConnect from './apiConnect'
+import { useAppStore } from '@/stores/app.ts'
 
 export function registerPlugins (app: App) {
   app
@@ -21,5 +22,6 @@ export function registerPlugins (app: App) {
     .use(apiConnect)
     .use(vueAppInstance => {
       vueAppInstance.config.globalProperties.$isMobile = () => vuetify.display.mobile.value
+      vueAppInstance.config.globalProperties.$store = useAppStore()
     })
 }

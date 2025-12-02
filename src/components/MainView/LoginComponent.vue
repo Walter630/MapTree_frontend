@@ -39,6 +39,7 @@
                 placeholder="Digite sua senha"
                 required
                 :type="showPassword ? 'text' : 'password'"
+                @keyup.enter="login"
               >
                 <template #append-inner>
                   <v-icon @click="showPassword = !showPassword">{{
@@ -161,14 +162,14 @@ export default defineComponent({
         } as LoginRequest)
 
         if (response.data) {
-          // Save access token (refresh token comes via HTTP-only cookie)
-          this.$api.setToken(response.data.accessToken)
-          console.log('Login successful:', response.data.accessToken)
-          this.$router.push('/admin')
-          return response.data.accessToken
+          console.log('Login successful:', response.data)
+          // Save access token (refresh token comes via HTTP-only cookie) and user info in the store
+          this.$api.setToken(response.data.accessToken);
+          // Save user info in the store
+          this.$store.setUser(response.data.user);
+          // Redirect based on user role
+          this.$router.push(`/${response.data.user.role.toLowerCase()}`)
         }
-
-        return null
       } catch (error) {
         console.error('Login failed:', error)
         throw error

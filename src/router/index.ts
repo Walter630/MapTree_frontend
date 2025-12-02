@@ -28,9 +28,7 @@ import ManagerNotificationsView from '@/components/GestorView/ManagerNotificatio
 // Outsourced employee
 import OutsourcedEmployeeMain from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
 
-// Store
-import { useAppStore } from '@/stores/app.ts'
-import { apiConnect } from '@/plugins/apiConnect.ts'
+import { apiConnect, type User } from '@/plugins/apiConnect.ts'
 import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
 
 const router = createRouter({
@@ -107,28 +105,40 @@ const router = createRouter({
 /* ============================
    BEFORE EACH (AUTH GUARD)
 =============================== */
-/*
-router.beforeEach((to, from, next) => {
-  const store = useAppStore()
 
+router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
   const requiredRole = to.meta.role
 
-  const isLogged = apiConnect.isAuthenticated()
-  const user = store.user // aqui assume que você guarda user após login
-
-  // 1. Usuário não autenticado e rota exige auth
-  if (requiresAuth && !isLogged) {
-    return next({ name: 'Login' })
+  // Se a rota NÃO requer autenticação, libera imediatamente
+  if (!requiresAuth) {
+    return next()
   }
 
-  // 2. Rota exige role específica
-  if (requiredRole && user?.role !== requiredRole) {
-    return next({ name: 'Main' }) // Sem permissão
-  }
+  try {
+    // Verifica o token apenas se a rota requer autenticação
+    const { data } = await apiConnect.get<{ valid: boolean }>('/auth/verify-token')
 
-  next()
-})*/
+    if (!data.valid) {
+      return next({ name: 'Login' })
+    }
+
+    // Se precisa verificar role, busca o usuário
+    if (requiredRole) {
+      const { data: user } = await apiConnect.get<User>('users/me/profile')
+
+      if (user.role !== requiredRole) {
+        return next({ name: 'Main' })
+      }
+    }
+
+    next()
+  } catch (error) {
+    // Se houver erro na validação, redireciona para login
+    console.error('Erro na autenticação:', error)
+    next({ name: 'Login' })
+  }
+})
 
 /* ============================
         AFTER EACH
