@@ -9,16 +9,28 @@
         </div>
 
         <div class="d-flex align-center mb-4 mt-6">
-          <v-btn class="mr-4" style="box-shadow: none; border: 1px solid #D0D5DD; height: 56px; border-radius: 8px; background-color: #FFFFFF; width: 56px" @click="goBack">
+          <v-btn
+            class="mr-4"
+            style="
+              box-shadow: none;
+              border: 1px solid #d0d5dd;
+              height: 56px;
+              border-radius: 8px;
+              background-color: #ffffff;
+              width: 56px;
+            "
+            @click="goBack"
+          >
             <v-icon>mdi-chevron-left</v-icon>
           </v-btn>
           <div>
-            <span class="text-h5 font-weight-regular" style="color: #2F3367">FUNCIONÁRIOS</span>
-            <p class="text-body-2 text-grey-darken-1" style="margin-top: 10px">Gerencie Os Funcionários E Suas Atribuições.</p>
+            <span class="text-h5 font-weight-regular" style="color: #2f3367">FUNCIONÁRIOS</span>
+            <p class="text-body-2 text-grey-darken-1" style="margin-top: 10px">
+              Gerencie Os Funcionários E Suas Atribuições.
+            </p>
           </div>
         </div>
       </v-col>
-
     </v-row>
 
     <v-row class="mt-4" align="center">
@@ -31,18 +43,15 @@
           @click="$router.push('/manager/register-employee')"
         >
           ADICIONAR FUNCIONÁRIO
-
         </v-btn>
       </v-col>
-
-
     </v-row>
 
     <v-row class="mt-6">
       <v-col cols="12">
         <v-data-table
           :headers="headers"
-          :items="paginatedFuncionarios"
+          :items="funcionarios"
           :search="search"
           :sort-by="[{ key: 'nome', order: 'asc' }]"
           class="elevation-1"
@@ -54,9 +63,6 @@
 
           <template #item.nome="{ item }">
             <div class="d-flex align-center py-2">
-              <v-avatar size="40" class="mr-3">
-                <v-img :src="item.fotoUrl" :alt="item.nome" />
-              </v-avatar>
               <div class="text-body-1">{{ item.nome }}</div>
             </div>
           </template>
@@ -84,7 +90,7 @@
             variant="solo"
             hide-details
             class="ml-2"
-            style="width: 70px; font-size: 12px;"
+            style="width: 70px; font-size: 12px"
           />
         </div>
       </v-col>
@@ -97,7 +103,7 @@
 
           <span class="mx-1">
             <v-btn
-              v-for="p in pageCount"
+              v-for="p in 1"
               :key="p"
               size="small"
               variant="text"
@@ -110,8 +116,22 @@
           </span>
 
           <span class="mx-2 text-subtitle-2">...</span>
-          <v-btn size="small" variant="text" :color="page === 11 ? 'black' : 'grey'" @click="page = 11" class="font-weight-bold">11</v-btn>
-          <v-btn size="small" variant="text" :color="page === 12 ? 'black' : 'grey'" @click="page = 12" class="font-weight-bold">12</v-btn>
+          <v-btn
+            size="small"
+            variant="text"
+            :color="page === 11 ? 'black' : 'grey'"
+            @click="page = 11"
+            class="font-weight-bold"
+            >11</v-btn
+          >
+          <v-btn
+            size="small"
+            variant="text"
+            :color="page === 12 ? 'black' : 'grey'"
+            @click="page = 12"
+            class="font-weight-bold"
+            >12</v-btn
+          >
 
           <span class="text-subtitle-2 mx-1">Próxima</span>
           <v-btn icon size="small" variant="text" @click="page < pageCount && page++">
@@ -124,20 +144,22 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from 'vue'
+import { defineComponent, ref, inject } from 'vue'
+import type { ApiConnect, User } from '@/plugins/apiConnect.ts'
 
 interface Funcionario {
-  id: string;
-  nome: string;
-  status: string; // O status na imagem é "Fulano De Tal", vou manter como string para simulação
-  fotoUrl: string;
-  gerente: string;
+  id: string
+  nome: string
+  cpf: string
+  status: string // O status na imagem é "Fulano De Tal", vou manter como string para simulação
 }
 
 export default defineComponent({
   name: 'FuncionarioGestorView',
-
   setup() {
+    const api: ApiConnect = inject('api') as ApiConnect // Injeção do serviço API, se necessário
+    const store: any = inject('store'); // Injeção do store, se necessário
+
     // --- ESTADO E DADOS ---
     const page = ref(1)
     const itemsPerPage = ref(4) // Ajustado para 4, conforme 'Linhas por página 4' na imagem
@@ -147,48 +169,17 @@ export default defineComponent({
 
     const gerentes = ['Gerente A', 'Gerente B', 'Gerente C']
 
-    const funcionarios = ref<Funcionario[]>([
-      { id: '#35R4Y57U6', nome: 'Fulano De Tal', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/1.jpg', gerente: 'Gerente A' },
-      { id: '#35R4Y57U6', nome: 'Ciclano De Oliveira', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/2.jpg', gerente: 'Gerente B' },
-      { id: '#35R4Y57U6', nome: 'Beltrana da Silva', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/3.jpg', gerente: 'Gerente A' },
-      { id: '#35R4Y57U6', nome: 'Marcos Lima', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/1.jpg', gerente: 'Gerente C' },
-      // Adicionando mais para simular paginação
-      { id: '#1A2B3C4D5', nome: 'Joana Prado', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/4.jpg', gerente: 'Gerente A' },
-      { id: '#5J1T3U7B9', nome: 'Carlos Pereira', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/2.jpg', gerente: 'Gerente B' },
-      { id: '#8P9O2A6Q4', nome: 'Ana Souza', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/3.jpg', gerente: 'Gerente C' },
-      { id: '#7D2K5L9M3', nome: 'Pedro Henrique', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/1.jpg', gerente: 'Gerente A' },
-      { id: '#6F8G4H2J0', nome: 'Sofia Nunes', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/4.jpg', gerente: 'Gerente B' },
-      { id: '#0Q9W8E7R6', nome: 'Lucas Rocha', status: 'Fulano De Tal', fotoUrl: 'https://cdn.vuetifyjs.com/images/lists/3.jpg', gerente: 'Gerente C' },
-    ])
+    const funcionarios = ref<Funcionario[]>([])
 
     // Headers ajustados para as colunas: ID, Nome, Status, Ações
     const headers = [
       { title: 'Id', key: 'id', align: 'start', sortable: true },
       { title: 'Nome', key: 'nome', sortable: true },
+      { title: 'CPF', key: 'cpf', sortable: true },
+      { title: 'Telefone', key: 'phone', sortable: true },
       { title: 'Status', key: 'status', sortable: true },
       { title: 'Ações', key: 'acoes', align: 'end', sortable: false },
     ]
-
-    // --- COMPUTED: FILTRAGEM E PAGINAÇÃO ---
-    const filteredFuncionarios = computed(() =>
-      funcionarios.value.filter((f) => {
-        // Filtra apenas pelo Gerente (o único filtro de v-select na imagem)
-        const matchesGerente = filterGerente.value ? f.gerente === filterGerente.value : true
-        // A busca global por 'search' é tratada pelo v-data-table
-        return matchesGerente
-      })
-    )
-
-    const pageCount = computed(() =>
-      Math.ceil(filteredFuncionarios.value.length / itemsPerPage.value)
-    )
-
-    const paginatedFuncionarios = computed(() => {
-      const start = (page.value - 1) * itemsPerPage.value
-      const end = start + itemsPerPage.value
-      // Aplica a paginação APÓS a filtragem do gerente
-      return filteredFuncionarios.value.slice(start, end)
-    })
 
     // --- MÉTODOS ---
     function goBack() {
@@ -208,6 +199,25 @@ export default defineComponent({
     function deleteItem(item: Funcionario) {
       console.log('Excluir:', item)
     }
+    async function fetchFuncionarios() {
+      try {
+        const response = await api.get<User[]>('users', {
+          params: {
+            role: 'USER',
+          },
+        });
+
+        funcionarios.value = response.data.map((user) => ({
+          id: user.id,
+          nome: user.name,
+          cpf: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '***.$2.$3-**'),
+          phone: user.phone.replace(/(\d{2})(\d)(\d{4})(\d{4})/, '($1) $2 $3-$4'),
+          status: user.isActive ? 'Ativo' : 'Inativo',
+        }));
+      } catch (error) {
+        console.error('Erro ao buscar funcionários:', error)
+      }
+    }
 
     return {
       funcionarios,
@@ -215,16 +225,19 @@ export default defineComponent({
       gerentes,
       filterGerente,
       search,
-      paginatedFuncionarios,
       page,
-      pageCount,
       itemsPerPage,
       goBack,
       addFuncionario,
       applyFilters,
       editItem,
       deleteItem,
+      fetchFuncionarios,
+      store,
     }
+  },
+  async created() {
+    await this.fetchFuncionarios();
   },
 })
 </script>
