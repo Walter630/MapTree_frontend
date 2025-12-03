@@ -148,7 +148,7 @@
             <v-icon size="small" class="mr-2 action-icon" @click="editItem(item)"
             >mdi-square-edit-outline</v-icon
             >
-            <v-icon size="small" class="action-icon" @click="deleteItem(item)"
+            <v-icon size="small" class="action-icon" @click="openDialogDelete(item)"
             >mdi-trash-can-outline</v-icon
             >
           </template>
@@ -156,6 +156,34 @@
       </v-col>
     </v-row>
   </v-container>
+
+  <v-dialog v-model="dialogDelete.active" max-width="500px">
+    <v-card width="500px">
+      <v-card-title class="text-h6">
+        Confirmação de Exclusão
+        <v-btn
+          style="position: absolute; top: 0; right: 0;"
+          icon="mdi-close"
+          variant="text"
+          @click="closeDialogDelete"
+          color="red"
+          :disabled="dialogDelete.loading"
+        />
+      </v-card-title>
+      <v-card-text>
+        <p>Tem certeza de que deseja excluir esta empresa?</p>
+        <ul class="ml-5">
+          <li>{{ dialogDelete?.item?.name }}</li>
+          <li>{{ dialogDelete?.item?.taxId }}</li>
+        </ul>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn text @click="closeDialogDelete" :disabled="dialogDelete.loading">Cancelar</v-btn>
+        <v-btn color="red" :loading="dialogDelete.loading" :disabled="dialogDelete.loading" text @click="deleteItem">Excluir</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script lang="ts">
@@ -198,13 +226,20 @@ export default defineComponent({
 
         { title: 'Nome', key: 'name', sortable: true },
         { title: 'CNPJ', key: 'taxId', sortable: true },
-        { title: 'Gestor', key: 'managerId', sortable: true },
+        { title: 'Gestor', key: 'manager.name', sortable: true },
         { title: 'Status', key: 'isActive', sortable: true },
         { title: 'Ações', key: 'acoes', sortable: false, align: 'end' },
       ],
       // backup para filtros
       allCompanies: [] as Empresa[],
       // Dados da Tabela simulando os estados da imagem
+
+      // dialog delete
+      dialogDelete: {
+        active: false,
+        item: null as Empresa | null,
+        loading: false,
+      }
     }
   },
   computed: {
@@ -234,7 +269,8 @@ export default defineComponent({
           name: company.name,
           taxId: company.taxId,
           isOutsourced: company.isOutsourced,
-          managerId: company.managerId,
+          manager: company.manager,
+          managerId: company.manager.id,
           isActive: company.isActive, // Transforma Boolean em String visual
         }))
         this.totalEmpresas = this.allCompanies.length
@@ -259,10 +295,28 @@ export default defineComponent({
     editItem(item: Empresa) {
       this.$router.push(`/admin/edit-company/${item.id}`)
     },
-    deleteItem(item: Empresa) {
-      this.$api.delete(`/organizations/${item.id}`)
-      this.getCompanies()
+    async deleteItem() {
+      try {
+        this.dialogDelete.loading = true;
+        await this.$api.delete(`/organizations/${this.dialogDelete?.item?.id}`);
+      } catch (e) {
+        console.error('Erro ao deletar empresa:', e);
+      } finally {
+        await this.getCompanies();
+        this.dialogDelete.loading = false;
+        this.dialogDelete.active = false;
+        this.dialogDelete.item = null;
+      }
     },
+    openDialogDelete(item: Empresa) {
+      this.dialogDelete.active = true
+      this.dialogDelete.item = item
+    },
+    closeDialogDelete() {
+      this.dialogDelete.active = false;
+      this.dialogDelete.item = null;
+      this.dialogDelete.loading = false;
+    }
   },
 })
 </script>

@@ -86,7 +86,7 @@ const router = createRouter({
         {
           path: 'outsourced-employee',
           component: OutsourcedEmployeeMain,
-          meta: { requiresAuth: true, role: 'OUTSOURCED' },
+          meta: { requiresAuth: true, role: 'USER' },
           children: [
             { path: '', name: 'OutsourcedEmployeeHome', component: MainFuncionarioTerc },
           ],

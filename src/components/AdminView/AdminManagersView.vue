@@ -324,7 +324,7 @@ export default defineComponent({
           email: user.email,
 
           // Busca o objeto da empresa pelo ID (agora funciona pois 'this.contas' tem 'id' e 'name')
-          company: this.contas.find((company) => company.id === user.company?.id)?.name ?? '—',
+          company: user?.organization?.name || '—',
           status: 'Ativo',
         }))
         // NOVO: Define o valor total

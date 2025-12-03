@@ -26,7 +26,7 @@ export interface User {
   name: string
   email: string
   role: UserRole
-  company?: {
+  organization?: {
     id: string
     name: string
   }
@@ -47,8 +47,19 @@ export interface Company {
   name: string
   taxId: string        // CNPJ ou CPF da empresa
   isOutsourced: boolean     //se é terceirizada
-  managerId: string
+  managerId?: string
+  manager: Manager
   isActive: boolean
+}
+
+export interface Manager {
+  id: string
+  name: string
+  email: string
+  cpf: string
+  phone: string
+  isActive: boolean
+  organizationId: string | null
 }
 
 
