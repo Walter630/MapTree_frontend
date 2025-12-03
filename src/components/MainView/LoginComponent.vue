@@ -162,7 +162,6 @@ export default defineComponent({
         } as LoginRequest)
 
         if (response.data) {
-          console.log('Login successful:', response.data)
           // Save access token (refresh token comes via HTTP-only cookie) and user info in the store
           this.$api.setToken(response.data.accessToken);
           // Save user info in the store
