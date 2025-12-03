@@ -24,4 +24,6 @@ export function registerPlugins (app: App) {
       vueAppInstance.config.globalProperties.$isMobile = () => vuetify.display.mobile.value
       vueAppInstance.config.globalProperties.$store = useAppStore()
     })
+
+  app.provide('store', useAppStore())
 }
