@@ -138,7 +138,7 @@
             <p class="mb-2">Cidade</p>
             <v-select
               v-model="filterCidade"
-              :items="cidades"
+
               label="Cidade"
               placeholder="Selecione a Cidade"
               variant="outlined"
@@ -166,8 +166,7 @@
     <!-- Table card -->
     <v-row class="mt-8">
       <v-col cols="12" class="pa-0" bg-color="#f4f4f4">
-
-          <p class="table-title-text mb-4">Gestores Cadastradas</p>
+        <p class="table-title-text mb-4">Gestores Cadastradas</p>
           <v-data-table
             :headers="headers"
             :items="gestores"
@@ -176,36 +175,29 @@
             class="elevation-0 data-table-custom"
             hide-default-footer
           >
-            <template #item.name="{ item }">
-              <div class="d-flex align-center">
-                <v-avatar size="10" class="mr-2">
-                  <v-img :src="item.fotoUrl" :alt="item.name" cover />
-                </v-avatar>
-                <div class="text-body-1 table-text">{{ item.name }}</div>
-              </div>
-            </template>
+           <template #item="{ item }">
+            <tr>
+              <td class="table-id">{{ item.name }}</td>
+              <td class="table-text">{{ item.email }}</td>
+              <td class="table-text">{{ item.organization }}</td>
+              <td>
+                <v-chip color="green" v-if="item.isActive">
+                  {{ item.isActive }}
 
-            <template #item.companyId="{ item }">
-              <div class="text-body-1 table-text">{{ item.companyId }}</div>
-            </template>
-
-            <template #item.isActive="{ item }">
-              <v-chip color="green" class="font-weight-bold status-chip">
-                {{ item.isActive }}
-              </v-chip>
-            </template>
-
-            <template #item.acoes="{ item }">
-              <v-icon size="small" class="mr-2 action-icon" @click="openDialogEdit(item)"
-              >mdi-square-edit-outline</v-icon
-              >
-              <v-icon size="small" class="action-icon" @click="openDialogDelete(item)"
-              >mdi-trash-can-outline</v-icon
-              >
+                </v-chip>
+              </td>
+              <td>
+                <v-icon size="small" class="mr-2 action-icon" @click="openDialogEdit(item)">
+                  mdi-square-edit-outline
+                </v-icon>
+                <v-icon size="small" class="action-icon" @click="openDialogDelete(item)">
+                  mdi-trash-can-outline
+                </v-icon>
+              </td>
+            </tr>
             </template>
           </v-data-table>
 
-          <!-- pagination -->
           <v-divider></v-divider>
           <v-card-actions class="justify-center py-6">
             <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
@@ -231,6 +223,8 @@
             <v-card-text>
               <v-text-field v-model="dialogEdit.item.name" label="Nome" />
               <v-text-field v-model="dialogEdit.item.email" label="Email" />
+              <v-select v-model="dialogEdit.item.organization" :items="contas" label="Empresa" />
+              <v-select v-model="dialogEdit.item.isActive" :items="[true, false]" label="Ativo" />
             </v-card-text>
           </v-card>
         </v-card-text>
@@ -279,12 +273,13 @@ import type { User } from '@/plugins/apiConnect.ts'
 interface Gestor {
   id: string
   name: string
-  companyId: string
+  organizationId: string
+  organization: string
   email: string
-  isActive?: boolean
+  role?: string
+  isActive: boolean
 }
 
-// 👈 NOVA INTERFACE para o array de Filtro/Select
 interface EmpresaFiltro {
   id: string
   name: string
@@ -294,7 +289,7 @@ export default defineComponent({
   data() {
     return {
       gestores: [] as Gestor[],
-      totalGestores: 0,
+
 
       comparacaoPercentual: '',
       comparacaoCor: 'text-success', // ou 'text-danger'
@@ -312,6 +307,7 @@ export default defineComponent({
       page: 1,
       headers: [
         { title: 'Nome', key: 'name' , sortable: true},
+        { title: 'Email', key: 'email' , sortable: true},
         { title: 'Empresa', key: 'company' ,sortable: true },
         { title: 'Status', key: 'isActive', sortable: true },
         { title: 'Ações', key: 'acoes',  sortable: false },
@@ -333,12 +329,9 @@ export default defineComponent({
   },
 
   computed: {
-    paginatedGestores() {
-      const start = (this.page - 1) * this.itemsPerPage
-      const end = start + this.itemsPerPage
-      return this.gestores.slice(start, end)
+    totalGestores() {
+      return this.gestores.length
     },
-
     pageCount() {
       return Math.ceil(this.gestores.length / this.itemsPerPage)
     }
@@ -350,23 +343,18 @@ export default defineComponent({
 
   methods: {
     async getAllCompaniesAndUsers(): Promise<void> {
-
       await this.getAllUsers();     // Em seguida, carrega os usuários
     },
     //usar computed
-    /** 🔹 Buscar usuários do backend */
     async getAllUsers(): Promise<void> {
       try {
         const response = await this.$api.get<User[]>('/users') // Usando 'any' para flexibilidade
-
         this.allGestores = response.data.map(user => ({
           id: user.id,
           name: user.name,
           email: user.email,
-
-          // Busca o objeto da empresa pelo ID (agora funciona pois 'this.contas' tem 'id' e 'name')
-          company: user.organization,
-          companyId: user?.organization?.id,
+          organization: user.organization,
+          organizationId: user.organization?.name,
           isActive: user.isActive,
         }))
         // NOVO: Define o valor total
@@ -381,7 +369,12 @@ export default defineComponent({
     async editItem() {
       try {
         this.dialogEdit.loading = true;
-        await this.$api.put(`/users/${this.dialogEdit?.item?.id}`)
+        await this.$api.patch(`/users/${this.dialogEdit?.item?.id}`, {
+          name: this.dialogEdit?.item?.name,
+          email: this.dialogEdit?.item?.email,
+          organizationId: this.dialogEdit?.item?.organization,
+          isActive: this.dialogEdit?.item?.isActive,
+        })
       } catch (error) {
         console.error('Erro ao buscar usuário:', error)
       } finally {
@@ -407,8 +400,6 @@ export default defineComponent({
       return this.$api?.isAuthenticated() ?? {}
     },
 
-
-    /** 🔹 Criar novo gestor */
     addGestor() {
       this.$router.push('/admin/register-managers')
     },
@@ -433,11 +424,10 @@ export default defineComponent({
     applyFilters() {
       this.gestores = this.allGestores.filter(g => {
         const matchName = this.search ? g.name?.toLowerCase().includes(this.search.toLowerCase()) : true
-        const matchConta = this.filterConta ? g.companyId === this.filterConta : true
-        const matchCidade = this.filterCidade ? g.cidade === this.filterCidade : true
-        return matchName && matchConta && matchCidade
-      })
+        const matchConta = this.filterConta ? g.organization === this.filterConta : true
 
+        return matchName && matchConta
+      })
       this.page = 1
     },
 
@@ -464,16 +454,6 @@ export default defineComponent({
 .gestores-page {
   margin-top: 20px;
   padding: 24px;
-}
-
-/* Breadcrumb / header */
-.breadcrumb .muted {
-  color: #9aa0a6;
-  font-size: 13px;
-}
-.page-title {
-  font-weight: 600;
-  color: #374151;
 }
 
 /* Title / subtitle */
@@ -509,7 +489,7 @@ export default defineComponent({
   padding: 16px;
   min-height: 120px;
   display: flex;
-  background-color: #f4f4f4;
+  background-color: #F6F6F6;
   flex-direction: column;
   justify-content: flex-start;
   position: relative;
@@ -552,40 +532,8 @@ export default defineComponent({
   color: #10b981 !important;
 }
 
-/* Filters */
 
-.filter-row .v-select,
-.filter-row .v-text-field {
-  max-width: 100%;
-  margin-right: 26px;
-}
 
-/* Table card */
-.table-card {
-  border-radius: 8px;
-  border: 1px solid #eee;
-  padding-bottom: 0;
-  overflow: hidden;
-}
-
-/* Table header/title */
-.table-title {
-  font-weight: 700;
-  font-size: 16px;
-}
-.table-subtitle {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-/* Table styles */
-.gestores-table {
-  padding: 0 16px 16px 16px;
-}
-.id-cell {
-  font-weight: 700;
-  color: #374151;
-}
 .action-icon {
   cursor: pointer;
   color: #6b7280;

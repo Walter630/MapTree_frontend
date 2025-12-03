@@ -34,17 +34,61 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-8 summary-cards-row">
-      <v-col cols="12" sm="6" md="3" v-for="(card, index) in summaryCards" :key="index">
+
+    <!-- Quick cards (com "ocr" ícone no canto direito) -->
+    <v-row class="cards-row" align="stretch" justify="start" elevation="0">
+      <v-col cols="12" sm="6" md="3">
         <v-card class="summary-card">
-          <div class="d-flex justify-space-between align-start">
-            <div class="summary-title">{{ card.title }}</div>
-            <v-icon class="summary-icon">{{ card.icon }}</v-icon>
+          <div class="card-head">
+            <div class="summary-head">
+              <span>Total de Empresas</span>
+            </div>
+            <v-icon class="corner-icon" small>mdi-domain</v-icon>
           </div>
-          <v-card-text class="pa-0 mt-2">
-            <div class="summary-value">{{ card.value }}</div>
-            <div :class="['summary-note', card.noteClass]">{{ card.note }}</div>
-          </v-card-text>
+
+          <div class="summary-value">{{ totalEmpresas }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" sm="6" md="3">
+        <v-card class="summary-card">
+          <div class="card-head">
+            <div class="summary-head">
+              <span>Pendentes</span>
+            </div>
+            <v-icon class="corner-icon" small>mdi-alert-circle-outline</v-icon>
+          </div>
+
+          <div class="summary-value">18</div>
+          <div class="summary-note text-danger">Requerem atenção</div>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" sm="6" md="3">
+        <v-card class="summary-card">
+          <div class="card-head">
+            <div class="summary-head">
+              <span>Taxa de Conclusão</span>
+            </div>
+            <v-icon class="corner-icon" small>mdi-chart-donut</v-icon>
+          </div>
+
+          <div class="summary-value">94%</div>
+          <div class="summary-note text-success">▲ 2% vs última semana</div>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" sm="6" md="3">
+        <v-card class="summary-card">
+          <div class="card-head">
+            <div class="summary-head">
+              <span>Taxa de Conclusão</span>
+            </div>
+            <v-icon class="corner-icon" small>mdi-chart-donut</v-icon>
+          </div>
+
+          <div class="summary-value">94%</div>
+          <div class="summary-note text-success">▲ 2% vs última semana</div>
         </v-card>
       </v-col>
     </v-row>
@@ -110,7 +154,7 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-8">
+    <v-row class="mt-8" style="background-color: #F6F6F6">
       <v-col cols="12" class="pa-0">
         <p class="table-title-text mb-4">Empresas Cadastradas</p>
 
@@ -118,39 +162,31 @@
           :headers="headers"
           :items="empresas"
           :search="search"
-          :sort-by="[{ key: 'nome', order: 'asc' }]"
           class="elevation-0 data-table-custom"
           hide-default-footer
         >
-          <template #item.id="{ item }">
-            <div class="text-subtitle-2 font-weight-regular table-id">{{ item.id }}</div>
-          </template>
-
-          <template #item.name="{ item }">
-            <div class="text-body-1 table-text">{{ item.name }}</div>
-          </template>
-
-          <template #item.taxId="{ item }">
-            <div class="text-body-1 table-text">{{ item.taxId }}</div>
-          </template>
-
-          <template #item.managerId="{ item }">
-            <div class="text-body-1 table-text">{{ item.managerId }}</div>
-          </template>
-
-          <template #item.isActive="{ item }">
-            <v-chip color="green" class="font-weight-bold status-chip">
-              {{ item.isActive }}
-            </v-chip>
-          </template>
-
-          <template #item.acoes="{ item }">
-            <v-icon size="small" class="mr-2 action-icon" @click="editItem(item)"
-            >mdi-square-edit-outline</v-icon
-            >
-            <v-icon size="small" class="action-icon" @click="openDialogDelete(item)"
-            >mdi-trash-can-outline</v-icon
-            >
+          <!-- slot genérico da linha: aqui você monta todas as células -->
+          <template #item="{ item }">
+            <!-- células para cada coluna (substitua classes/estrutura conforme seu table) -->
+            <tr>
+              <td class="table-id">{{ item.name }}</td>
+              <td class="table-text">{{ item.taxId }}</td>
+              <td class="table-text">{{ item.manager.name }}</td>
+              <td>
+                <v-chip color="green" class="font-weight-bold status-chip">
+                  {{ item.isActive }}
+                </v-chip>
+              </td>
+              <!-- coluna de ações (sem usar item.acoes) -->
+              <td>
+                <v-icon size="small" class="mr-2 action-icon" @click="openDialogUpdate(item)">
+                  mdi-square-edit-outline
+                </v-icon>
+                <v-icon size="small" class="action-icon" @click="openDialogDelete(item)">
+                  mdi-trash-can-outline
+                </v-icon>
+              </td>
+            </tr>
           </template>
         </v-data-table>
       </v-col>
@@ -173,7 +209,7 @@
       <v-card-text>
         <p>Tem certeza de que deseja excluir esta empresa?</p>
         <ul class="ml-5">
-          <li>{{ dialogDelete?.item?.name }}</li>
+          <li style="font-weight: bold">{{ dialogDelete?.item?.name }}</li>
           <li>{{ dialogDelete?.item?.taxId }}</li>
         </ul>
       </v-card-text>
@@ -184,20 +220,49 @@
       </v-card-actions>
     </v-card>
   </v-dialog>
+  <v-dialog v-model="dialogUpdate.active" max-width="500px">
+    <v-card width="500px">
+      <v-card-title class="text-h6">
+        Edição de Empresa
+        <v-btn
+          style="position: absolute; top: 0; right: 0;"
+          icon="mdi-close"
+          variant="text"
+          @click="closeDialogUpdate"
+          color="red"
+          :disabled="dialogUpdate.loading"
+        />
+      </v-card-title>
+      <v-card-text>
+        <p>Tem certeza de que deseja editar esta empresa?</p>
+        <ul class="ml-5">
+          <li>{{ dialogUpdate?.item?.name }}</li>
+          <li>{{ dialogUpdate?.item?.taxId }}</li>
+        </ul>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn text @click="closeDialogUpdate" :disabled="dialogUpdate.loading">Cancelar</v-btn>
+        <v-btn color="red" :loading="dialogUpdate.loading" :disabled="dialogUpdate.loading" text @click="editItem">Editar</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
 </template>
 
 <script lang="ts">
 import { defineComponent } from 'vue'
-import router from '@/router'
 import type { Company } from '@/plugins/apiConnect.ts'
+import type { Manager } from '@/plugins/apiConnect.ts'
 
-interface Empresa {
+interface Company {
   id: string;
   name: string;
   taxId: string;
   isOutsourced: boolean     //se é terceirizada
-  managerId: string;
-  isActive?: boolean;
+  managerId?: string;
+  manager: Manager;
+  isActive: boolean;
 }
 
 export default defineComponent({
@@ -205,8 +270,7 @@ export default defineComponent({
 
   data() {
     return {
-      empresas: [] as Empresa[],
-      totalEmpresas: 0,
+      empresas: [] as Company[],
       filterEmpresa: null,
       filterCidade: null,
       search: '',
@@ -214,41 +278,45 @@ export default defineComponent({
       cidades: ['Rio de Janeiro', 'São Paulo', 'Fortaleza'],
       page: 1,
       itemsPerPage: 10,
-      summaryCards: [
-        { title: 'Total de Empresas', icon: 'mdi-domain', value: '2,543', note: '↑ 12% vs mês anterior', noteClass: 'text-success' },
-        { title: 'Ativas', icon: 'mdi-alert-circle-outline', value: '18', note: 'Requerem atenção', noteClass: 'text-error' },
-        { title: 'Planos Premium', icon: 'mdi-information-outline', value: '94%', note: '↑ 2% vs última semana', noteClass: 'text-success' },
-        { title: 'Suspensas', icon: 'mdi-information-outline', value: '0', note: '↓ 2% vs última semana', noteClass: 'text-success' }, // Ajustado para o ícone e nota da imagem
-      ],
 
       // Headers ajustados para a imagem
       headers: [
         { title: 'Nome', key: 'name', sortable: true },
         { title: 'CNPJ', key: 'taxId', sortable: true },
-        { title: 'Gestor', key: 'manager.name', sortable: true },
+        { title: 'Gestor', key: 'managerId', sortable: true },
         { title: 'Status', key: 'isActive', sortable: true },
         { title: 'Ações', key: 'acoes', sortable: false, align: 'end' },
       ],
       // backup para filtros
-      allCompanies: [] as Empresa[],
+      allCompanies: [] as Company[],
       // Dados da Tabela simulando os estados da imagem
 
       // dialog delete
       dialogDelete: {
         active: false,
-        item: null as Empresa | null,
+        item: null as Company | null,
         loading: false,
+      },
+
+      dialogUpdate: {
+        active: false,
+        item: null as Company | null,
+        loading: false
       }
     }
   },
   computed: {
     pageCount() {
       return Math.ceil(this.empresas.length / this.itemsPerPage)
+    },
+    totalEmpresas() {
+      return this.empresas.length
     }
   },
   mounted() {
     this.getCompanies()
   },
+
 
   methods: {
     // Função auxiliar para retornar a cor do v-chip com base no Status
@@ -261,12 +329,11 @@ export default defineComponent({
           taxId: company.taxId,
           isOutsourced: company.isOutsourced,
           manager: company.manager,
-          managerId: company.manager.id,
+          managerId: company.managerId,
           isActive: company.isActive, // Transforma Boolean em String visual
         }))
         this.totalEmpresas = this.allCompanies.length
-        console.log(this.allCompanies)
-        // exibir na tabela
+
         this.empresas = [...this.allCompanies]
       } catch (error) {
         console.error('Failed to fetch companies:', error)
@@ -283,8 +350,25 @@ export default defineComponent({
     applyFilters() {
       console.log('Filtros aplicados:', this.filterEmpresa, this.search, this.filterCidade)
     },
-    editItem(item: Empresa) {
-      this.$router.push(`/admin/edit-company/${item.id}`)
+    async editItem() {
+      try {
+        this.dialogUpdate.loading = true;
+        await this.$api.patch(`/organizations/${this.dialogUpdate?.item?.id}`, {
+          name: this.dialogUpdate?.item?.name,
+          taxId: this.dialogUpdate?.item?.taxId,
+          isOutsourced: this.dialogUpdate?.item?.isOutsourced,
+          manager: this.dialogUpdate?.item?.manager,
+          managerId: this.dialogUpdate?.item?.managerId,
+          isActive: this.dialogUpdate?.item?.isActive,
+        });
+      } catch (error) {
+        console.error('Erro ao buscar empresa:', error);
+      } finally {
+        await this.getCompanies();
+        this.dialogUpdate.loading = false;
+        this.dialogUpdate.active = false;
+        this.dialogUpdate.item = null;
+      }
     },
     async deleteItem() {
       try {
@@ -299,7 +383,7 @@ export default defineComponent({
         this.dialogDelete.item = null;
       }
     },
-    openDialogDelete(item: Empresa) {
+    openDialogDelete(item: Company) {
       this.dialogDelete.active = true
       this.dialogDelete.item = item
     },
@@ -307,15 +391,22 @@ export default defineComponent({
       this.dialogDelete.active = false;
       this.dialogDelete.item = null;
       this.dialogDelete.loading = false;
-    }
+    },
+    closeDialogUpdate() {
+      this.dialogUpdate.active = false;
+      this.dialogUpdate.item = null;
+      this.dialogUpdate.loading = false;
+    },
+    openDialogUpdate(item: Company) {
+      this.dialogUpdate.active = true
+      this.dialogUpdate.item = item
+    },
   },
 })
 </script>
 
 <style scoped>
-/* ---- PADRÃO GESTORES ---- */
 
-/* Container mais compacto */
 .empresas-container {
   margin-top: 20px;
   padding: 24px;
@@ -357,16 +448,13 @@ export default defineComponent({
   padding: 16px;
   min-height: 120px;
   display: flex;
-  background-color: #f4f4f4;
+  background-color: #F6F6F6;
   flex-direction: column;
   justify-content: flex-start;
   position: relative;
   box-shadow: none;
 }
 
-.summary-title {
-  font-size: 13px;
-}
 .summary-value {
   margin-top: 22px;
   font-size: 28px;
@@ -376,6 +464,12 @@ export default defineComponent({
   margin-top: 6px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
 }
 
 /* ---- FILTROS ---- */
@@ -407,10 +501,7 @@ export default defineComponent({
 .data-table-custom {
   border-radius: 8px;
   overflow: hidden;
-}
-
-.data-table-custom >>> th {
-  font-size: 11px !important;
+  background-color: #F6F6F6;
 }
 
 .table-text,
@@ -432,8 +523,10 @@ export default defineComponent({
   height: 22px !important;
 }
 
-/* Espaçamento geral dos rows */
-.v-row {
-  margin-bottom: 4px !important;
+.cards-row {
+  margin-top: 8px;
+  box-shadow: none;
+
 }
+
 </style>

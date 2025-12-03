@@ -1,45 +1,83 @@
 <script lang="ts">
-import { useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app.ts'
-import { ref } from 'vue'
+import { defineComponent } from 'vue';
 
-export default {
-  name: 'MainComponent',
-  setup() {
-    const search = ref('')
-    const router = useRouter()
-    const store = useAppStore()
-
-
-    const empresas = ref([
-      {
-        nome: 'EcoEnergia Sul',
-        gestor: 'Carlos Silva',
-        data: '2024-11-08',
-        status: 'Ativa',
-        cor: '#D5F8D1'
-      },
-      {
-        nome: 'Verde Luz Nordeste',
-        gestor: 'Ana Santos',
-        data: '2024-11-07',
-        status: 'Ativa',
-        cor: '#D5F8D1'
-      },
-      {
-        nome: 'PowerTree Centro',
-        gestor: 'João Costa',
-        data: '2024-11-09',
-        status: 'Pendente',
-        cor: '#FFF8B3'
-      }
-    ])
-
-    const clearSearch = () => search.value = ''
-
-    return { search, router, store, empresas, clearSearch }
-  }
+// Definindo um tipo TypeScript para os dados que vêm da API
+// Adapte esta interface para corresponder exatamente à estrutura JSON que o seu backend retorna.
+interface EmpresaAPI {
+  id: number;
+  name: string; // Ou 'nome', dependendo da API
+  managerName: string; // Ou 'gestor'
+  status: 'active' | 'pending' | 'inactive'; // Assumindo status em inglês
+  createdAt: string; // Data de criação
 }
+
+// Interface para o objeto transformado que o template usa (mantendo a estrutura original do template)
+interface EmpresaDisplay {
+  nome: string;
+  data: string;
+  gestor: string;
+  status: string;
+  cor: string;
+}
+
+export default defineComponent({
+  name: 'CompaniesListComponent',
+  data() {
+    return {
+      search: '' as string,
+      empresas: [] as EmpresaDisplay[], // Lista vazia inicialmente
+      loading: false as boolean,
+      error: null as string | null,
+    };
+  },
+  methods: {
+    formatStatus(status: EmpresaAPI['status']): { label: string, color: string } {
+      switch (status) {
+        case 'active':
+          return { label: 'Ativo', color: '#4CAF50' };
+        case 'pending':
+          return { label: 'Pendente', color: '#FFEB3B' };
+        case 'inactive':
+          return { label: 'Inativo', color: '#F44336' };
+        default:
+          return { label: 'Desconhecido', color: '#9E9E9E' };
+      }
+    },
+    async getCompanies() {
+      this.loading = true;
+      this.error = null;
+      try {
+        // ASSUMIMOS que this.$api está disponível globalmente via um plugin Vue/Nuxt
+        const response = await this.$api.get<EmpresaAPI[]>('/organizations');
+
+        // Mapeamos os dados da API para o formato que o template espera
+        this.empresas = response.data.map(item => {
+          const statusInfo = this.formatStatus(item.status);
+          return {
+            nome: item.name,
+            data: new Date(item.createdAt).toLocaleDateString('pt-BR'),
+            gestor: item.managerName,
+            status: statusInfo.label,
+            cor: statusInfo.color,
+          };
+        });
+
+      } catch (e: any) {
+        console.error('Erro ao buscar empresas:', e.message);
+        this.error = 'Falha ao carregar dados das empresas.';
+      } finally {
+        this.loading = false;
+      }
+    },
+    clearSearch() {
+      this.search = '';
+    },
+  },
+  mounted() {
+    // Chamar a API automaticamente ao carregar o componente
+    this.getCompanies();
+  },
+});
 </script>
 <template>
   <v-container style="margin-top: 40px;">
@@ -107,55 +145,67 @@ export default {
       </v-col>
     </v-row>
 
-    <!-- Segunda Linha -->
-    <v-row style="margin-top: 35px;">
-      <!-- Distribuição de Planos -->
-      <v-col cols="12" md="6">
-        <v-card class="cardBox">
-          <h4 class="titleBox">Distribuição de Planos</h4>
-
-          <div class="centerBox">
-            Nenhuma Ação Realizada
-          </div>
-        </v-card>
-      </v-col>
-
-      <!-- Empresas Cadastradas -->
-      <v-col cols="12" md="6">
+    <v-row>
+      <v-col cols="12" md="6" offset-md="3">
         <v-card class="cardBox">
           <h4 class="titleBox">Empresas Cadastradas Recentemente</h4>
 
-          <v-row class="headerTable">
-            <v-col cols="4">Empresa</v-col>
-            <v-col cols="4">Gestor</v-col>
-            <v-col cols="4">Status</v-col>
-          </v-row>
+          <!-- Indicador de Carregamento -->
+          <div v-if="loading" class="centerBox">
+            <v-progress-circular indeterminate color="primary"></v-progress-circular>
+            <p class="ml-3">Carregando empresas...</p>
+          </div>
 
-          <div
-            v-for="(empresa, i) in empresas"
-            :key="i"
-            class="linhaEmpresa"
-          >
-            <v-row align="center">
-              <v-col cols="4" >
-                <div>{{ empresa.nome }}</div>
-                <div class="dataEmpresa">{{ empresa.data }}</div>
-              </v-col>
+          <!-- Mensagem de Erro -->
+          <div v-else-if="error" class="centerBox" style="color: #F44336;">
+            <p>{{ error }}</p>
+            <v-btn small color="error" @click="getCompanies">Tentar Novamente</v-btn>
+          </div>
 
-              <v-col cols="4">{{ empresa.gestor }}</v-col>
+          <!-- Lista Vazia -->
+          <div v-else-if="empresas.length === 0" class="centerBox">
+            Nenhuma empresa encontrada ou cadastrada recentemente.
+          </div>
 
-              <v-col cols="4">
-                <span
-                  class="badgeStatus"
-                  :style="{ backgroundColor: empresa.cor }"
-                >
-                  {{ empresa.status }}
-                </span>
-              </v-col>
+          <!-- Lista de Empresas -->
+          <div v-else>
+            <v-row class="headerTable">
+              <v-col cols="4">Empresa</v-col>
+              <v-col cols="4">Gestor</v-col>
+              <v-col cols="4">Status</v-col>
             </v-row>
 
-            <v-divider v-if="i < empresas.length - 1"></v-divider>
+            <div
+              v-for="(empresa, i) in empresas"
+              :key="empresa.nome"
+              class="linhaEmpresa"
+            >
+              <v-row align="center">
+                <v-col cols="4">
+                  <div>{{ empresa.nome }}</div>
+                  <div class="dataEmpresa">{{ empresa.data }}</div>
+                </v-col>
+
+                <v-col cols="4">{{ empresa.gestor }}</v-col>
+
+                <v-col cols="4">
+                  <span
+                    class="badgeStatus"
+                    :style="{ backgroundColor: empresa.cor }"
+                  >
+                    {{ empresa.status }}
+                  </span>
+                </v-col>
+              </v-row>
+
+              <v-divider v-if="i < empresas.length - 1"></v-divider>
+            </div>
           </div>
+        </v-card>
+      </v-col>
+      <v-col cols="6" md="6">
+        <v-card>
+
         </v-card>
       </v-col>
     </v-row>
