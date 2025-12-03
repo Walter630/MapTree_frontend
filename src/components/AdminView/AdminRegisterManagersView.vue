@@ -76,15 +76,14 @@
             <v-text-field
               v-model="formData.phone"
               :rules="[rules.required, rules.contactFormat]"
-              placeholder="555-555-1234"
-              mask="###-###-####"
+              placeholder="(XX) X XXXX-XXXX"
+              mask="(##) # ####-####"
               variant="outlined"
-
               hide-details
             >
               <template v-slot:prepend-inner>
                 <div class="d-flex align-center mr-2">
-                  <span class="mr-2" style="color: #344054;">+1</span>
+                  <span class="mr-2" style="color: #344054;">+55</span>
                   <v-divider vertical class="contact-divider"></v-divider>
                 </div>
               </template>
