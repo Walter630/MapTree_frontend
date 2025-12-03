@@ -24,7 +24,9 @@ export enum UserRole {
 export interface User {
   id: string
   name: string
+  cpf: string
   email: string
+  phone: string
   role: UserRole
   organization?: {
     id: string
@@ -323,6 +325,8 @@ export default {
 
 // Export instance for use outside Vue components
 export { apiConnect }
+
+export type { ApiConnect }
 
 // Type augmentation for Vue
 declare module '@vue/runtime-core' {
