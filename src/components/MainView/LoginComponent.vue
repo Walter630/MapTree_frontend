@@ -96,8 +96,7 @@
                   class="register-link"
                   style="color: blue; text-decoration: none; cursor: pointer"
                   @click="$router.push('/register')"
-                  >Cadastre-se</a
-                >
+                  >Cadastre-se</a>
                 <v-icon color="blue">mdi-chevron-right</v-icon>
               </div>
             </v-form>
