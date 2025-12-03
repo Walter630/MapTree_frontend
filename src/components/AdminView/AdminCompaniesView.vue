@@ -223,7 +223,6 @@ export default defineComponent({
 
       // Headers ajustados para a imagem
       headers: [
-
         { title: 'Nome', key: 'name', sortable: true },
         { title: 'CNPJ', key: 'taxId', sortable: true },
         { title: 'Gestor', key: 'manager.name', sortable: true },
@@ -243,12 +242,6 @@ export default defineComponent({
     }
   },
   computed: {
-    paginatedEmpresas() {
-      const start = (this.page - 1) * this.itemsPerPage
-      const end = start + this.itemsPerPage
-      return this.empresas.slice(start, end)
-    },
-
     pageCount() {
       return Math.ceil(this.empresas.length / this.itemsPerPage)
     }
@@ -259,8 +252,6 @@ export default defineComponent({
 
   methods: {
     // Função auxiliar para retornar a cor do v-chip com base no Status
-
-
     async getCompanies(): Promise<void> {
       try {
         const res = await this.$api.get<Company[]>('/organizations')

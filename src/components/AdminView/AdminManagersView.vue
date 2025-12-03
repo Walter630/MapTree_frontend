@@ -107,7 +107,7 @@
           <v-col cols="12" sm="4" md="2" class="pr-4">
             <p class="mb-2">Empresa</p>
             <v-select
-              v-model="filterEmpresa"
+              v-model="filterConta"
               :items="contas"
               item-title="name"
               item-value="id"
@@ -164,56 +164,44 @@
 
 
     <!-- Table card -->
-    <v-row class="mt-6">
-      <v-col cols="12">
-        <v-card class="table-card" elevation="0">
-          <v-card-title class="pt-6 pb-4">
-            <div>
-              <div class="table-title">Gestores Cadastrados</div>
-              <div class="table-subtitle">Gerencie os gestores cadastrados no sistema</div>
-            </div>
-          </v-card-title>
+    <v-row class="mt-8">
+      <v-col cols="12" class="pa-0" bg-color="#f4f4f4">
+
+          <p class="table-title-text mb-4">Gestores Cadastradas</p>
           <v-data-table
-            class="gestores-table"
             :headers="headers"
-            :items="paginatedGestores"
-            :items-per-page="itemsPerPage"
-            :page="page"
+            :items="gestores"
             :search="search"
-            @update:page="page = $event"
+            :sort-by="[{ key: 'nome', order: 'asc' }]"
+            class="elevation-0 data-table-custom"
             hide-default-footer
           >
-          <template #item.id="{ item }">
-              <div class="id-cell">{{ item.id }}</div>
-            </template>
-
-            <template #item.nome="{ item }">
+            <template #item.name="{ item }">
               <div class="d-flex align-center">
                 <v-avatar size="10" class="mr-2">
-                  <v-img :src="item.fotoUrl" :alt="item.nome" cover />
+                  <v-img :src="item.fotoUrl" :alt="item.name" cover />
                 </v-avatar>
-                <div>{{ item.nome }}</div>
+                <div class="text-body-1 table-text">{{ item.name }}</div>
               </div>
             </template>
 
-            <template #item.company="{ item }">
-              <div>{{ item.company }}</div>
+            <template #item.companyId="{ item }">
+              <div class="text-body-1 table-text">{{ item.companyId }}</div>
             </template>
 
-            <template #item.status="{ item }">
-              <v-chip
-                :class="statusClass(item.status)"
-                small
-                style="min-width: 20px"
-                :style="{ backgroundColor: statusBg(item.status) }"
-              >
-                {{ item.status }}
+            <template #item.isActive="{ item }">
+              <v-chip color="green" class="font-weight-bold status-chip">
+                {{ item.isActive }}
               </v-chip>
             </template>
 
             <template #item.acoes="{ item }">
-              <v-icon small class="mr-2 action-icon" @click="editItem(item)">mdi-pencil</v-icon>
-              <v-icon small class="action-icon" @click="deleteItem(item)">mdi-delete</v-icon>
+              <v-icon size="small" class="mr-2 action-icon" @click="openDialogEdit(item)"
+              >mdi-square-edit-outline</v-icon
+              >
+              <v-icon size="small" class="action-icon" @click="openDialogDelete(item)"
+              >mdi-trash-can-outline</v-icon
+              >
             </template>
           </v-data-table>
 
@@ -222,10 +210,66 @@
           <v-card-actions class="justify-center py-6">
             <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
           </v-card-actions>
-        </v-card>
       </v-col>
     </v-row>
+
+    <v-dialog v-model="dialogEdit.active" max-width="500px">
+      <v-card width="500px">
+        <v-card-title class="text-h6">
+          Edição de Gestor
+          <v-btn
+            style="position: absolute; top: 0; right: 0;"
+            icon="mdi-close"
+            variant="text"
+            @click="closeDialogEdit"
+            color="red"
+            :disabled="dialogEdit.loading"
+          />
+        </v-card-title>
+        <v-card-text>
+          <v-card v-if="dialogEdit.item" >
+            <v-card-text>
+              <v-text-field v-model="dialogEdit.item.name" label="Nome" />
+              <v-text-field v-model="dialogEdit.item.email" label="Email" />
+            </v-card-text>
+          </v-card>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text @click="closeDialogEdit" :disabled="dialogEdit.loading">Cancelar</v-btn>
+          <v-btn color="red" :loading="dialogEdit.loading" :disabled="dialogEdit.loading" text @click="editItem">Editar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </v-container>
+  <v-dialog v-model="dialogDelete.active" max-width="500px">
+    <v-card width="500px">
+      <v-card-title class="text-h6">
+        Confirmação de Exclusão
+        <v-btn
+          style="position: absolute; top: 0; right: 0;"
+          icon="mdi-close"
+          variant="text"
+          @click="closeDialogDelete"
+          color="red"
+          :disabled="dialogDelete.loading"
+        />
+      </v-card-title>
+      <v-card-text>
+        <p>Tem certeza de que deseja excluir esta empresa?</p>
+        <ul class="ml-5">
+          <li>{{ dialogDelete?.item?.name }}</li>
+          <li>{{ dialogDelete?.item?.email }}</li>
+        </ul>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn text @click="closeDialogDelete" :disabled="dialogDelete.loading">Cancelar</v-btn>
+        <v-btn color="red" :loading="dialogDelete.loading" :disabled="dialogDelete.loading" text @click="deleteItem">Excluir</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script lang="ts">
@@ -234,9 +278,10 @@ import type { User } from '@/plugins/apiConnect.ts'
 
 interface Gestor {
   id: string
-  nome: string
-  company: string
-  status: string
+  name: string
+  companyId: string
+  email: string
+  isActive?: boolean
 }
 
 // 👈 NOVA INTERFACE para o array de Filtro/Select
@@ -249,9 +294,8 @@ export default defineComponent({
   data() {
     return {
       gestores: [] as Gestor[],
-      totalGestores: 0, // 👈 Novo campo para a contagem dinâmica
+      totalGestores: 0,
 
-      // 👈 NOVAS PROPRIEDADES DE COMPARAÇÃO
       comparacaoPercentual: '',
       comparacaoCor: 'text-success', // ou 'text-danger'
       // filtros
@@ -267,12 +311,21 @@ export default defineComponent({
       itemsPerPage: 6,
       page: 1,
       headers: [
-
-        { title: 'Nome', key: 'nome' },
-        { title: 'Empresa', key: 'company' },
-        { title: 'Status', key: 'status', width: 120 },
-        { title: 'Ações', key: 'acoes', width: 120, sortable: false },
+        { title: 'Nome', key: 'name' , sortable: true},
+        { title: 'Empresa', key: 'company' ,sortable: true },
+        { title: 'Status', key: 'isActive', sortable: true },
+        { title: 'Ações', key: 'acoes',  sortable: false },
       ],
+      dialogDelete: {
+        active: false,
+        loading: false,
+        item: null as User | null,
+      },
+      dialogEdit: {
+        active: false,
+        loading: false,
+        item: null as User | null,
+      },
 
       // backup para filtros
       allGestores: [] as Gestor[],
@@ -297,20 +350,8 @@ export default defineComponent({
 
   methods: {
     async getAllCompaniesAndUsers(): Promise<void> {
-      await this.getAllCompanies(); // Garante que as empresas estejam carregadas
+
       await this.getAllUsers();     // Em seguida, carrega os usuários
-    },
-    async getAllCompanies(): Promise<void> {
-      try {
-        const response = await this.$api.get<User[]>('/organizations')
-        // Armazena a lista de empresas como OBJETOS { id, name }
-        this.contas = response.data.map((company) => ({
-          id: company.id,
-          name: company.name
-        }))
-      } catch (error) {
-        console.error('Erro ao buscar empresas:', error)
-      }
     },
     //usar computed
     /** 🔹 Buscar usuários do backend */
@@ -318,14 +359,15 @@ export default defineComponent({
       try {
         const response = await this.$api.get<User[]>('/users') // Usando 'any' para flexibilidade
 
-        this.allGestores = response.data.map((user) => ({
+        this.allGestores = response.data.map(user => ({
           id: user.id,
-          nome: user.name,
+          name: user.name,
           email: user.email,
 
           // Busca o objeto da empresa pelo ID (agora funciona pois 'this.contas' tem 'id' e 'name')
-          company: user?.organization?.name || '—',
-          status: 'Ativo',
+          company: user.organization,
+          companyId: user?.organization?.id,
+          isActive: user.isActive,
         }))
         // NOVO: Define o valor total
         this.totalGestores = this.allGestores.length;
@@ -336,19 +378,35 @@ export default defineComponent({
       }
     },
 
-    async editItem(item: Gestor) {
+    async editItem() {
       try {
-        const edit = await this.$api.get<User>(`/users/${item.id}`)
-        this.$router.push(`/admin/register-managers/${item.id}`)
+        this.dialogEdit.loading = true;
+        await this.$api.put(`/users/${this.dialogEdit?.item?.id}`)
       } catch (error) {
         console.error('Erro ao buscar usuário:', error)
+      } finally {
+        await this.getAllUsers();
+        this.dialogEdit.loading = false;
+        this.dialogEdit.active = false;
+        this.dialogEdit.item = null;
       }
+    },
+
+    openDialogEdit(item: User) {
+      this.dialogEdit.active = true
+      this.dialogEdit.item = item
+    },
+    closeDialogEdit() {
+      this.dialogEdit.active = false;
+      this.dialogEdit.item = null;
+      this.dialogEdit.loading = false;
     },
 
     /** 🔹 Usuário logado */
     getCurrentUser() {
       return this.$api?.isAuthenticated() ?? {}
     },
+
 
     /** 🔹 Criar novo gestor */
     addGestor() {
@@ -357,18 +415,25 @@ export default defineComponent({
 
 
     /** 🔹 Excluir item */
-    deleteItem(item: Gestor) {
-      if (confirm(`Deseja deletar ${item.nome}?`)) {
-        this.gestores = this.gestores.filter(g => g.id !== item.id)
-        this.$api.delete(`/users/${item.id}`)
+    async deleteItem() {
+      try {
+        this.dialogDelete.loading = true;
+        await this.$api.delete(`/users/${this.dialogDelete?.item?.id}`)
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error)
+      } finally {
+        await this.getAllUsers();
+        this.dialogDelete.loading = false;
+        this.dialogDelete.active = false;
+        this.dialogDelete.item = null;
       }
     },
 
     /** 🔹 Aplicar filtros */
     applyFilters() {
       this.gestores = this.allGestores.filter(g => {
-        const matchName = this.search ? g.nome?.toLowerCase().includes(this.search.toLowerCase()) : true
-        const matchConta = this.filterConta ? g.empresa === this.filterConta : true
+        const matchName = this.search ? g.name?.toLowerCase().includes(this.search.toLowerCase()) : true
+        const matchConta = this.filterConta ? g.companyId === this.filterConta : true
         const matchCidade = this.filterCidade ? g.cidade === this.filterCidade : true
         return matchName && matchConta && matchCidade
       })
@@ -376,21 +441,19 @@ export default defineComponent({
       this.page = 1
     },
 
+    openDialogDelete(item: User) {
+      this.dialogDelete.active = true
+      this.dialogDelete.item = item
+    },
+    closeDialogDelete() {
+      this.dialogDelete.active = false;
+      this.dialogDelete.item = null;
+      this.dialogDelete.loading = false;
+    },
+
     /** 🔹 Voltar */
     goBack() {
       this.$router.back()
-    },
-
-    /** 🔹 Classes de status */
-    statusClass(status: string) {
-      return { 'text-white': true }
-    },
-
-    /** 🔹 Cor do chip */
-    statusBg(status: string) {
-      if (status === 'Ativo') return '#C6F513'
-      if (status === 'Inativo') return '#e11d48'
-      return '#ddd'
     },
   },
 })
