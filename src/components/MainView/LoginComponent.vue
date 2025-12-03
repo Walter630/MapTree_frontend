@@ -22,10 +22,10 @@
                 color="green"
                 dense
                 hide-details
-                label="Email"
                 variant="outlined"
                 placeholder="Digite seu email"
                 required
+                density="compact"
               />
               <p>Senha</p>
               <v-text-field
@@ -34,10 +34,10 @@
                 color="green"
                 dense
                 hide-details
-                label="Senha"
                 variant="outlined"
                 placeholder="Digite sua senha"
                 required
+                density="compact"
                 :type="showPassword ? 'text' : 'password'"
                 @keyup.enter="login"
               >
@@ -94,7 +94,7 @@
                 Não possui uma conta?
                 <a
                   class="register-link"
-                  style="color: blue; text-decoration: none"
+                  style="color: blue; text-decoration: none; cursor: pointer"
                   @click="$router.push('/register')"
                   >Cadastre-se</a
                 >
