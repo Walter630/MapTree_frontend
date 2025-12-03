@@ -17,25 +17,25 @@
             <v-text-field
               v-model="formData.name"
               color="green"
-              class="mb-4"
+              class="mb-2"
               dense
               hide-details
-              label="Nome"
               variant="outlined"
               placeholder="Digite seu nome"
               required
+              density="compact"
             ></v-text-field>
 
             <p>CPF</p>
             <v-text-field
               v-model="formData.cpf"
               color="green"
-              class="mb-4"
+              class="mb-2"
               dense
               hide-details
-              label="Nome"
+              density="compact"
               variant="outlined"
-              placeholder="Digite seu nome"
+              placeholder="Digite seu CPF"
               required
             ></v-text-field>
 
@@ -43,23 +43,23 @@
             <v-text-field
               v-model="formData.phone"
               color="green"
-              class="mb-4"
+              class="mb-2"
               dense
               hide-details
-              label="Nome"
+              density="compact"
               variant="outlined"
-              placeholder="Digite seu nome"
+              placeholder="Digite seu telefone"
               required
             ></v-text-field>
 
             <p>Email</p>
             <v-text-field
               v-model="formData.email"
-              class="mb-4"
+              class="mb-2"
               color="green"
               dense
               hide-details
-              label="Email"
+              density="compact"
               variant="outlined"
               placeholder="Digite seu email"
               required
@@ -68,11 +68,11 @@
             <p>Senha</p>
             <v-text-field
               v-model="formData.password"
-              class="mb-4"
+              class="mb-2"
               color="green"
               dense
               hide-details
-              label="Senha"
+              density="compact"
               variant="outlined"
               placeholder="Digite sua senha"
               required
@@ -98,7 +98,7 @@
               Já possui uma conta?
               <a
                 class="register-link"
-                style="color: blue; text-decoration: none;"
+                style="color: blue; text-decoration: none; cursor: pointer;"
                 @click="$router.push('/login')"
               >
                 Fazer Login
