@@ -22,4 +22,10 @@ export const useAppStore = defineStore('app', {
       this.loadingPage = value
     },
   },
+
+  getters: {
+    getOrganizationId(): string | null {
+      return this.user?.organization?.id || null;
+    }
+  }
 })
