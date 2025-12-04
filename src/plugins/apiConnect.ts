@@ -6,6 +6,7 @@
 
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { App } from 'vue'
+import type { Data } from '@vue-leaflet/vue-leaflet/dist/src/utils'
 
 interface TokenData {
   accessToken: string | null
@@ -53,6 +54,7 @@ export interface Company {
   managerId?: string
   manager: Manager
   isActive: boolean
+  createdAt?: Data
 }
 
 export interface Manager {

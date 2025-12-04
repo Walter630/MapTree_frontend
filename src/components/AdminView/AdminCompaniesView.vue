@@ -93,7 +93,7 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-10">
+    <v-row class="mt-10 mb-12">
       <v-col cols="12" class="filters-box pa-4">
         <div class="d-flex align-center mb-4">
           <v-icon class="mr-2 filter-icon">mdi-filter-variant</v-icon>
@@ -154,10 +154,9 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-8" style="background-color: #F6F6F6">
+    <v-row class="mt-12" style="background-color: #F6F6F6; border-radius: 8px;">
       <v-col cols="12" class="pa-0">
-        <p class="table-title-text mb-4">Empresas Cadastradas</p>
-
+        <p class="table-title-text mb-4 " style="font-size: 14px">Empresas Cadastradas</p>
         <v-data-table
           :headers="headers"
           :items="empresas"
@@ -189,6 +188,9 @@
             </tr>
           </template>
         </v-data-table>
+        <v-card-actions class="justify-center py-6">
+          <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
+        </v-card-actions>
       </v-col>
     </v-row>
   </v-container>
@@ -235,10 +237,13 @@
       </v-card-title>
       <v-card-text>
         <p>Tem certeza de que deseja editar esta empresa?</p>
-        <ul class="ml-5">
-          <li>{{ dialogUpdate?.item?.name }}</li>
-          <li>{{ dialogUpdate?.item?.taxId }}</li>
-        </ul>
+        <v-card v-if="dialogUpdate.item">
+          <v-card-text>
+            <v-text-field v-model="dialogUpdate.item.name" label="Nome" />
+            <v-text-field v-model="dialogUpdate.item.taxId" label="CNPJ" />
+            <v-text-field v-model="dialogUpdate.item.manager.name" label="Representante" />
+          </v-card-text>
+        </v-card>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -252,7 +257,6 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
-import type { Company } from '@/plugins/apiConnect.ts'
 import type { Manager } from '@/plugins/apiConnect.ts'
 
 interface Company {
@@ -436,14 +440,14 @@ export default defineComponent({
   height: 42px !important;
   background: #c6f513 !important;
   border-radius: 8px;
-  margin-top: -10px !important;
+  margin-top: 10px !important;
   margin-bottom: 10px !important;
 }
 
 /* ---- CARDS RESUMO ---- */
 
 .summary-card {
-  border: 1px solid #e8e8e8;
+  border: 1px solid #CDCDCD;
   border-radius: 8px;
   padding: 16px;
   min-height: 120px;
@@ -462,7 +466,7 @@ export default defineComponent({
 }
 .summary-note {
   margin-top: 6px;
-  color: #6b7280;
+  color: #9aa0a6;
   font-size: 13px;
 }
 
@@ -478,7 +482,7 @@ export default defineComponent({
   border-radius: 8px;
   padding: 18px !important;
   margin-top: 20px !important;
-  background: #f9fafb !important;
+  background: #f6f6f6 !important;
 }
 
 .filter-field {
@@ -496,12 +500,16 @@ export default defineComponent({
 .table-title-text {
   font-size: 15px;
   margin-bottom: 8px !important;
+  padding: 10px !important;
 }
 
 .data-table-custom {
   border-radius: 8px;
   overflow: hidden;
   background-color: #F6F6F6;
+  box-shadow: none;
+  padding: 10px !important;
+  margin-bottom: 10px !important;
 }
 
 .table-text,
@@ -526,7 +534,7 @@ export default defineComponent({
 .cards-row {
   margin-top: 8px;
   box-shadow: none;
-
+  padding: 0 !important;
 }
 
 </style>

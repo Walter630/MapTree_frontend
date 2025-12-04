@@ -10,16 +10,6 @@
           <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
           <span class="text-caption font-weight-bold" style="color: #2f3367">#CadastrarEmpresas</span>
         </div>
-
-        <div class="d-flex align-center">
-          <v-btn icon depressed class="mr-3 back-btn" @click="goBack">
-            <v-icon>mdi-chevron-left</v-icon>
-          </v-btn>
-          <div>
-            <p class="title-text">Cadastrar Empresa</p>
-            <p class="subtitle-text">Insira as informações da nova empresa</p>
-          </div>
-        </div>
       </v-col>
     </v-row>
 
@@ -36,7 +26,7 @@
       </v-col>
 
       <v-col>
-        <h1 style="color: #101828; font-size: 24px; font-weight: 600; margin-bottom: 4px">
+        <h1 style="color: #2F3367; font-size: 20px; font-weight: 600; margin-bottom: 4px">
           Cadastro de Empresas
         </h1>
         <p style="color: #667085; font-size: 16px">Cadastre as empresas e seus dados principais.</p>
@@ -71,22 +61,20 @@
                 density="comfortable"
               ></v-text-field>
             </div>
-
-            <v-select
-              v-model="managerId"
-              :items="managers"
-              item-title="name"
-              item-value="id"
-              label="Selecione o Gerente"
-              class="custom-field"
-            ></v-select>
-
-
+            <div>
+              <label class="field-label">Gerente</label>
+              <v-select
+                v-model="managerId"
+                :items="managers"
+                item-title="name"
+                item-value="id"
+                label="Selecione o Gerente"
+                class="custom-field"
+              ></v-select>
+            </div>
           </v-col>
 
-
           <!-- COLUNA 2 -->
-
           <v-col cols="12" md="6" class="d-flex flex-column gap-4">
             <div>
               <label class="field-label">Terceirizada</label>
@@ -230,4 +218,5 @@ export default defineComponent ({
   border: 1px solid #d0d5dd;
   border-radius: 8px;
 }
+
 </style>

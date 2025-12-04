@@ -26,7 +26,7 @@
             <v-btn
               color="#C6F513"
               size="large"
-              class="font-weight-bold text-black text-none new-empresa-btn"
+              class="font-weight-bold text-black text-none new-gestor-btn"
               prepend-icon="mdi-plus"
               @click="addGestor"
             >
@@ -48,7 +48,6 @@
             <!-- ícone pequeno no canto (ocr) -->
             <v-icon class="corner-icon" small>mdi-account-multiple</v-icon>
           </div>
-
           <div class="summary-value">{{ totalGestores }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
         </v-card>
       </v-col>
@@ -97,13 +96,13 @@
     </v-row>
 
     <!-- Filters box -->
-    <v-row class="mt-10">
+    <v-row class="mt-10 mb-12">
       <v-col cols="12" class="filters-box pa-4">
         <div class="d-flex align-center mb-4">
           <v-icon class="mr-2 filter-icon">mdi-filter-variant</v-icon>
           <p class="filter-text">Filtros</p>
         </div>
-        <v-row align="center" no-gutters style="display: flex; align-items: center; justify-content: space-between;">
+        <v-row  no-gutters style="display: flex; align-items: center; justify-content: space-between;">
           <v-col cols="12" sm="4" md="2" class="pr-4">
             <p class="mb-2">Empresa</p>
             <v-select
@@ -164,9 +163,9 @@
 
 
     <!-- Table card -->
-    <v-row class="mt-8">
-      <v-col cols="12" class="pa-0" bg-color="#f4f4f4">
-        <p class="table-title-text mb-4">Gestores Cadastradas</p>
+    <v-row class="mt-12" style="background-color: #F6F6F6; border-radius: 8px;">
+      <v-col cols="12" class="pa-0">
+        <p class="table-title-text mb-4" style="font-size: 14px">Gestores Cadastradas</p>
           <v-data-table
             :headers="headers"
             :items="gestores"
@@ -197,8 +196,6 @@
             </tr>
             </template>
           </v-data-table>
-
-          <v-divider></v-divider>
           <v-card-actions class="justify-center py-6">
             <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
           </v-card-actions>
@@ -471,11 +468,17 @@ export default defineComponent({
 /* Back button */
 .back-btn {
   border: 1px solid #e6e6e6;
-  background: white;
+  background: #f6f6f6;
   min-width: 36px;
   min-height: 36px;
   border-radius: 8px;
+}
 
+.filters-box {
+  border-radius: 8px;
+  padding: 18px !important;
+  margin-top: 20px !important;
+  background: #f6f6f6 !important;
 }
 /* Summary cards */
 .cards-row {
@@ -484,7 +487,7 @@ export default defineComponent({
 
 }
 .summary-card {
-  border: 1px solid #e8e8e8;
+  border: 1px solid #D0D5DD;
   border-radius: 8px;
   padding: 16px;
   min-height: 120px;
@@ -522,7 +525,7 @@ export default defineComponent({
 }
 .summary-note {
   margin-top: 6px;
-  color: #6b7280;
+  color: #9aa0a6;
   font-size: 13px;
 }
 .text-danger {
@@ -532,11 +535,31 @@ export default defineComponent({
   color: #10b981 !important;
 }
 
-
-
+.new-gestor-btn {
+  height: 42px !important;
+  background: #c6f513 !important;
+  border-radius: 8px;
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
 .action-icon {
   cursor: pointer;
   color: #6b7280;
+}
+
+.data-table-custom {
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #F6F6F6;
+  box-shadow: none;
+  padding: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.table-title-text {
+  font-size: 15px;
+  margin-bottom: 8px !important;
+  padding: 10px !important;
 }
 
 /* Responsive tweaks */

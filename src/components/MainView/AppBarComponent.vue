@@ -1,17 +1,14 @@
 <template>
-  <!-- DESKTOP -->
-  <v-app-bar color="white" flat v-if="!isMobile" style="margin: 1px 0">
-
-    <!-- Logo -->
+  <v-app-bar color="white" flat v-if="!isMobile" style="margin: 1px 0 1px 0; ">
     <img
       src="@/assets/LogomaptreeHeaderpng.png"
       alt="Logo"
       style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px;"
+      @click="goTo('/')"
     />
 
     <v-spacer />
 
-    <!-- MENU -->
     <v-toolbar-items class="d-flex justify-center" style="margin-top: 10px;">
       <v-btn
         v-for="item in currentMenu"
@@ -30,23 +27,81 @@
     </v-toolbar-items>
 
     <v-spacer />
-    <v-btn icon :color="isActive('/notifications') ? green : 'black'" style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;" @click="goTo('/gestor/notifications')">
+    <v-btn
+      icon
+      :color="isActive('/gestor/notifications') ? green : 'black'"
+      style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;"
+      @click="goTo('/gestor/notifications')"
+    >
       <v-icon>mdi-bell-outline</v-icon>
     </v-btn>
 
-    <!-- Perfil -->
-    <v-avatar size="45" color="grey-darken-2" style="margin-right: 20px;" @click="goTo('')">
-      <img
-        src="@/assets/Logomaptreeverde.png"
-        alt="Perfil"
-        style="width: 45px; height: 45px; border-radius: 50%;"
-      />
+    <v-menu min-width="200px">
+      <template v-slot:activator="{ props }">
+        <div
+          v-bind="props"
+          style="
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          gap: 10px;
+          padding: 5px 10px;
+        "
+        >
+          <v-avatar size="40" style="background-color: #C1E328;">
+            <img
+              src="@/assets/Logomaptreeverde.png"
+              alt="Perfil"
+              style="width: 40px; height: 40px; border-radius: 50%;"
+            />
+          </v-avatar>
 
-    </v-avatar>
+          <span style="font-size: 16px; color: black;">
+            {{ user?.name || 'Usuário' }}
+          </span>
+
+          <v-icon size="20">mdi-menu-down</v-icon>
+        </div>
+      </template>
+      <v-card>
+        <v-card-text>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <v-avatar size="40" style="background-color: #C1E328; ">
+              <img
+                src="@/assets/Logomaptreeverde.png"
+                alt="Perfil"
+                style="width: 40px; height: 40px; border-radius: 50%; align-items: center;"
+              />
+            </v-avatar>
+          </div>
+          <div class="mx-auto text-center">
+            <h3>{{ user?.name }}</h3>
+            <p class="text-caption mt-1">
+              {{ user?.email }}
+            </p>
+            <v-divider class="my-3"></v-divider>
+            <v-btn
+              variant="text"
+              rounded
+              @click="editAccount"
+            >
+              Edit Account
+            </v-btn>
+            <v-divider class="my-3"></v-divider>
+            <v-btn
+              variant="text"
+              rounded
+              @click="logout"
+            >
+              Disconnect
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-menu>
 
   </v-app-bar>
 
-  <!-- MOBILE -->
   <v-app-bar flat v-else>
     <v-btn icon @click="drawer = !drawer">
       <v-icon>mdi-menu</v-icon>
@@ -70,9 +125,8 @@
     </v-navigation-drawer>
   </v-app-bar>
 </template>
+
 <script lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 interface MenuItem {
@@ -84,86 +138,106 @@ interface MenuItem {
 export default {
   name: 'AppBarComponent',
 
-  setup() {
-    const store = useAppStore()
-    const route = useRoute()
-    const router = useRouter()
-
-    const drawer = ref(false)
-    const green = '#C1E328'
-
-    // 🔥 MENUS POR ROLE
-    const menus: Record<string, MenuItem[]> = {
-      ADMIN: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
-        { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
-        { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
-      ],
-
-      MANAGER: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
-        { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
-        { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
-      ],
-
-      USER: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
-        { title: 'Podas', icon: 'mdi-content-cut', to: '/podas' },
-        { title: 'Relatórios', icon: 'mdi-file-chart', to: '/relatorios' }
-      ],
-
-      USER_CREDENCIADO: [
-        { title: 'Painel', icon: 'mdi-view-dashboard', to: '/credenciado' },
-        { title: 'Rotas', icon: 'mdi-map', to: '/credenciado/rotas' },
-        { title: 'Podas', icon: 'mdi-leaf', to: '/credenciado/podas' },
-      ],
-
-      GUEST: [
-        { title: 'Login', icon: 'mdi-login', to: '/login' },
-        { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' }
-      ],
-    }
-
-    // 🔥 MENU BASEADO NO USUÁRIO LOGADO
-    const currentMenu = computed<MenuItem[]>(() => {
-      const role = store.user?.role
-
-      if (!role) return menus.ADMIN
-
-      return menus[role] ?? menus.ADMIN
-    })
-
-    const isActive = (path: string) => route.path === path
-
-    const goTo = (path: string) => {
-      router.push(path)
-      drawer.value = false
-    }
-
-    // MOBILE
-    const isMobile = computed(() => store.isMobile)
-
-    const checkMobile = () => {
-      store.setIsMobile(window.innerWidth < 960)
-    }
-
-    onMounted(() => {
-      checkMobile()
-      window.addEventListener('resize', checkMobile)
-    })
-
-    watch(() => route.path, () => {
-      drawer.value = false
-    })
-
+  // Configuração da Options API
+  data() {
     return {
-      drawer,
-      green,
-      currentMenu,
-      isMobile,
-      isActive,
-      goTo
+      drawer: false,
+      green: '#C1E328',
+      // Definição dos menus
+      menus: {
+        ADMIN: [
+          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
+          { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
+          { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
+        ] as MenuItem[], // Tipagem para o array
+        MANAGER: [
+          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
+          { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
+          { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
+        ] as MenuItem[],
+        USER: [
+          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
+          { title: 'Podas', icon: 'mdi-content-cut', to: '/podas' },
+          { title: 'Relatórios', icon: 'mdi-file-chart', to: '/relatorios' }
+        ] as MenuItem[],
+        USER_CREDENCIADO: [
+          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/credenciado' },
+          { title: 'Rotas', icon: 'mdi-map', to: '/credenciado/rotas' },
+          { title: 'Podas', icon: 'mdi-leaf', to: '/credenciado/podas' },
+        ] as MenuItem[],
+        GUEST: [
+          { title: 'Login', icon: 'mdi-login', to: '/login' },
+          { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' }
+        ] as MenuItem[],
+      }
     }
+  },
+
+  computed: {
+    store() {
+      return useAppStore()
+    },
+    user() {
+      return this.store.user
+    },
+
+
+    currentMenu(): MenuItem[] {
+      const role = this.store.user?.role
+      return this.menus[role as keyof typeof this.menus] ?? this.menus.ADMIN
+    },
+
+    // Verifica se o componente está em modo mobile (baseado na store)
+    isMobile(): boolean {
+      return this.store.isMobile
+    }
+  },
+
+  watch: {
+    // Observa a mudança de rota para fechar o drawer no mobile
+    '$route.path'() {
+      this.drawer = false
+    }
+  },
+
+  methods: {
+    isActive(path: string): boolean {
+      return this.$route.path === path
+    },
+
+    // Navega para a rota e fecha o drawer (se aberto)
+    goTo(path: string): void {
+      this.$router.push(path)
+      this.drawer = false
+    },
+
+    // Verifica o tamanho da tela para definir se é mobile
+    checkMobile(): void {
+      this.store.setIsMobile(window.innerWidth < 960)
+    },
+
+    // Lida com o logout
+    logout(): void {
+      // Acessa o plugin $api injetado globalmente
+      this.$api.logout()
+      this.$router.push('/login')
+    },
+
+    // Navega para a edição da conta
+    editAccount(): void {
+      this.$router.push('/edit-account')
+    }
+  },
+
+  // Lifecycle hook para configurar o listener de redimensionamento
+  mounted() {
+    this.checkMobile()
+    window.addEventListener('resize', this.checkMobile)
+  },
+
+  // Lifecycle hook para limpar o listener de redimensionamento
+  beforeUnmount() {
+    window.removeEventListener('resize', this.checkMobile)
   }
 }
 </script>
