@@ -30,6 +30,7 @@ import OutsourcedEmployeeMain from '@/components/FuncionarioTerceirizadoView/Mai
 
 import { apiConnect, type User } from '@/plugins/apiConnect.ts'
 import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
+import mainComponent from '@/components/MainView/MainComponent.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -84,7 +85,7 @@ const router = createRouter({
            OUTSOURCED EMPLOYEE
         ============================= */
         {
-          path: 'outsourced-employee',
+          path: 'user-outsource',
           component: OutsourcedEmployeeMain,
           meta: { requiresAuth: true, role: 'USER' },
           children: [
@@ -92,9 +93,9 @@ const router = createRouter({
           ],
         },
         {
-          path: 'employees',
+          path: 'user',
           name: 'Employees',
-          component: MainFuncionarioTerc,
+          component: mainComponent,
           meta: { requiresAuth: true, role: 'USER' },
         }
       ],
