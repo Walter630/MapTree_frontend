@@ -1,7 +1,4 @@
 <script lang="ts">
-// Caminho: src/components/FuncionarioTerceirizadoView/MockTrees/mockTrees.ts
-
-// 🔥 CORREÇÃO: Adicione 'export' na frente da interface
 export interface CityTreeLocation {
   id?: string | number;
   lat: number;
@@ -11,7 +8,6 @@ export interface CityTreeLocation {
   tree_type?: string;
 }
 
-// O restante da sua função generateMockTrees...
 const generateMockTrees = (centerLat: number, centerLng: number, count: number): CityTreeLocation[] => {
   // ... (código da geração mantido)
   const mockData: CityTreeLocation[] = [];
@@ -19,7 +15,7 @@ const generateMockTrees = (centerLat: number, centerLng: number, count: number):
   const types = ['Ipê Roxo', 'Pau Ferro', 'Jatobá', 'Flamboyant', 'Mangueira'];
 
   for (let i = 0; i < count; i++) {
-    const lat = centerLat + (Math.random() - 0.5) * 0.05;
+    const lat = centerLat + (Math.random() - 0.5) * 0.05; // 0.05 é cerca de 5km de variação
     const lng = centerLng + (Math.random() - 0.5) * 0.05;
 
     mockData.push({
@@ -34,10 +30,12 @@ const generateMockTrees = (centerLat: number, centerLng: number, count: number):
   return mockData;
 };
 
-const LIM_NORTE_LAT = -5.1438;
-const LIM_NORTE_LNG = -38.0850;
+// 🔥 CORREÇÃO DE LOCALIZAÇÃO: Coordenadas de Tabuleiro do Norte, CE
+const TABULEIRO_NORTE_LAT = -5.2308;
+const TABULEIRO_NORTE_LNG = -38.0825;
 
-export const MOCK_CITY_TREES: CityTreeLocation[] = generateMockTrees(LIM_NORTE_LAT, LIM_NORTE_LNG, 500);
+// Gera árvores mockadas no novo centro
+export const MOCK_CITY_TREES: CityTreeLocation[] = generateMockTrees(TABULEIRO_NORTE_LAT, TABULEIRO_NORTE_LNG, 500);
 
 console.log(`${MOCK_CITY_TREES.length} árvores mockadas geradas.`);
 </script>

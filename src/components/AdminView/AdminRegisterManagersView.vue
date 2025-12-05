@@ -217,7 +217,7 @@ export default {
     },
     async registrar() {
       try {
-        const response = await this.$api.post<User>('/users', this.formData);
+        const response = await this.$api.post<User>('/auth/register', this.formData);
         if (response.status === 201) {
           this.$router.push('/admin/managers')
         } else {

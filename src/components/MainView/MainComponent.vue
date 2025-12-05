@@ -60,7 +60,15 @@
             Região em risco
           </p>
 
-          <PruningMap style="height: 270px; border-radius: 8px; overflow: hidden;" />
+          <PruningMap ref="pruningMapRef" style="height: 270px; border-radius: 8px; overflow: hidden;" />
+          <v-btn
+            class="mt-4"
+            color="primary"
+            @click="toggleMapExpanded"
+            width="100%"
+          >
+            {{ mapExpanded ? '🗗 Reduzir' : '🗗 Expandir' }}
+          </v-btn>
         </v-card>
       </v-col>
 
@@ -75,7 +83,7 @@
             type="image"
             class="rounded-lg"
           ></v-skeleton-loader>
-          <donut-chart />
+          <donut-chart :data="{ agendadas: 10, pendentes: 5, execucao: 3, concluidas: 15 }" :width="200" :height="200"/>
         </v-card>
       </v-col>
 
@@ -209,6 +217,7 @@ export default defineComponent({
     return {
       search: "" as string,
       isLoading: false as boolean,
+      mapExpanded: false as boolean,
 
       // Dados das Métricas (tipagem MetricCard[])
       metricCards: [
@@ -282,6 +291,11 @@ export default defineComponent({
       // **TODO:** Implementar a lógica de filtragem/busca de dados no backend
       console.log("Pesquisando:", this.search);
     },
+    toggleMapExpanded() {
+      this.mapExpanded = !this.mapExpanded;
+      this.$refs.pruningMapRef.toggleExpanded();
+    },
+
 
     getStatusColor(status: ReportItem['status']): string {
       switch (status) {

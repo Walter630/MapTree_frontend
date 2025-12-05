@@ -38,7 +38,7 @@ export default defineComponent({
       const radius = Math.min(width, height) / 2;
 
       const data = [
-        { label: 'Pendentes', value: props.data.pendentes, color: '#C9C8C3' },
+
         { label: 'Em Execução', value: props.data.execucao, color: '#C1E328' },
         { label: 'Concluídas', value: props.data.concluidas, color: '#0057FF' },
       ];

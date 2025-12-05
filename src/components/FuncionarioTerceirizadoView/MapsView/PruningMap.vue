@@ -1,55 +1,37 @@
 <script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref, computed } from 'vue';
+import { defineComponent, onMounted, onUnmounted, ref, computed, inject } from 'vue';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-import { MOCK_CITY_TREES } from '@/components/FuncionarioTerceirizadoView/MockTrees/Mocktree.vue';
-import type { CityTreeLocation } from '@/components/FuncionarioTerceirizadoView/MockTrees/MockTree.vue';
+interface CityTreeLocation {
+  id?: string;
+  age: Date;
+  latitude: number;
+  longitude: number;
+  status: string;
+  near_trees?: boolean;
+}
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+interface MarkedLocation {
+  id: string;
+  lat: number;
+  lng: number;
+  notes: string;
+  timestamp: Date;
+}
+
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Interfaces definidas no arquivo Mocktree.vue, mas mantidas aqui para referência:
-interface TaskLocation {
-  id?: string | number;
-  lat: number;
-  lng: number;
-  address: string;
-  status: 'agendada' | 'em_progresso' | 'concluida';
-}
-// interface CityTreeLocation extends TaskLocation { tree_type?: string; }
-
-
-// 🔥 FUNÇÃO AUXILIAR PARA DADOS DA FIAÇÃO (MOCKADO)
-const getMockWireRoutes = (): L.LatLngTuple[][] => {
-  // Simula duas rotas principais de fiação na área central de Limoeiro do Norte
-  const route1: L.LatLngTuple[] = [
-    [-5.1450, -38.0800],
-    [-5.1430, -38.0840],
-    [-5.1400, -38.0870],
-    [-5.1380, -38.0900],
-  ];
-
-  const route2: L.LatLngTuple[] = [
-    [-5.1420, -38.0830],
-    [-5.1400, -38.0855],
-    [-5.1395, -38.0870],
-  ];
-
-  return [route1, route2];
-};
-
-
 export default defineComponent({
   name: 'PruningMap',
   props: {
     tasks: {
-      type: Array as () => TaskLocation[],
+      type: Array as () => CityTreeLocation[],
       required: true,
       default: () => []
     },
@@ -59,71 +41,104 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const $api = inject('$api') as { get: (url: string, config?: Record<string, unknown>) => Promise<{ data: unknown }> };
+
     let map: L.Map | null = null;
     let markersLayer: L.LayerGroup | null = null;
-    let wiresLayer: L.LayerGroup | null = null; // Camada para fiação e círculos de perigo
     let userLayer: L.LayerGroup | null = null;
+    let markedLayer: L.LayerGroup | null = null;
 
     let userMarker: L.Marker | null = null;
     let userAccuracyCircle: L.Circle | null = null;
-
     let watchId: number | null = null;
+    let fetchTimeout: number | null = null;
 
     const following = ref(true);
-    const markMode = ref(false); // Modo de marcação manual de fiação
+    const markMode = ref(false);
     const locationStatus = ref<'idle' | 'requesting' | 'found' | 'denied' | 'error'>('idle');
+    const isExpanded = ref(false);
 
     const cityTrees = ref<CityTreeLocation[]>([]);
-    const loadingTrees = ref(true);
-
-    const markedWireCircles: Record<string, L.Circle> = {}; // Círculos marcados manualmente pelo usuário
-
-    const distanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-      return L.latLng(lat1, lng1).distanceTo(L.latLng(lat2, lng2));
-    };
+    const markedLocations = ref<MarkedLocation[]>([]);
+    const loadingTrees = ref(false);
 
     const treeCount = computed(() => Array.isArray(cityTrees.value) ? cityTrees.value.length : 0);
+    const crowdedTreeCount = computed(() => cityTrees.value.filter(t => t.near_trees).length);
+    const markedCount = computed(() => markedLocations.value.length);
     let resizeHandler: ((ev?: Event) => void) | null = null;
 
-    // ... (createTreeIcon e ensureLeafletCss mantidos)
-    const createTreeIcon = (status: 'agendada' | 'em_progresso' | 'concluida'): L.DivIcon => {
-      // ... (código do ícone mantido)
+    const TREE_PROXIMITY_THRESHOLD = 50;
+
+    const createTreeIcon = (status: string, crowded = false): L.DivIcon => {
       let bgColor = '#4CAF50';
       let borderColor = '#2E7D32';
-      if (status === 'em_progresso') {
+      if (status === 'TO_PRUNE') {
         bgColor = '#FFC107';
         borderColor = '#F57F17';
       }
-      if (status === 'concluida') {
+      if (status === 'UNDER_OBSERVATION') {
         bgColor = '#2196F3';
         borderColor = '#1565C0';
       }
 
+      if (crowded) {
+        bgColor = '#FF6B6B';
+        borderColor = '#CC0000';
+      }
+
+      const pulseAnimation = crowded ? 'pulse 1.5s infinite' : 'none';
+
       return L.divIcon({
         html: `
           <div style="
-            position: relative;
-            width: 45px;
-            height: 45px;
+            background-color: ${bgColor};
+            border: 3px solid ${borderColor};
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: ${bgColor};
-            border: 4px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 0 2px ${borderColor}, 0 3px 8px rgba(0,0,0,0.4);
-            cursor: pointer;
-            font-size: 24px;
+            color: white;
             font-weight: bold;
-            transition: transform 0.2s;
-          " onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">
+            font-size: 16px;
+            animation: ${pulseAnimation};
+            box-shadow: 0 0 8px rgba(0,0,0,0.3);
+          ">
             🌳
+          </div>
+        `,
+        iconSize: [crowded ? 50 : 40, crowded ? 50 : 40],
+        iconAnchor: [crowded ? 25 : 20, crowded ? 50 : 40],
+        popupAnchor: [0, crowded ? -50 : -36],
+        className: 'tree-marker',
+      });
+    };
+
+    const createMarkerIcon = (): L.DivIcon => {
+      return L.divIcon({
+        html: `
+          <div style="
+            background-color: #9C27B0;
+            border: 2px solid #6A1B9A;
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.3);
+          ">
+            📌
           </div>
         `,
         iconSize: [45, 45],
         iconAnchor: [22, 45],
-        popupAnchor: [0, -50],
-        className: 'tree-marker',
+        popupAnchor: [0, -45],
+        className: 'custom-marker',
       });
     };
 
@@ -134,167 +149,90 @@ export default defineComponent({
         link.rel = 'stylesheet';
         link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
         document.head.appendChild(link);
-        console.info('Leaflet CSS injected');
       }
     };
 
-    // 🔥 NOVA FUNÇÃO: Desenha as rotas de fiação
-    const drawWires = () => {
-      if (!map || !wiresLayer) return;
-
-      // Limpa a camada de fiação, mas mantém os círculos marcados manualmente
-      wiresLayer.eachLayer(layer => {
-        if (layer instanceof L.Polyline) {
-          wiresLayer!.removeLayer(layer);
-        }
-      });
-
-      const wireRoutes = getMockWireRoutes();
-
-      wireRoutes.forEach(route => {
-        const polyline = L.polyline(route, {
-          color: '#333333', // Cor escura para simular cabos
-          weight: 2,
-          opacity: 0.8,
-          dashArray: '5, 10' // Linha tracejada (opcional)
-        });
-        wiresLayer!.addLayer(polyline);
-      });
-
-      console.info(`✅ Desenhadas ${wireRoutes.length} rotas de fiação simuladas.`);
-
-      // Após desenhar as rotas, identifica árvores próximas à fiação
-      highlightTreesNearWires();
-    };
-
-    // 🔥 NOVA FUNÇÃO: Identifica e destaca árvores próximas
-    const highlightTreesNearWires = () => {
-      if (!map || !markersLayer || !wiresLayer) return;
-
-      // Limpa destaques anteriores de proximidade (se existirem, além dos manuais)
-      wiresLayer.eachLayer(layer => {
-        // Remove apenas círculos gerados automaticamente (não os marcados manualmente)
-        const key = (layer as any)._leaflet_id;
-        if (layer instanceof L.Circle && !markedWireCircles[key]) {
-          wiresLayer!.removeLayer(layer);
-        }
-      });
-
-      // Círculos de perigo automático (para evitar duplicidade nos marcadores manuais)
-      const autoDangerCircles: L.Circle[] = [];
-      const WIRE_DISTANCE_THRESHOLD = 15; // 15 metros de distância de risco
-
-      // Pega todos os segmentos de linha (fiação)
-      const allWireSegments: L.Polyline[] = [];
-      wiresLayer.eachLayer(layer => {
-        if (layer instanceof L.Polyline) {
-          allWireSegments.push(layer);
-        }
-      });
-
-      let nearbyCount = 0;
-
-      cityTrees.value.forEach(tree => {
-        const treeLatLng = L.latLng(tree.lat, tree.lng);
-        let isNearWire = false;
-
-        for (const wire of allWireSegments) {
-          const wireCoords = wire.getLatLngs() as L.LatLng[];
-
-          // O Leaflet tem um método para checar a menor distância de um ponto a uma polyline
-          // Embora não seja nativo e exato, podemos simular a checagem por proximidade dos vértices:
-          let minDistance = Infinity;
-
-          // Percorre os vértices (pontos de sustentação da fiação)
-          wireCoords.forEach(wirePoint => {
-            const dist = distanceMeters(treeLatLng.lat, treeLatLng.lng, wirePoint.lat, wirePoint.lng);
-            if (dist < minDistance) {
-              minDistance = dist;
-            }
-          });
-
-          // Se estiver muito próximo de um dos vértices da fiação
-          if (minDistance <= WIRE_DISTANCE_THRESHOLD) {
-            isNearWire = true;
-            break;
-          }
-        }
-
-        if (isNearWire) {
-          nearbyCount++;
-          const dangerCircle = L.circle(treeLatLng, {
-            radius: 12, // Círculo pequeno de alerta na base da árvore
-            color: '#FF0000',
-            fillColor: '#FFC0CB',
-            weight: 1,
-            fillOpacity: 0.5,
-          });
-          autoDangerCircles.push(dangerCircle);
-          wiresLayer!.addLayer(dangerCircle);
-        }
-      });
-
-      console.log(`⚠️ Identificadas ${nearbyCount} árvores próximas à fiação (a menos de ${WIRE_DISTANCE_THRESHOLD}m dos postes).`);
-      // Adicione um controle visual para o usuário
-      if (nearbyCount > 0) {
-        // Se necessário, você pode adicionar um popup ou notificação aqui.
-      }
-    }
-
-
-    const fetchCityTrees = async () => {
-      console.log('⏳ Carregando inventário de árvores da cidade (usando dados MOCKADOS para contornar erro de backend)...');
-      loadingTrees.value = true;
-
-      // Simulação de delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
+    const fetchTreesFromApi = async (minLat: number, minLng: number, maxLat: number, maxLng: number) => {
       try {
-        // 1. Usa APENAS o array grande importado
-        const realCityData: CityTreeLocation[] = MOCK_CITY_TREES;
-
-        // 2. Garante que props.tasks é um array (melhor prática)
-        const safeTasks = props.tasks || [];
-
-        // 3. Combina as tarefas atuais com o inventário mockado
-        const combinedData: CityTreeLocation[] = [
-          ...safeTasks,
-          ...realCityData
-        ];
-
-        cityTrees.value = combinedData;
-
+        const response = await $api.get('/trees', {
+          params: { minLat, minLng, maxLat, maxLng }
+        });
+        const trees = (response.data as CityTreeLocation[]) || [];
+        return trees.map(tree => ({
+          ...tree,
+          latitude: Number(tree.latitude),
+          longitude: Number(tree.longitude),
+        }));
       } catch (error) {
-        console.error("❌ Erro ao processar dados mockados:", error);
-        cityTrees.value = props.tasks || [];
+        console.error('Erro ao buscar árvores:', error);
+        return [];
+      }
+    };
+
+    const checkTreesProximity = () => {
+      cityTrees.value.forEach((tree, index) => {
+        tree.near_trees = false;
+        const treeLatLng = L.latLng(tree.latitude, tree.longitude);
+
+        cityTrees.value.forEach((otherTree, otherIndex) => {
+          if (index !== otherIndex) {
+            const otherLatLng = L.latLng(otherTree.latitude, otherTree.longitude);
+            const distance = treeLatLng.distanceTo(otherLatLng);
+            if (distance < TREE_PROXIMITY_THRESHOLD) {
+              tree.near_trees = true;
+            }
+          }
+        });
+      });
+    };
+
+    const drawMarkedLocations = () => {
+      if (!markedLayer) return;
+      markedLayer.clearLayers();
+
+      markedLocations.value.forEach(marked => {
+        const marker = L.marker([marked.lat, marked.lng], {
+          icon: createMarkerIcon()
+        });
+        const popupHtml = `
+          <div style="font-size:12px;">
+            <b>Marcação:</b> ${marked.notes}<br>
+            <small>${new Date(marked.timestamp).toLocaleString('pt-BR')}</small><br>
+            <button onclick="window.deleteMarked('${marked.id}')" style="margin-top:5px; padding:4px 8px; background:#FF6B6B; color:white; border:none; border-radius:4px; cursor:pointer;">
+              Deletar
+            </button>
+          </div>
+        `;
+        marker.bindPopup(popupHtml);
+        markedLayer!.addLayer(marker);
+      });
+    };
+
+    const fetchVisibleData = async () => {
+      if (!map) return;
+      loadingTrees.value = true;
+      try {
+        const bounds = map.getBounds();
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+
+        const apiTrees = await fetchTreesFromApi(sw.lat, sw.lng, ne.lat, ne.lng);
+
+        const safeTasks = (props.tasks || []) as CityTreeLocation[];
+        cityTrees.value = [...safeTasks, ...apiTrees];
+
+        checkTreesProximity();
+        drawRoute(cityTrees.value);
       } finally {
         loadingTrees.value = false;
-        console.log(`✅ ${cityTrees.value.length} árvores (MOCKADAS) carregadas.`);
-
-        drawRoute(cityTrees.value);
-        // 🔥 CHAMADA PARA DESENHAR FIOS E DESTACAR ÁRVORES
-        drawWires();
-
-        if (cityTrees.value.length > 0 && map) {
-          const allLats = cityTrees.value.map(t => t.lat);
-          const allLngs = cityTrees.value.map(t => t.lng);
-          const avgLat = allLats.reduce((a, b) => a + b) / allLats.length;
-          const avgLng = allLngs.reduce((a, b) => a + b) / allLngs.length;
-
-          map.setView([avgLat, avgLng], 13);
-        }
       }
     };
-
 
     const initializeMap = () => {
       if (!document.getElementById('map-container')) return;
-
       ensureLeafletCss();
+      map = L.map('map-container', { attributionControl: false }).setView([-23.5505, -46.6333], 13);
 
-      map = L.map('map-container', { attributionControl: false }).setView([-5.1438, -38.0850], 13);
-
-      // ... (Configuração do Tile Layer mantida)
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri',
         maxZoom: 18,
@@ -302,42 +240,175 @@ export default defineComponent({
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        opacity: 0.7,
+        opacity: 0.6,
       }).addTo(map);
 
-      // Ordem das camadas: Wires abaixo dos Markers, Markers abaixo do User
-      wiresLayer = L.layerGroup().addTo(map);
       markersLayer = L.layerGroup().addTo(map);
+      markedLayer = L.layerGroup().addTo(map);
       userLayer = L.layerGroup().addTo(map);
 
       map.on('click', onMapClick);
+      map.on('moveend', onMapMove);
       addControls();
 
       map.whenReady(() => {
-        setTimeout(() => {
-          if (map) map.invalidateSize();
-          fetchCityTrees();
-        }, 150);
+        if (map) {
+          setTimeout(() => {
+            fetchVisibleData();
+          }, 300);
+        }
       });
 
-      resizeHandler = () => { if (map) map.invalidateSize(); };
+      resizeHandler = () => {
+        if (map) map.invalidateSize();
+      };
       window.addEventListener('resize', resizeHandler as EventListener);
-
       startGeolocation();
     };
 
-    // ... (restante das funções mantidas: addControls, setUserLocation, startGeolocation, stopGeolocation, onMapClick, toggleMarkWireForTask, drawRoute)
-    const addControls = () => { /* ... mantida ... */ };
-    const setUserLocation = (lat: number, lng: number, accuracy = 50) => { /* ... mantida ... */ };
-    const startGeolocation = () => { /* ... mantida ... */ };
-    const stopGeolocation = () => { /* ... mantida ... */ };
-    const onMapClick = (ev: L.LeafletMouseEvent) => { /* ... mantida ... */ };
-    const toggleMarkWireForTask = (task: CityTreeLocation) => { /* ... mantida ... */ };
-    const drawRoute = (tasks: CityTreeLocation[]) => { /* ... mantida ... */ };
+    const addControls = () => {
+      if (!map) return;
+      const CustomControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: () => {
+          const container = L.DomUtil.create('div', 'custom-map-controls leaflet-bar');
+          const btn = L.DomUtil.create('button', '', container) as HTMLButtonElement;
+          btn.innerText = following.value ? '🔍 Seguir' : '📍 Solto';
+          btn.onclick = () => {
+            following.value = !following.value;
+          };
+          return container;
+        }
+      });
+      map.addControl(new CustomControl());
+    };
 
+    const setUserLocation = (lat: number, lng: number, accuracy = 50) => {
+      if (!map || !userLayer) return;
+      const latlng = L.latLng(lat, lng);
+      if (!userMarker) {
+        userMarker = L.marker(latlng, { title: 'Você' });
+        userLayer.addLayer(userMarker);
+      } else {
+        userMarker.setLatLng(latlng);
+      }
+      if (!userAccuracyCircle) {
+        userAccuracyCircle = L.circle(latlng, { radius: accuracy, color: '#2E86AB', fillOpacity: 0.1 });
+        userLayer.addLayer(userAccuracyCircle);
+      } else {
+        userAccuracyCircle.setLatLng(latlng);
+        userAccuracyCircle.setRadius(accuracy);
+      }
+      if (following.value && map) {
+        map.setView(latlng, map.getZoom() < 15 ? 15 : map.getZoom());
+      }
+      locationStatus.value = 'found';
+    };
+
+    const startGeolocation = () => {
+      if (!('geolocation' in navigator)) {
+        locationStatus.value = 'denied';
+        return;
+      }
+      locationStatus.value = 'requesting';
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          setUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          locationStatus.value = 'found';
+        },
+        () => {
+          locationStatus.value = 'error';
+        },
+        { enableHighAccuracy: true }
+      );
+      if (watchId === null) {
+        const id = navigator.geolocation.watchPosition(
+          pos => {
+            setUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          }
+        );
+        watchId = id;
+      }
+    };
+
+    const stopGeolocation = () => {
+      if ('geolocation' in navigator && watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (userLayer) {
+        userLayer.clearLayers();
+        userMarker = null;
+        userAccuracyCircle = null;
+      }
+      locationStatus.value = 'idle';
+    };
+
+    const onMapMove = () => {
+      if (fetchTimeout) window.clearTimeout(fetchTimeout);
+      fetchTimeout = window.setTimeout(() => {
+        fetchVisibleData();
+        fetchTimeout = null;
+      }, 600);
+    };
+
+    const onMapClick = (ev: L.LeafletMouseEvent) => {
+      if (!markMode.value) return;
+      if (isExpanded.value) return;
+
+      const latlng = ev.latlng;
+      const notes = prompt('Adicione uma nota para esta marcação:');
+      if (!notes) return;
+
+      const newMarked: MarkedLocation = {
+        id: `marker_${Date.now()}`,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        notes,
+        timestamp: new Date(),
+      };
+
+      markedLocations.value.push(newMarked);
+      drawMarkedLocations();
+    };
+
+    const deleteMarkedLocation = (id: string) => {
+      markedLocations.value = markedLocations.value.filter(m => m.id !== id);
+      drawMarkedLocations();
+    };
+
+    const drawRoute = (tasks: CityTreeLocation[]) => {
+      if (!markersLayer) return;
+      markersLayer.clearLayers();
+      if (tasks.length === 0) return;
+
+      tasks.forEach(t => {
+        const marker = L.marker([t.latitude, t.longitude], {
+          icon: createTreeIcon(t.status, t.near_trees || false)
+        });
+        const popupHtml = `
+          <div style="font-size:12px;">
+            <b>Árvore ID:</b> ${t.id}<br>
+            <b>Status:</b> ${t.status}<br>
+            <b>Próxima a outras:</b> ${t.near_trees ? 'Sim ⚠️' : 'Não'}<br>
+            <small>Lat: ${t.latitude.toFixed(4)}, Lng: ${t.longitude.toFixed(4)}</small>
+          </div>
+        `;
+        marker.bindPopup(popupHtml);
+        markersLayer!.addLayer(marker);
+      });
+    };
+
+    const toggleExpanded = () => {
+      isExpanded.value = !isExpanded.value;
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 300);
+    };
 
     onMounted(() => {
       initializeMap();
+      (window as unknown as { deleteMarked: (id: string) => void }).deleteMarked = deleteMarkedLocation;
     });
 
     onUnmounted(() => {
@@ -345,6 +416,7 @@ export default defineComponent({
       if (resizeHandler) window.removeEventListener('resize', resizeHandler as EventListener);
       if (map) {
         map.off('click', onMapClick);
+        map.off('moveend', onMapMove);
         map.remove();
         map = null;
       }
@@ -356,49 +428,104 @@ export default defineComponent({
       else startGeolocation();
     };
 
+    const toggleMarkMode = () => {
+      markMode.value = !markMode.value;
+    };
+
     return {
       following,
       markMode,
       locationStatus,
       treeCount,
+      crowdedTreeCount,
+      markedCount,
       loadingTrees,
       cityTrees,
       drawRoute,
-      ensureLeafletCss,
       doLocate,
+      toggleMarkMode,
+      isExpanded,
+      toggleExpanded,
     };
   },
 });
 </script>
 
 <template>
-  <div style="position: relative;">
-    <div id="map-container" style="height: 100%; width: 100%; border-radius: 8px; z-index: 1;"></div>
+  <div :class="isExpanded ? 'map-wrapper-expanded' : 'map-wrapper'">
+    <div id="map-container" :class="isExpanded ? 'map-container-expanded' : 'map-container'"></div>
 
-    <div class="map-overlay-panel" style="position: absolute; left: 12px; top: 12px; z-index: 1200; background: rgba(255,255,255,0.95); padding: 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">
-      <div style="display:flex; gap:8px; align-items:center;">
-        <button @click.prevent="drawRoute(cityTrees)" :disabled="loadingTrees" style="padding:6px 8px;">
-          Mostrar Todas as Árvores
+    <div :class="isExpanded ? 'map-overlay-panel-expanded' : 'map-overlay-panel'">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button @click.prevent="doLocate" style="padding:8px 12px;">📍 Localizar</button>
+        <button @click.prevent="toggleMarkMode" :style="{ padding: '8px 12px', background: markMode ? '#9C27B0' : 'white', color: markMode ? 'white' : 'black' }">
+          📌 Marcar
         </button>
-        <button @click.prevent="doLocate" style="padding:6px 8px;">Localizar</button>
       </div>
-      <div style="margin-top:6px; font-size:12px; color:#333">
-        <span v-if="loadingTrees">Carregando inventário... 🌳</span>
-        <span v-else>Árvores da Cidade: **{{ treeCount }}**</span>
+      <div style="margin-top:10px; font-size:13px; color:#333; border-top:1px solid #ddd; padding-top:8px;">
+        <div v-if="loadingTrees" style="color:#666;">Carregando dados do mapa... 🌳</div>
+        <div v-else>
+          <div><b>Árvores visíveis:</b> {{ treeCount }}</div>
+          <div style="color:#CC0000; font-weight:bold;"><b>📍 Próximas entre si:</b> {{ crowdedTreeCount }}</div>
+          <div style="color:#9C27B0; font-weight:bold;"><b>📌 Marcações:</b> {{ markedCount }}</div>
+        </div>
       </div>
-      <div style="margin-top:4px; font-size:12px; color:#666">Status de localização: {{ locationStatus }}</div>
+      <div style="margin-top:6px; font-size:11px; color:#666;">
+        Status: {{ locationStatus }}
+        <span v-if="markMode" style="color:#9C27B0; font-weight:bold;">| Modo marcação ativado</span>
+      </div>
     </div>
   </div>
 </template>
 
-
 <style scoped>
-/* Estilos mantidos e atualizados */
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.map-wrapper-expanded {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  background: #f0f0f0;
+}
+
 #map-container {
+  flex: 1;
+  width: 100%;
   background-color: #f0f0f0;
 }
 
-/* Os estilos personalizados dos controles e marcadores mantidos */
+.map-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 0;
+}
+
+.map-container-expanded {
+  height: 100%;
+  width: 100%;
+  border-radius: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
 .leaflet-top.leaflet-right .custom-map-controls button {
   background: white;
   border: 1px solid #ccc;
@@ -417,53 +544,93 @@ export default defineComponent({
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
-:deep(.tree-marker img) {
-  transition: transform 0.2s ease;
-}
-
-:deep(.tree-marker:hover) {
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)) brightness(1.1);
+:deep(.custom-marker) {
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
 }
 
 :deep(.leaflet-popup-content) {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  font-size: 13px;
   margin: 0;
-  padding: 8px;
-}
-
-:deep(.leaflet-popup-content b) {
-  color: #2c3e50;
-  font-weight: 600;
+  padding: 10px;
 }
 
 .map-overlay-panel {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 1200;
+  background: rgba(255,255,255,0.97);
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  max-width: 280px;
+  transition: all 0.3s ease;
 }
 
-.map-overlay-panel button {
+.map-overlay-panel-expanded {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 1200;
+  background: rgba(255,255,255,0.97);
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  max-width: 300px;
+  transition: all 0.3s ease;
+}
+
+.map-overlay-panel button,
+.map-overlay-panel-expanded button {
   background: white;
   border: 1px solid #ddd;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 8px 12px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.map-overlay-panel button:hover:not(:disabled) {
+.map-overlay-panel button:hover:not(:disabled),
+.map-overlay-panel-expanded button:hover:not(:disabled) {
   background: #f0f0f0;
   border-color: #999;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.map-overlay-panel button:active:not(:disabled) {
+.map-overlay-panel button:active:not(:disabled),
+.map-overlay-panel-expanded button:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-.map-overlay-panel button:disabled {
+.map-overlay-panel button:disabled,
+.map-overlay-panel-expanded button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .map-wrapper {
+    height: 100vh;
+  }
+
+  .map-wrapper-expanded {
+    height: 100vh;
+  }
+
+  .map-overlay-panel,
+  .map-overlay-panel-expanded {
+    max-width: 250px;
+    font-size: 12px;
+  }
+
+  .map-overlay-panel button,
+  .map-overlay-panel-expanded button {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
 }
 </style>

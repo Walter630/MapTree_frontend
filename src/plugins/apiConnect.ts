@@ -6,7 +6,6 @@
 
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { App } from 'vue'
-import type { Data } from '@vue-leaflet/vue-leaflet/dist/src/utils'
 
 interface TokenData {
   accessToken: string | null
@@ -54,7 +53,7 @@ export interface Company {
   managerId?: string
   manager: Manager
   isActive: boolean
-  createdAt?: Data
+  createdAt?: Date
 }
 
 export interface Manager {
@@ -66,6 +65,24 @@ export interface Manager {
   isActive: boolean
   organizationId: string | null
 }
+
+export interface Tree {
+  id: string
+  age: Date
+  lat: number
+  lng: number
+  status: 'agendada' | 'em_progresso' | 'concluida'
+  speciesId: string
+}
+
+export interface Species {
+  id: string
+  commonName: string
+  scientificName: string
+  family: string
+  description: string
+}
+
 
 
 class ApiConnect {
@@ -321,7 +338,7 @@ export default {
   install: (app: App) => {
     // Make apiConnect available globally
     app.config.globalProperties.$api = apiConnect
-    app.provide('api', apiConnect)
+    app.provide('$api', apiConnect)
   },
 }
 
