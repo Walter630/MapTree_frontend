@@ -61,11 +61,13 @@
             <p class="text-caption text-grey-darken-1 mb-3">4 locais para visitar hoje</p>
 
             <div style="position: relative; height: 398px; width: 100%;">
-              <PruningMap :tasks="tasks" />
-
+              <v-btn icon @click="$router.push('/map')">
+                <v-icon>mdi-map</v-icon>
+              </v-btn>
+              <PruningMap  @click="$router.push('/map')" />
               <div class="map-overlay-status">
-
               </div>
+
             </div>
 
             <v-row dense class="pt-2">
@@ -207,8 +209,8 @@
 
   <script lang="ts">
   import { defineComponent, ref, computed } from "vue";
-  import DonutChart from "./GraficosView/DonutChart.vue";
-  import PruningMap from './MapsView/PruningMap.vue';
+  import DonutChart from "@/components/functions/GraficosView/DonutChart.vue";
+  import PruningMap from '@/components/functions/MapsView/PruningMap.vue';
 
   // Interfaces de tipagem
   interface MetricCard {

@@ -13,6 +13,9 @@ export const useAppStore = defineStore('app', {
     setUser(user: User | null) {
       this.user = user
     },
+    getUser(user: User | null) {
+      this.user = user
+    },
 
     setIsMobile(value: boolean) {
       this.isMobile = value

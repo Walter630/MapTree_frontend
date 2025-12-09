@@ -120,7 +120,7 @@ export function useAuth() {
     error.value = null
 
     try {
-      const response = await apiConnect.get<User>('/users/me')
+      const response = await apiConnect.get<User>('/users/me/profile')
 
       if (response.data) {
         user.value = response.data

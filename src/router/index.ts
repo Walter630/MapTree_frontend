@@ -31,6 +31,9 @@ import OutsourcedEmployeeMain from '@/components/FuncionarioTerceirizadoView/Mai
 import { apiConnect, type User } from '@/plugins/apiConnect.ts'
 import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
 import mainComponent from '@/components/MainView/MainComponent.vue'
+import MapPage from '@/pages/map/MapPage.vue'
+import UserPage from '@/pages/UserPage.vue'
+import { useAppStore } from '@/stores/app.ts'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -78,6 +81,7 @@ const router = createRouter({
             { path: 'register-employee', name: 'RegisterEmployee', component: RegisterEmployee },
             { path: 'reports', name: 'ManagerReports', component: ManagerReportsView },
             { path: 'notifications', name: 'ManagerNotifications', component: ManagerNotificationsView },
+
           ],
         },
 
@@ -90,13 +94,18 @@ const router = createRouter({
           meta: { requiresAuth: true, role: 'USER' },
           children: [
             { path: '', name: 'OutsourcedEmployeeHome', component: MainFuncionarioTerc },
+            { path: 'mapOutsourced', name: 'Map', component: MapPage },
           ],
         },
         {
           path: 'user',
           name: 'Employees',
-          component: mainComponent,
+          component: UserPage,
           meta: { requiresAuth: true, role: 'USER' },
+          children: [
+            { path: '', name: 'UserHome', component: MainComponent },
+            { path: 'mapUser', name: 'Map', component: MapPage },
+          ],
         }
       ],
     },
@@ -110,6 +119,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
   const requiredRole = to.meta.role
+  const store = useAppStore()
 
   // Se a rota NÃO requer autenticação, libera imediatamente
   if (!requiresAuth) {
@@ -127,10 +137,11 @@ router.beforeEach(async (to, from, next) => {
     // Se precisa verificar role, busca o usuário
     if (requiredRole) {
       const { data: user } = await apiConnect.get<User>('users/me/profile')
-
+      store.getUser(user)
       if (user.role !== requiredRole) {
         return next({ name: 'Main' })
       }
+
     }
 
     next()

@@ -48,11 +48,11 @@
           padding: 5px 10px;
         "
         >
-          <v-avatar size="40" style="background-color: #C1E328;">
+          <v-avatar size="40" style="background-color: #C1E328; align-items: center; justify-content: center; ">
             <img
               src="@/assets/Logomaptreeverde.png"
               alt="Perfil"
-              style="width: 40px; height: 40px; border-radius: 50%;"
+              style="width: 40px; height: 40px; border-radius: 50%; align-items: center; justify-content: center;"
             />
           </v-avatar>
 
@@ -66,11 +66,11 @@
       <v-card>
         <v-card-text>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <v-avatar size="40" style="background-color: #C1E328; ">
+            <v-avatar size="40" style="background-color: #C1E328; align-items: center; justify-content: center; ">
               <img
                 src="@/assets/Logomaptreeverde.png"
                 alt="Perfil"
-                style="width: 40px; height: 40px; border-radius: 50%; align-items: center;"
+                style="width: 40px; height: 40px; border-radius: 50%; align-items: center; justify-content: center;"
               />
             </v-avatar>
           </div>
@@ -135,6 +135,15 @@ interface MenuItem {
   to: string
 }
 
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+
+}
+
+
 export default {
   name: 'AppBarComponent',
 
@@ -143,6 +152,8 @@ export default {
     return {
       drawer: false,
       green: '#C1E328',
+      user: null as User | null,
+
       // Definição dos menus
       menus: {
         ADMIN: [
@@ -156,9 +167,10 @@ export default {
           { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
         ] as MenuItem[],
         USER: [
-          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/' },
-          { title: 'Podas', icon: 'mdi-content-cut', to: '/podas' },
-          { title: 'Relatórios', icon: 'mdi-file-chart', to: '/relatorios' }
+          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
+          { title: 'Podas', icon: 'mdi-content-cut'  },
+          { title: 'Relatórios', icon: 'mdi-file-chart' },
+          { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
         ] as MenuItem[],
         USER_CREDENCIADO: [
           { title: 'Painel', icon: 'mdi-view-dashboard', to: '/credenciado' },
@@ -177,14 +189,13 @@ export default {
     store() {
       return useAppStore()
     },
-    user() {
-      return this.store.user
-    },
-
 
     currentMenu(): MenuItem[] {
       const role = this.store.user?.role
+
+      console.log(role)
       return this.menus[role as keyof typeof this.menus] ?? this.menus.ADMIN
+
     },
 
     // Verifica se o componente está em modo mobile (baseado na store)
@@ -203,6 +214,18 @@ export default {
   methods: {
     isActive(path: string): boolean {
       return this.$route.path === path
+    },
+
+    getUser() {
+      this.$api.get('/users/me/profile')
+        .then(response => {
+          if (response.data) {
+            this.user = response.data
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching user profile:', error)
+        })
     },
 
     // Navega para a rota e fecha o drawer (se aberto)
@@ -233,6 +256,7 @@ export default {
   mounted() {
     this.checkMobile()
     window.addEventListener('resize', this.checkMobile)
+    this.getUser()
   },
 
   // Lifecycle hook para limpar o listener de redimensionamento

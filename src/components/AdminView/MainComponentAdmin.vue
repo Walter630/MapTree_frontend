@@ -121,7 +121,7 @@ export default defineComponent({
 
     <!-- Cards de Resumo -->
     <v-row style="margin-top: 25px;" class="d-flex" justify="start">
-      <v-col cols="12" md="3" class="mr-4">
+      <v-col cols="12" md="3" >
         <v-card class="cardResumo">
           <div class="cardHeader">
             <span>Empresas</span>
@@ -132,7 +132,7 @@ export default defineComponent({
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3" class="mr-4">
+      <v-col cols="12" md="3">
         <v-card class="cardResumo">
           <div class="cardHeader">
             <span>Gestores</span>
