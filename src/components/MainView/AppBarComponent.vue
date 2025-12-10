@@ -1,24 +1,24 @@
 <template>
-  <v-app-bar color="white" flat v-if="!isMobile" style="margin: 1px 0 1px 0; ">
+  <v-app-bar color="white" flat v-if="!isMobile" style="margin: 1px 0 1px 0">
     <img
       src="@/assets/LogomaptreeHeaderpng.png"
       alt="Logo"
-      style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px;"
+      style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px"
       @click="goTo('/')"
     />
 
     <v-spacer />
 
-    <v-toolbar-items class="d-flex justify-center" style="margin-top: 10px;">
+    <v-toolbar-items class="d-flex justify-center" style="margin-top: 10px">
       <v-btn
         v-for="item in currentMenu"
         :key="item.to"
         variant="text"
-        style="margin-right: 10px;"
+        style="margin-right: 10px"
         :color="isActive(item.to) ? 'black' : 'grey-darken-2'"
         @click="goTo(item.to)"
       >
-        <v-icon size="24" style="margin-right: 5px;" :color="isActive(item.to) ? green : 'black'">
+        <v-icon size="24" style="margin-right: 5px" :color="isActive(item.to) ? green : 'black'">
           {{ item.icon }}
         </v-icon>
 
@@ -30,7 +30,7 @@
     <v-btn
       icon
       :color="isActive('/gestor/notifications') ? green : 'black'"
-      style="background-color: #D9D9D9; margin-right: 20px; height: 45px; width: 45px;"
+      style="background-color: #d9d9d9; margin-right: 20px; height: 45px; width: 45px"
       @click="goTo('/gestor/notifications')"
     >
       <v-icon>mdi-bell-outline</v-icon>
@@ -40,23 +40,26 @@
       <template v-slot:activator="{ props }">
         <div
           v-bind="props"
-          style="
-          display: flex;
-          align-items: center;
-          cursor: pointer;
-          gap: 10px;
-          padding: 5px 10px;
-        "
+          style="display: flex; align-items: center; cursor: pointer; gap: 10px; padding: 5px 10px"
         >
-          <v-avatar size="40" style="background-color: #C1E328; align-items: center; justify-content: center; ">
+          <v-avatar
+            size="40"
+            style="background-color: #c1e328; align-items: center; justify-content: center"
+          >
             <img
               src="@/assets/Logomaptreeverde.png"
               alt="Perfil"
-              style="width: 40px; height: 40px; border-radius: 50%; align-items: center; justify-content: center;"
+              style="
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                align-items: center;
+                justify-content: center;
+              "
             />
           </v-avatar>
 
-          <span style="font-size: 16px; color: black;">
+          <span style="font-size: 16px; color: black">
             {{ user?.name || 'Usuário' }}
           </span>
 
@@ -65,41 +68,36 @@
       </template>
       <v-card>
         <v-card-text>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <v-avatar size="40" style="background-color: #C1E328; align-items: center; justify-content: center; ">
+
+          <div class="mx-auto text-center">
+            <v-avatar
+              size="40"
+              style="background-color: #c1e328; align-items: center; justify-content: center"
+            >
               <img
                 src="@/assets/Logomaptreeverde.png"
                 alt="Perfil"
-                style="width: 40px; height: 40px; border-radius: 50%; align-items: center; justify-content: center;"
+                style="
+                  width: 40px;
+                  height: 40px;
+                  border-radius: 50%;
+                  align-items: center;
+                  justify-content: center;
+                "
               />
             </v-avatar>
-          </div>
-          <div class="mx-auto text-center">
             <h3>{{ user?.name }}</h3>
             <p class="text-caption mt-1">
               {{ user?.email }}
             </p>
             <v-divider class="my-3"></v-divider>
-            <v-btn
-              variant="text"
-              rounded
-              @click="editAccount"
-            >
-              Edit Account
-            </v-btn>
+            <v-btn variant="text" rounded @click="editAccount"> Edit Account </v-btn>
             <v-divider class="my-3"></v-divider>
-            <v-btn
-              variant="text"
-              rounded
-              @click="logout"
-            >
-              Disconnect
-            </v-btn>
+            <v-btn variant="text" rounded @click="logout"> Disconnect </v-btn>
           </div>
         </v-card-text>
       </v-card>
     </v-menu>
-
   </v-app-bar>
 
   <v-app-bar flat v-else>
@@ -109,11 +107,7 @@
 
     <v-navigation-drawer v-model="drawer" temporary>
       <v-list>
-        <v-list-item
-          v-for="item in currentMenu"
-          :key="item.to"
-          @click="goTo(item.to)"
-        >
+        <v-list-item v-for="item in currentMenu" :key="item.to" @click="goTo(item.to)">
           <v-list-item-icon>
             <v-icon>{{ item.icon }}</v-icon>
           </v-list-item-icon>
@@ -140,9 +134,7 @@ interface User {
   name: string
   email: string
   role: string
-
 }
-
 
 export default {
   name: 'AppBarComponent',
@@ -168,7 +160,7 @@ export default {
         ] as MenuItem[],
         USER: [
           { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
-          { title: 'Podas', icon: 'mdi-content-cut'  },
+          { title: 'Podas', icon: 'mdi-content-cut' },
           { title: 'Relatórios', icon: 'mdi-file-chart' },
           { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
         ] as MenuItem[],
@@ -179,9 +171,9 @@ export default {
         ] as MenuItem[],
         GUEST: [
           { title: 'Login', icon: 'mdi-login', to: '/login' },
-          { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' }
+          { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' },
         ] as MenuItem[],
-      }
+      },
     }
   },
 
@@ -195,20 +187,19 @@ export default {
 
       console.log(role)
       return this.menus[role as keyof typeof this.menus] ?? this.menus.ADMIN
-
     },
 
     // Verifica se o componente está em modo mobile (baseado na store)
     isMobile(): boolean {
       return this.store.isMobile
-    }
+    },
   },
 
   watch: {
     // Observa a mudança de rota para fechar o drawer no mobile
     '$route.path'() {
       this.drawer = false
-    }
+    },
   },
 
   methods: {
@@ -217,13 +208,14 @@ export default {
     },
 
     getUser() {
-      this.$api.get('/users/me/profile')
-        .then(response => {
+      this.$api
+        .get('/users/me/profile')
+        .then((response) => {
           if (response.data) {
-            this.user = response.data
+            this.user = response.data as User
           }
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('Error fetching user profile:', error)
         })
     },
@@ -249,7 +241,7 @@ export default {
     // Navega para a edição da conta
     editAccount(): void {
       this.$router.push('/edit-account')
-    }
+    },
   },
 
   // Lifecycle hook para configurar o listener de redimensionamento
@@ -262,6 +254,6 @@ export default {
   // Lifecycle hook para limpar o listener de redimensionamento
   beforeUnmount() {
     window.removeEventListener('resize', this.checkMobile)
-  }
+  },
 }
 </script>

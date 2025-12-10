@@ -83,7 +83,15 @@ export interface Species {
   description: string
 }
 
-
+export interface Pruning {
+  idTree: string
+  tree: Tree
+  idUser: string
+  user: User
+  date: Date
+  observations: string
+  type: 'LIGHT' | 'MODERATE' | 'HEAVY'
+}
 
 class ApiConnect {
   private axiosInstance: AxiosInstance

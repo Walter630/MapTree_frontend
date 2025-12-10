@@ -30,7 +30,6 @@ import OutsourcedEmployeeMain from '@/components/FuncionarioTerceirizadoView/Mai
 
 import { apiConnect, type User } from '@/plugins/apiConnect.ts'
 import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFuncionarioTerc.vue'
-import mainComponent from '@/components/MainView/MainComponent.vue'
 import MapPage from '@/pages/map/MapPage.vue'
 import UserPage from '@/pages/UserPage.vue'
 import { useAppStore } from '@/stores/app.ts'

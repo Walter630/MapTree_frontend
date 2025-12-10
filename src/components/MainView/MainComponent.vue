@@ -18,12 +18,9 @@
             prepend-inner-icon="mdi-magnify"
             hide-details
             class="search-input"
-          >
-            <template #append-inner>
-              <v-btn class="search-button" @click="performSearch" flat> Buscar </v-btn>
-            </template>
-          </v-text-field>
+          />
         </div>
+        <v-btn color="black" variant="flat" size="large" @click="performSearch"> BUSCAR </v-btn>
       </v-col>
     </v-row>
 
@@ -46,7 +43,7 @@
             <span>Podas</span>
             <v-icon>mdi-account-group</v-icon>
           </div>
-          <p class="cardNumero">{{}}</p>
+          <p class="cardNumero">{{ countPrunings }}</p>
           <p class="cardInfo">+7 este mês</p>
         </v-card>
       </v-col>
@@ -54,7 +51,7 @@
       <v-col cols="12" md="3">
         <v-card class="cardResumo">
           <div class="cardHeader">
-            <span>Espécies</span>
+            <span>Areas Críticas</span>
             <v-icon>mdi-sprout</v-icon>
           </div>
           <p class="cardNumero">156</p>
@@ -67,7 +64,7 @@
             <span>Espécies</span>
             <v-icon>mdi-sprout</v-icon>
           </div>
-          <p class="cardNumero">156</p>
+          <p class="cardNumero">{{ countSpecies }}</p>
           <p class="cardInfo">Catalogadas</p>
         </v-card>
       </v-col>
@@ -124,15 +121,15 @@
             v-for="tree in treesFiltradas"
             :key="tree.id"
             class="pa-3 mb-2 rounded-lg alert-card"
-            color="#FBE0E3"
+            :style="{
+              backgroundColor: tree.status === 'TO_PRUNE' || 'em_progresso' ? '#FBE0E3' : '#FBE0E3',
+            }"
             flat
           >
             <p class="text-subtitle-2 font-weight-medium mb-1">
               {{ tree.status }}
             </p>
-            <p class="text-subtitle-2 font-weight-medium mb-1">
-              {{ new Date(tree.age).toLocaleDateString('pt-BR') }}
-            </p>
+            <p class="text-subtitle-2 font-weight-medium mb-1"></p>
 
             <p class="text-caption text-grey-darken-1 mb-1">
               {{ tree.lat }}
@@ -158,20 +155,28 @@
             <v-icon class="mr-2">mdi-leaf-maple</v-icon>
             Espécies por localidade
           </p>
-          <v-skeleton-loader height="270" type="image" class="rounded-lg"></v-skeleton-loader>
+
+<!--          <PruningMap
+            ref="pruningMapRef"
+            style="height: 270px; border-radius: 8px; overflow: hidden"
+          />-->
         </v-card>
       </v-col>
 
       <v-col cols="12" md="6">
         <v-card
-          flat
           class="pa-4"
-          style="border: 1px solid #cdcdcd; background-color: white; border-radius: 12px"
+          style="
+            border: 1px solid #cdcdcd;
+            background-color: #f6f6f6;
+            border-radius: 12px;
+            box-shadow: none;
+          "
         >
           <p class="text-subtitle-1 font-weight-bold mb-4">Últimos Relatórios de Poda</p>
+
           <v-data-table
             :headers="reportHeaders"
-            :items="reportItems"
             hide-default-footer
             hide-default-header
             class="report-table"
@@ -189,31 +194,14 @@
                 </th>
               </tr>
             </thead>
-            <template #item="{ item }">
-              <tr class="report-row">
-                <td class="pt-2">
-                  <p class="text-body-2 font-weight-medium mb-0">
-                    {{ item.localizacao.split('\n')[0] }}
-                  </p>
-                  <p class="text-caption text-grey-darken-1 mt-0">
-                    {{ item.localizacao.split('\n')[1] }}
-                  </p>
-                </td>
-                <td>
-                  <v-chip
-                    :color="getStatusColor(item.status)"
-                    size="small"
-                    label
-                    class="font-weight-medium"
-                    style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 0 8px"
-                    :style="{ backgroundColor: getStatusColor(item.status) }"
-                  >
-                    {{ item.status }}
-                  </v-chip>
-                </td>
-                <td class="text-body-2 font-weight-regular">{{ item.acao }}</td>
+
+            <tbody>
+              <tr v-for="report in species" :key="report.id">
+                <td>{{ report.scientificName }}</td>
+                <td>{{ report.family }}</td>
+                <td>{{ report.trees }}</td>
               </tr>
-            </template>
+            </tbody>
           </v-data-table>
         </v-card>
       </v-col>
@@ -228,21 +216,12 @@ import PruningMap from '@/components/functions/MapsView/PruningMap.vue'
 import DonutChart from '@/components/functions/GraficosView/DonutChart.vue'
 import { useAuth } from '@/hooks/useAuth'
 
-// Interfaces de tipagem
-
-interface MetricCard {
-  title: string
-  value: string
-  subtext: string
-  icon: string
-}
-
 export interface Tree {
   id: string
   age: Date
   lat: number
   lng: number
-  status: 'TO_PRUNE' | 'em_progresso' | 'NORMAL'
+  status: 'TO_PRUNE' | 'UNDER_OBSERVATION' | 'NORMAL' | 'PRUNED'
 }
 
 interface User {
@@ -259,11 +238,29 @@ interface ReportItem {
   acao: string
 }
 
+interface Pruning {
+  idTree: string
+  tree: Tree
+  idUser: string
+  user: User
+  date: Date
+  observations: string
+  type: 'LIGHT' | 'MODERATE' | 'HEAVY'
+}
+
 interface ReportHeader {
   title: string
   key: string
 }
 
+interface Species {
+  id: string
+  commonName: string
+  scientificName: string
+  family: string
+  description: string
+  trees: Tree[]
+}
 export default defineComponent({
   name: 'HomeGestorView',
 
@@ -282,37 +279,12 @@ export default defineComponent({
       // single logged user (null while loading/not authenticated)
       user: null as User | null,
       trees: null as Tree[] | null,
+      species: null as Species[] | null,
       countTrees: 0 as number,
       treesFiltradas: [] as Tree[],
-      /* species: [] as Species[],*/
-
-      // Dados das Métricas (tipagem MetricCard[])
-      metricCards: [
-        {
-          title: 'Árvores Cadastradas',
-          value: this.countTrees,
-          subtext: '+3 este mês',
-          icon: 'mdi-content-duplicate',
-        },
-        {
-          title: 'Podas Agendadas',
-          value: '240',
-          subtext: '+7 este mês',
-          icon: 'mdi-home-plus-outline',
-        },
-        {
-          title: 'Áreas Críticas',
-          value: '156',
-          subtext: '3 requerem atenção imediata',
-          icon: 'mdi-information-outline',
-        },
-        {
-          title: 'Espécies',
-          value: '156',
-          subtext: 'Catalogadas',
-          icon: 'mdi-sprout',
-        },
-      ] as MetricCard[],
+      prunings: [] as Pruning[],
+      countPrunings: 0 as number,
+      countSpecies: 0 as number,
 
       // Cabeçalhos dos Relatórios (tipagem ReportHeader[])
       reportHeaders: [
@@ -320,13 +292,6 @@ export default defineComponent({
         { title: 'Status', key: 'status' },
         { title: 'Árvore', key: 'acao' },
       ] as ReportHeader[],
-
-      // Itens dos Relatórios (tipagem ReportItem[])
-      reportItems: [
-        { localizacao: 'Rua das Flores, 123\n2024-11-08', status: 'Pendente', acao: '0483478' },
-        { localizacao: 'Av. Central, 456\n2024-11-07', status: 'Em progresso', acao: '4T456Y5' },
-        { localizacao: 'Praça da Paz, s/n\n2024-11-09', status: 'Concluída', acao: '0345T7578' },
-      ] as ReportItem[],
     }
   },
 
@@ -341,6 +306,34 @@ export default defineComponent({
       this.$router.push('/user/mapUser')
     },
 
+    getSpecies() {
+      this.$api
+        .get('/species')
+        .then((response) => {
+          if (response.data) {
+            this.species = response.data as Species[]
+            this.countSpecies = this.species.length
+          }
+        })
+        .catch((error) => {
+          console.error('Erro ao buscar espécies:', error)
+        })
+    },
+
+    getPrunings() {
+      this.$api
+        .get('/pruning')
+        .then((response) => {
+          if (response.data) {
+            this.prunings = response.data as Pruning[]
+            this.countPrunings = this.prunings.length
+          }
+        })
+        .catch((error) => {
+          console.error('Erro ao buscar pruning:', error)
+        })
+    },
+
     getTrees() {
       this.$api
         .get('/trees')
@@ -348,6 +341,7 @@ export default defineComponent({
           if (response.data) {
             this.trees = response.data as Tree[]
             this.countTrees = this.trees.length
+            this.getSpecies()
 
             // 🚨 FILTRAR APENAS AS ÁRVORES PARA PODA
             this.treesFiltradas = this.trees.filter((tree) => {
@@ -376,19 +370,6 @@ export default defineComponent({
         })
     },
 
-    /* getSpecies() {
-      this.$api
-        .get('/species')
-        .then((response) => {
-          if (response.data) {
-            this.species = response.data as Species[]
-          }
-        })
-        .catch((error) => {
-          console.error('Erro ao buscar espécies:', error)
-        })
-    },
-*/
     getStatusColor(status: ReportItem['status']): string {
       switch (status) {
         case 'Pendente':
@@ -401,23 +382,6 @@ export default defineComponent({
           return '#FFFFFF'
       }
     },
-
-    // Se precisar buscar dados do backend:
-    /*
-    async fetchDashboardData() {
-        this.isLoading = true;
-        try {
-            // const response = await (this as any).$api.get('/api/dashboard/summary');
-            // this.metricCards = response.data.metrics;
-            // this.alerts = response.data.alerts;
-            // this.reportItems = response.data.reports;
-        } catch (error) {
-            console.error("Erro ao buscar dados do dashboard:", error);
-        } finally {
-            this.isLoading = false;
-        }
-    }
-    */
   },
 
   // 4. Se houver lógica de inicialização, usar mounted()
@@ -425,17 +389,13 @@ export default defineComponent({
     // Preencher usuário logado ao montar
     this.getUser()
     this.getTrees()
-    /*  this.getSpecies()*/
+    this.getSpecies()
+    this.getPrunings()
   },
 })
 </script>
 
 <style scoped>
-/* Estilos mantidos (não foi solicitada alteração neles) */
-.metric-card {
-  transition: box-shadow 0.2s ease;
-}
-
 .cardResumo {
   background: #f6f6f6;
   border: 1px solid #cdcdcd;
@@ -466,7 +426,6 @@ export default defineComponent({
 .alert-card {
   border: 1px solid #cdcdcd;
   box-shadow: none;
-  background-color: transparent !important;
 }
 
 .report-table {

@@ -155,8 +155,7 @@ export default {
   },
   methods: {
     goBack() {
-      // Lógica para voltar, como this.$router.go(-1) ou um evento de emit
-      this.$router.push("/gestor/funcionarios")
+      this.$router.push("/manager/employees")
     },
     async registrar() {
       try {
@@ -205,6 +204,7 @@ export default {
       // Lógica para cancelar, como resetar o formulário ou redirecionar
       console.log('Ação de Cancelar');
       this.resetForm();
+      this.$router.push('/manager/employees')
     },
   },
 };

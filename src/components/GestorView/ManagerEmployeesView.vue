@@ -1,81 +1,78 @@
 <template>
   <v-container class="pa-6">
-    <v-row>
+    <v-row align="center" class="mb-2">
       <v-col cols="12">
-        <div class="d-flex align-center mb-2">
-          <span class="text-caption text-grey-darken-1">Meu Painel</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold">#Funcionários</span>
-        </div>
-
-        <div class="d-flex align-center mb-4 mt-6">
-          <v-btn
-            class="mr-4"
-            style="
-              box-shadow: none;
-              border: 1px solid #d0d5dd;
-              height: 56px;
-              border-radius: 8px;
-              background-color: #ffffff;
-              width: 56px;
-            "
-            @click="goBack"
+        <div class="d-flex align-center mb-6">
+          <span class="text-caption text-grey-darken-1" @click="$router.push('/manager')"
+            >Meu Painel</span
           >
-            <v-icon>mdi-chevron-left</v-icon>
+          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
+          <span class="text-caption font-weight-bold" style="color: #2f3367">#Funcionários</span>
+        </div>
+        <div class="d-flex align-center mb-2">
+          <!-- Back button (square) -->
+          <v-btn icon class="back-btn mr-3" @click="goBack">
+            <v-icon>mdi-arrow-left</v-icon>
           </v-btn>
+
           <div>
-            <span class="text-h5 font-weight-regular" style="color: #2f3367">FUNCIONÁRIOS</span>
-            <p class="text-body-2 text-grey-darken-1" style="margin-top: 10px">
-              Gerencie Os Funcionários E Suas Atribuições.
-            </p>
+            <h2 class="title mb-1">Funcionários</h2>
+            <p class="subtitle">Gerencie usuários e suas permissões no sistema</p>
           </div>
         </div>
+
+        <!-- Novo Gestor abaixo do título -->
+        <v-row class="mt-3">
+          <v-col cols="12">
+            <v-btn
+              color="#C6F513"
+              size="large"
+              class="font-weight-bold text-black text-none new-funcionario-btn"
+              prepend-icon="mdi-plus"
+              @click="addEmployee"
+            >
+              Novo Funcionário
+            </v-btn>
+          </v-col>
+        </v-row>
       </v-col>
     </v-row>
 
-    <v-row class="mt-4" align="center">
-      <v-col cols="12" sm="6" md="3" lg="8">
-        <v-btn
-          color="#C6F513"
-          size="large"
-          prepend-icon="mdi-plus"
-          class="font-weight-bold text-black"
-          @click="$router.push('/manager/register-employee')"
-        >
-          ADICIONAR FUNCIONÁRIO
-        </v-btn>
-      </v-col>
-    </v-row>
-
-    <v-row class="mt-6">
-      <v-col cols="12">
+    <v-row class="mt-12" style="background-color: #f6f6f6; border-radius: 8px">
+      <v-col cols="12" class="pa-0">
+        <p class="table-title-text mb-4" style="font-size: 14px">Gestores Cadastradas</p>
         <v-data-table
           :headers="headers"
-          :items="funcionarios"
+          :items="users"
           :search="search"
           :sort-by="[{ key: 'nome', order: 'asc' }]"
-          class="elevation-1"
+          class="elevation-0 data-table-custom"
           hide-default-footer
         >
-          <template #item.id="{ item }">
-            <div class="text-subtitle-2 font-weight-bold py-2">{{ item.id }}</div>
-          </template>
+          <template #item="{ item }">
+            <tr>
+              <td class="table-id">{{ item.name }}</td>
+              <td class="table-text">{{ item.cpf }}</td>
 
-          <template #item.nome="{ item }">
-            <div class="d-flex align-center py-2">
-              <div class="text-body-1">{{ item.nome }}</div>
-            </div>
-          </template>
-
-          <template #item.status="{ item }">
-            <div class="text-body-1">{{ item.status }}</div>
-          </template>
-
-          <template #item.acoes="{ item }">
-            <v-icon size="small" class="mr-2" @click="editItem(item)">mdi-pencil</v-icon>
-            <v-icon size="small" @click="deleteItem(item)">mdi-delete</v-icon>
+              <td>
+                <v-chip color="green" v-if="item.isActive">
+                  {{ item.isActive }}
+                </v-chip>
+              </td>
+              <td>
+                <v-icon size="small" class="mr-2 action-icon" @click="openDialogEdit(item)">
+                  mdi-square-edit-outline
+                </v-icon>
+                <v-icon size="small" class="action-icon" @click="openDialogDelete(item)">
+                  mdi-trash-can-outline
+                </v-icon>
+              </td>
+            </tr>
           </template>
         </v-data-table>
+        <v-card-actions class="justify-center py-6">
+          <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
+        </v-card-actions>
       </v-col>
     </v-row>
 
@@ -144,111 +141,223 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, inject } from 'vue'
-import type { ApiConnect, User } from '@/plugins/apiConnect.ts'
+import { defineComponent } from 'vue'
+import type { Manager, User } from '@/plugins/apiConnect.ts'
+
+interface Company {
+  id: string
+  name: string
+  taxId: string // CNPJ ou CPF da empresa
+  isOutsourced: boolean //se é terceirizada
+  managerId?: string
+  manager: Manager
+  isActive: boolean
+  createdAt?: Date
+}
 
 interface Funcionario {
   id: string
-  nome: string
+  name: string
   cpf: string
   status: string // O status na imagem é "Fulano De Tal", vou manter como string para simulação
+  email: string
+  phone: string
+  isActive: boolean
+  companyId: Company[]
 }
 
 export default defineComponent({
-  name: 'FuncionarioGestorView',
-  setup() {
-    const api: ApiConnect = inject('api') as ApiConnect // Injeção do serviço API, se necessário
-    const store: any = inject('store'); // Injeção do store, se necessário
-
-    // --- ESTADO E DADOS ---
-    const page = ref(1)
-    const itemsPerPage = ref(4) // Ajustado para 4, conforme 'Linhas por página 4' na imagem
-
-    const filterGerente = ref<string | null>('Gerente A')
-    const search = ref('')
-
-    const gerentes = ['Gerente A', 'Gerente B', 'Gerente C']
-
-    const funcionarios = ref<Funcionario[]>([])
-
-    // Headers ajustados para as colunas: ID, Nome, Status, Ações
-    const headers = [
-      { title: 'Id', key: 'id', align: 'start', sortable: true },
-      { title: 'Nome', key: 'nome', sortable: true },
-      { title: 'CPF', key: 'cpf', sortable: true },
-      { title: 'Telefone', key: 'phone', sortable: true },
-      { title: 'Status', key: 'status', sortable: true },
-      { title: 'Ações', key: 'acoes', align: 'end', sortable: false },
-    ]
-
-    // --- MÉTODOS ---
-    function goBack() {
-      console.log('Voltar para a página anterior')
-    }
-    function addFuncionario() {
-      console.log('Adicionar Funcionário')
-    }
-    function applyFilters() {
-      console.log('Filtros aplicados:', filterGerente.value, search.value)
-      // Volta para a primeira página após aplicar filtros
-      page.value = 1
-    }
-    function editItem(item: Funcionario) {
-      console.log('Editar:', item)
-    }
-    function deleteItem(item: Funcionario) {
-      console.log('Excluir:', item)
-    }
-    async function fetchFuncionarios() {
-      try {
-        const response = await api.get<User[]>('users', {
-          params: {
-            role: 'USER',
-          },
-        });
-
-        funcionarios.value = response.data.map((user) => ({
-          id: user.id,
-          nome: user.name,
-          cpf: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '***.$2.$3-**'),
-          phone: user.phone.replace(/(\d{2})(\d)(\d{4})(\d{4})/, '($1) $2 $3-$4'),
-          status: user.isActive ? 'Ativo' : 'Inativo',
-        }));
-      } catch (error) {
-        console.error('Erro ao buscar funcionários:', error)
-      }
-    }
-
+  data() {
     return {
-      funcionarios,
-      headers,
-      gerentes,
-      filterGerente,
-      search,
-      page,
-      itemsPerPage,
-      goBack,
-      addFuncionario,
-      applyFilters,
-      editItem,
-      deleteItem,
-      fetchFuncionarios,
-      store,
+      users: [] as Funcionario[],
+      cpfMask: '###.###.###-##',
+      comparacaoPercentual: '',
+      comparacaoCor: 'text-success', // ou 'text-danger'
+      // filtros
+      search: '',
+      totalUsers: 0,
+
+      // selects
+
+      // tabela
+      itemsPerPage: 6,
+      page: 1,
+      headers: [
+        { title: 'Nome', key: 'name', sortable: true },
+        { title: 'Cpf', key: 'cpf', sortable: true },
+        { title: 'Status', key: 'isActive', sortable: true },
+        { title: 'Ações', key: 'acoes', sortable: false },
+      ],
+      dialogDelete: {
+        active: false,
+        loading: false,
+        item: null as User | null,
+      },
+      dialogEdit: {
+        active: false,
+        loading: false,
+        item: null as User | null,
+      },
+
+      // backup para filtros
+      allUsers: [] as User[],
     }
   },
-  async created() {
-    await this.fetchFuncionarios();
+
+  computed: {
+    totalFuncionarios() {
+      return this.users.length
+    },
+    pageCount() {
+      return Math.ceil(this.users.length / this.itemsPerPage)
+    },
+    cpfMasked() {
+      return this.cpfMask
+    },
+  },
+
+  mounted() {
+    this.getAllCompaniesAndUsers()
+  },
+
+  methods: {
+    async getAllCompaniesAndUsers(): Promise<void> {
+      await this.getAllUsers() // Em seguida, carrega os usuários
+    },
+
+    //usar computed
+    async getAllUsers(): Promise<void> {
+      try {
+        const response = await this.$api.get<User[]>('/users') // Usando 'any' para flexibilidade
+        this.allUsers = response.data.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          cpf: user.cpf,
+          phone: user.phone,
+          isActive: user.isActive,
+          companyId: user.companyId,
+        }))
+        // NOVO: Define o valor total
+        this.totalUsers = this.allUsers.length
+        // exibir na tabela
+        this.users = [...this.allUsers]
+      } catch (error) {
+        console.error('Erro ao buscar usuários:', error)
+      }
+    },
+
+    async editItem() {
+      try {
+        this.dialogEdit.loading = true
+        await this.$api.patch(`/users/${this.dialogEdit?.item?.id}`, {
+          name: this.dialogEdit?.item?.name,
+          email: this.dialogEdit?.item?.email,
+          organizationId: this.dialogEdit?.item?.organization,
+          isActive: this.dialogEdit?.item?.isActive,
+        })
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error)
+      } finally {
+        await this.getAllUsers()
+        this.dialogEdit.loading = false
+        this.dialogEdit.active = false
+        this.dialogEdit.item = null
+      }
+    },
+
+    openDialogEdit(item: User) {
+      this.dialogEdit.active = true
+      this.dialogEdit.item = item
+    },
+    closeDialogEdit() {
+      this.dialogEdit.active = false
+      this.dialogEdit.item = null
+      this.dialogEdit.loading = false
+    },
+
+    /** 🔹 Usuário logado */
+    getCurrentUser() {
+      return this.$api?.isAuthenticated() ?? {}
+    },
+
+    addEmployee() {
+      this.$router.push('/manager/register-employee')
+    },
+
+    /** 🔹 Excluir item */
+    async deleteItem() {
+      try {
+        this.dialogDelete.loading = true
+        await this.$api.delete(`/users/${this.dialogDelete?.item?.id}`)
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error)
+      } finally {
+        await this.getAllUsers()
+        this.dialogDelete.loading = false
+        this.dialogDelete.active = false
+        this.dialogDelete.item = null
+      }
+    },
+
+    /** 🔹 Aplicar filtros */
+    applyFilters() {
+      this.users = this.users.filter((g) => {
+        const matchName = this.search
+          ? g.nome?.toLowerCase().includes(this.search.toLowerCase())
+          : true
+
+        return matchName
+      })
+      this.page = 1
+    },
+
+    openDialogDelete(item: User) {
+      this.dialogDelete.active = true
+      this.dialogDelete.item = item
+    },
+    closeDialogDelete() {
+      this.dialogDelete.active = false
+      this.dialogDelete.item = null
+      this.dialogDelete.loading = false
+    },
+
+    /** 🔹 Voltar */
+    goBack() {
+      this.$router.back()
+    },
   },
 })
 </script>
 
 <style scoped>
-/* Estilo para ajustar o alinhamento do v-select no footer */
-.v-select.ml-2 {
-  font-size: 12px;
+.back-btn {
+  border: 1px solid #e6e6e6;
+  background: #f6f6f6;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 8px;
 }
 .v-select.ml-2 :deep(.v-field__input) {
   padding-top: 5px;
   padding-bottom: 5px;
+}
+.new-funcionario-btn {
+  height: 42px !important;
+  background: #c6f513 !important;
+  border-radius: 8px;
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
 }
 </style>
