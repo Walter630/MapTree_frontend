@@ -54,12 +54,12 @@
         <v-card class="summary-card">
           <div class="card-head">
             <div class="summary-head">
-              <span>Pendentes</span>
+              <span>Ativas</span>
             </div>
-            <v-icon class="corner-icon" small>mdi-alert-circle-outline</v-icon>
+            <v-icon class="corner-icon" small>mdi-check-circle-outline</v-icon>
           </div>
 
-          <div class="summary-value">18</div>
+          <div class="summary-value">{{ totalEmpresas }}</div>
           <div class="summary-note text-danger">Requerem atenção</div>
         </v-card>
       </v-col>
@@ -82,9 +82,9 @@
         <v-card class="summary-card">
           <div class="card-head">
             <div class="summary-head">
-              <span>Taxa de Conclusão</span>
+              <span>Suspensas</span>
             </div>
-            <v-icon class="corner-icon" small>mdi-chart-donut</v-icon>
+            <v-icon class="corner-icon" small>mdi-alert-circle-outline</v-icon>
           </div>
 
           <div class="summary-value">94%</div>

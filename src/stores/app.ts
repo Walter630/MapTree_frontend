@@ -1,12 +1,13 @@
 // Utilities
 import { defineStore } from 'pinia'
-import type { User } from '@/plugins/apiConnect'
+import type { Pruning, User } from '@/plugins/apiConnect'
 
 export const useAppStore = defineStore('app', {
   state: () => ({
     user: null as User | null,
     isMobile: false,
     loadingPage: false,
+    pruningTypes: [] as Pruning[],
   }),
 
   actions: {
@@ -15,6 +16,13 @@ export const useAppStore = defineStore('app', {
     },
     getUser(user: User | null) {
       this.user = user
+    },
+
+    setPruningTypes(pruningTypes: Pruning[]) {
+      this.pruningTypes = pruningTypes
+    },
+    addPruning(pruning: Pruning) {
+      this.pruningTypes.unshift(pruning)
     },
 
     setIsMobile(value: boolean) {
@@ -28,7 +36,7 @@ export const useAppStore = defineStore('app', {
 
   getters: {
     getOrganizationId(): string | null {
-      return this.user?.organization?.id || null;
-    }
-  }
+      return this.user?.organization?.id || null
+    },
+  },
 })

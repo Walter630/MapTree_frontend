@@ -4,7 +4,7 @@
       src="@/assets/LogomaptreeHeaderpng.png"
       alt="Logo"
       style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px"
-      @click="goTo('/')"
+      @click="goToHome()"
     />
 
     <v-spacer />
@@ -29,9 +29,9 @@
     <v-spacer />
     <v-btn
       icon
-      :color="isActive('/gestor/notifications') ? green : 'black'"
+      :color="isActive('/notifications') ? green : 'black'"
       style="background-color: #d9d9d9; margin-right: 20px; height: 45px; width: 45px"
-      @click="goTo('/gestor/notifications')"
+      @click="goToNotification()"
     >
       <v-icon>mdi-bell-outline</v-icon>
     </v-btn>
@@ -68,7 +68,6 @@
       </template>
       <v-card>
         <v-card-text>
-
           <div class="mx-auto text-center">
             <v-avatar
               size="40"
@@ -122,6 +121,8 @@
 
 <script lang="ts">
 import { useAppStore } from '@/stores/app'
+import { getHomeRouteByRole } from '@/router/helpers/getHomeRoute'
+import { getNotificationRoute } from '@/router/helpers/getNotificationRoute.ts'
 
 interface MenuItem {
   title: string
@@ -161,7 +162,7 @@ export default {
         USER: [
           { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
           { title: 'Podas', icon: 'mdi-content-cut' },
-          { title: 'Relatórios', icon: 'mdi-file-chart' },
+          { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
           { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
         ] as MenuItem[],
         USER_CREDENCIADO: [
@@ -205,6 +206,24 @@ export default {
   methods: {
     isActive(path: string): boolean {
       return this.$route.path === path
+    },
+
+    goToHome(): void {
+      const role = this.store.user?.role
+      const home = getHomeRouteByRole(this.$router, role)
+
+      if (this.$route.path !== home) {
+        this.$router.push(home)
+      }
+    },
+
+    goToNotification(): void {
+      const role = this.store.user?.role
+      const notification = getNotificationRoute(this.$router, role)
+
+      if (this.$route.path !== notification) {
+        this.$router.push(notification)
+      }
     },
 
     getUser() {

@@ -156,10 +156,7 @@
             Espécies por localidade
           </p>
 
-<!--          <PruningMap
-            ref="pruningMapRef"
-            style="height: 270px; border-radius: 8px; overflow: hidden"
-          />-->
+          <SpeciesMap />
         </v-card>
       </v-col>
 
@@ -175,12 +172,7 @@
         >
           <p class="text-subtitle-1 font-weight-bold mb-4">Últimos Relatórios de Poda</p>
 
-          <v-data-table
-            :headers="reportHeaders"
-            hide-default-footer
-            hide-default-header
-            class="report-table"
-          >
+          <v-table class="report-table">
             <thead>
               <tr>
                 <th class="text-left text-caption text-grey-darken-1 font-weight-medium py-3">
@@ -196,13 +188,28 @@
             </thead>
 
             <tbody>
-              <tr v-for="report in species" :key="report.id">
-                <td>{{ report.scientificName }}</td>
-                <td>{{ report.family }}</td>
-                <td>{{ report.trees }}</td>
+              <tr v-for="report in prunings" :key="report.idTree" class="table-row">
+                <td class="py-3 text-body-2">
+                  {{ report.observations }}
+                </td>
+
+                <td class="py-3">
+                  <v-chip
+                    :color="color[report.type]"
+                    text-color="white"
+                    size="small"
+                    style="border-radius: 8px; border: 1px solid #cdcdcd; box-shadow: none"
+                  >
+                    {{ report.type }}
+                  </v-chip>
+                </td>
+
+                <td class="py-3 text-body-2">
+                  {{ report.tree?.species?.commonName ?? 'Árvore não identificada' }}
+                </td>
               </tr>
             </tbody>
-          </v-data-table>
+          </v-table>
         </v-card>
       </v-col>
     </v-row>
@@ -213,8 +220,8 @@
 import { defineComponent } from 'vue'
 // O import do mapa continua aqui
 import PruningMap from '@/components/functions/MapsView/PruningMap.vue'
-import DonutChart from '@/components/functions/GraficosView/DonutChart.vue'
 import { useAuth } from '@/hooks/useAuth'
+import SpeciesMap from '@/components/functions/MapsView/SpeciesMap.vue'
 
 export interface Tree {
   id: string
@@ -222,6 +229,7 @@ export interface Tree {
   lat: number
   lng: number
   status: 'TO_PRUNE' | 'UNDER_OBSERVATION' | 'NORMAL' | 'PRUNED'
+  species: Species
 }
 
 interface User {
@@ -266,7 +274,7 @@ export default defineComponent({
 
   // 1. Registro do componente importado
   components: {
-    DonutChart,
+    SpeciesMap,
     PruningMap,
   },
 
@@ -285,6 +293,12 @@ export default defineComponent({
       prunings: [] as Pruning[],
       countPrunings: 0 as number,
       countSpecies: 0 as number,
+
+      color: {
+        LIGHT: '#AFCDFF',
+        MODERATE: '#FDFD98',
+        HEAVY: '#B3E8A3',
+      },
 
       // Cabeçalhos dos Relatórios (tipagem ReportHeader[])
       reportHeaders: [

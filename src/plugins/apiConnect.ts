@@ -66,12 +66,19 @@ export interface Manager {
   organizationId: string | null
 }
 
+export enum TreeStatus {
+  PRUNED = 'PRUNED',
+  TO_PRUNE = 'TO_PRUNE',
+  UNDER_OBSERVATION = 'UNDER_OBSERVATION',
+  NORMAL = 'NORMAL',
+}
+
 export interface Tree {
   id: string
   age: Date
   lat: number
   lng: number
-  status: 'agendada' | 'em_progresso' | 'concluida'
+  status: TreeStatus
   speciesId: string
 }
 

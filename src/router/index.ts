@@ -33,6 +33,8 @@ import MainFuncionarioTerc from '@/components/FuncionarioTerceirizadoView/MainFu
 import MapPage from '@/pages/map/MapPage.vue'
 import UserPage from '@/pages/UserPage.vue'
 import { useAppStore } from '@/stores/app.ts'
+import ReportsPage from '@/pages/ReportsPage.vue'
+import NotificationPage from '@/pages/NotificationPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -57,7 +59,7 @@ const router = createRouter({
         {
           path: 'admin',
           component: AdminPage,
-          meta: { requiresAuth: true, role: 'ADMIN' },
+          meta: { requiresAuth: true, role: 'ADMIN', home: true },
           children: [
             { path: '', name: 'AdminHome', component: AdminMainComponent },
             { path: 'managers', name: 'AdminManagers', component: AdminManagersView },
@@ -73,13 +75,13 @@ const router = createRouter({
         {
           path: 'manager',
           component: ManagerPage,
-          meta: { requiresAuth: true, role: 'MANAGER' },
+          meta: { requiresAuth: true, role: 'MANAGER', home: true },
           children: [
             { path: '', name: 'ManagerHome', component: ManagerMainComponent },
             { path: 'employees', name: 'ManagerEmployees', component: ManagerEmployeesView },
             { path: 'register-employee', name: 'RegisterEmployee', component: RegisterEmployee },
             { path: 'reports', name: 'ManagerReports', component: ManagerReportsView },
-            { path: 'notifications', name: 'ManagerNotifications', component: ManagerNotificationsView },
+            { path: 'notifications', name: 'ManagerNotifications', component: ManagerNotificationsView, meta: { notification: true, role: 'MANAGER' } },
 
           ],
         },
@@ -87,23 +89,25 @@ const router = createRouter({
         /* ============================
            OUTSOURCED EMPLOYEE
         ============================= */
-        {
+        /*{
           path: 'user-outsource',
           component: OutsourcedEmployeeMain,
-          meta: { requiresAuth: true, role: 'USER' },
+          meta: { requiresAuth: true, role: 'USER', home: true, isOutsourced: true },
           children: [
             { path: '', name: 'OutsourcedEmployeeHome', component: MainFuncionarioTerc },
             { path: 'mapOutsourced', name: 'Map', component: MapPage },
           ],
-        },
+        },*/
         {
           path: 'user',
           name: 'Employees',
           component: UserPage,
-          meta: { requiresAuth: true, role: 'USER' },
+          meta: { requiresAuth: true, role: 'USER', home: true },
           children: [
             { path: '', name: 'UserHome', component: MainComponent },
+            { path: 'reports', name: 'UserReports', component: ReportsPage },
             { path: 'mapUser', name: 'Map', component: MapPage },
+            { path: 'notifications', name: 'UserNotifications', component: NotificationPage, meta: { notification: true, role: 'USER' } },
           ],
         }
       ],

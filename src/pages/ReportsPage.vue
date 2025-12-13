@@ -179,10 +179,10 @@
       </v-col>
     </v-row>
 
-    <v-card class="pa-4" style="box-shadow: none; background-color: #f6f6f6">
+    <v-card class="pa-4"  style="box-shadow: none; background-color: #f6f6f6">
       <h3 class="text-h6 mb-3 font-weight-regular">Resumo das Atividades Executadas</h3>
 
-      <v-list class="py-0 resumo-list">
+      <v-list  class="py-0 resumo-list">
         <v-list-item v-for="(item, index) in resumoData" :key="index" class="resumo-item">
           <v-list-item-content class="py-3">
             <v-row align="center">
@@ -235,20 +235,11 @@
                 </v-btn>
               </v-col>
 
-              <v-col cols="12" sm="1">
+              <v-col cols="12" sm="1" >
                 <div class="text-caption grey--text text--darken-1" style="font-weight: bold">
                   Status
                 </div>
-                <v-chip
-                  :color="item.statusColor"
-                  style="
-                    box-shadow: none;
-                    background-color: #f6f6f6;
-                    align-items: center;
-                    justify-content: center;
-                    display: flex;
-                  "
-                >
+                <v-chip :color="item.statusColor" style="box-shadow: none; background-color: #f6f6f6; align-items: center; justify-content: center; display: flex;" >
                   {{ item.status }}
                 </v-chip>
               </v-col>
