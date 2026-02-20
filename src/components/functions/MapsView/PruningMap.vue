@@ -3,6 +3,10 @@ import { defineComponent, onMounted, onUnmounted, ref, computed, inject } from '
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+/* ===================================
+   TIPOS
+=================================== */
+
 interface CityTreeLocation {
   id?: string
   age: Date
@@ -25,6 +29,10 @@ interface PowerLine {
   path: [number, number][]
 }
 
+/* ===================================
+   CORREÇÃO DO ÍCONE PADRÃO LEAFLET
+=================================== */
+
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -32,19 +40,44 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+/* ===================================
+   CONSTANTES
+=================================== */
+
+const POWER_LINE_THRESHOLD = 4
+
+const MOCK_POWER_LINES: PowerLine[] = [
+  {
+    id: 'line-1',
+    path: [
+      [-23.5508, -46.6336],
+      [-23.5515, -46.6324],
+      [-23.5522, -46.6312],
+    ],
+  },
+]
+
+/* ===================================
+   COMPONENTE
+=================================== */
+
 export default defineComponent({
   name: 'PruningMap',
+
   props: {
     tasks: {
       type: Array as () => CityTreeLocation[],
-      required: true,
+      required: false,
       default: () => [],
     },
   },
+
   setup(props) {
     const $api = inject('$api') as {
       get: (url: string, config?: Record<string, unknown>) => Promise<{ data: unknown }>
     }
+
+    /* ---------- Referências do Mapa ---------- */
 
     let map: L.Map | null = null
     let markersLayer: L.LayerGroup | null = null
@@ -52,36 +85,24 @@ export default defineComponent({
     let markedLayer: L.LayerGroup | null = null
     let powerLinesLayer: L.LayerGroup | null = null
 
-    let userMarker: L.Marker | null = null
-    let userAccuracyCircle: L.Circle | null = null
-    let watchId: number | null = null
-    let fetchTimeout: number | null = null
+    /* ---------- Estado Reativo ---------- */
 
     const following = ref(true)
     const markMode = ref(false)
     const locationStatus = ref<'idle' | 'requesting' | 'found' | 'denied' | 'error'>('idle')
     const isExpanded = ref(false)
-
     const cityTrees = ref<CityTreeLocation[]>([])
     const markedLocations = ref<MarkedLocation[]>([])
     const loadingTrees = ref(false)
+    const powerLines = ref<PowerLine[]>(MOCK_POWER_LINES)
+
+    /* ---------- Computed ---------- */
 
     const treeCount = computed(() => cityTrees.value.length)
     const crowdedTreeCount = computed(() => cityTrees.value.filter((t) => t.near_trees).length)
     const markedCount = computed(() => markedLocations.value.length)
 
-    const POWER_LINE_THRESHOLD = 4
-
-    const powerLines = ref<PowerLine[]>([
-      {
-        id: 'line-1',
-        path: [
-          [-23.5508, -46.6336],
-          [-23.5515, -46.6324],
-          [-23.5522, -46.6312],
-        ],
-      },
-    ])
+    /* ---------- Ícones ---------- */
 
     const createTreeIcon = (status: string, danger = false): L.DivIcon => {
       let bg = '#4CAF50'
@@ -118,12 +139,7 @@ export default defineComponent({
       })
     }
 
-    const createMarkerIcon = (): L.DivIcon =>
-      L.divIcon({
-        html: `<div style="background:#9C27B0;border-radius:50%;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">📌</div>`,
-        iconSize: [45, 45],
-        iconAnchor: [22, 45],
-      })
+    /* ---------- API ---------- */
 
     const fetchTreesFromApi = async (
       minLat: number,
@@ -143,18 +159,19 @@ export default defineComponent({
       }
     }
 
+    /* ---------- Cálculos Geométricos ---------- */
+
     const distancePointToSegment = (p: L.LatLng, a: L.LatLng, b: L.LatLng): number => {
-      const crs = map!.options.crs
+      const crs = map!.options.crs!
       const pp = crs.project(p)
       const ap = crs.project(a)
       const bp = crs.project(b)
 
       const dx = bp.x - ap.x
       const dy = bp.y - ap.y
-      const t = ((pp.x - ap.x) * dx + (pp.y - ap.y) * dy) / (dx * dx + dy * dy)
-      const clamped = Math.max(0, Math.min(1, t))
+      const t = Math.max(0, Math.min(1, ((pp.x - ap.x) * dx + (pp.y - ap.y) * dy) / (dx * dx + dy * dy)))
 
-      const closest = L.point(ap.x + clamped * dx, ap.y + clamped * dy)
+      const closest = L.point(ap.x + t * dx, ap.y + t * dy)
       return pp.distanceTo(closest)
     }
 
@@ -177,6 +194,8 @@ export default defineComponent({
       })
     }
 
+    /* ---------- Renderização ---------- */
+
     const drawRoute = (trees: CityTreeLocation[]) => {
       markersLayer?.clearLayers()
       trees.forEach((t) => {
@@ -194,6 +213,7 @@ export default defineComponent({
     const fetchVisibleData = async () => {
       if (!map) return
       loadingTrees.value = true
+
       const b = map.getBounds()
       const apiTrees = await fetchTreesFromApi(
         b.getSouthWest().lat,
@@ -201,11 +221,14 @@ export default defineComponent({
         b.getNorthEast().lat,
         b.getNorthEast().lng,
       )
+
       cityTrees.value = [...props.tasks, ...apiTrees]
       checkTreesNearPowerLines()
       drawRoute(cityTrees.value)
       loadingTrees.value = false
     }
+
+    /* ---------- Inicialização do Mapa ---------- */
 
     const initializeMap = () => {
       map = L.map('map-container').setView([-23.5505, -46.6333], 15)
@@ -217,12 +240,12 @@ export default defineComponent({
       userLayer = L.layerGroup().addTo(map)
       powerLinesLayer = L.layerGroup().addTo(map)
 
+      // Desenha linhas de fiação
       powerLines.value.forEach((l) =>
-        L.polyline(l.path, { color: '#ff0000', dashArray: '5,5', weight: 3 }).addTo(
-          powerLinesLayer!,
-        ),
+        L.polyline(l.path, { color: '#ff0000', dashArray: '5,5', weight: 3 }).addTo(powerLinesLayer!),
       )
 
+      // Eventos do mapa
       map.on('moveend', fetchVisibleData)
       map.on('click', (ev) => {
         if (!markMode.value) return
@@ -240,8 +263,12 @@ export default defineComponent({
       fetchVisibleData()
     }
 
+    /* ---------- Lifecycle ---------- */
+
     onMounted(() => initializeMap())
     onUnmounted(() => map?.remove())
+
+    /* ---------- Retorno ---------- */
 
     return {
       doLocate: () => map?.locate({ setView: true }),
@@ -260,8 +287,9 @@ export default defineComponent({
 
 <template>
   <div class="map-wrapper">
-    <div id="map-container"></div>
+    <div id="map-container" />
 
+    <!-- Painel de Controle -->
     <div class="map-overlay-panel">
       <button @click="doLocate">📍 Localizar</button>
       <button @click="toggleMarkMode">📌 Marcar</button>
@@ -281,9 +309,11 @@ export default defineComponent({
   height: 100vh;
   position: relative;
 }
+
 #map-container {
   height: 100%;
 }
+
 .map-overlay-panel {
   position: absolute;
   top: 12px;
@@ -292,16 +322,18 @@ export default defineComponent({
   padding: 12px;
   border-radius: 8px;
   z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
+
+.map-overlay-panel button {
+  display: block;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
 @keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 </style>

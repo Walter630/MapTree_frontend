@@ -1,118 +1,85 @@
 <template>
-  <v-app-bar color="white" flat v-if="!isMobile" style="margin: 1px 0 1px 0">
+  <!-- ===== Desktop AppBar ===== -->
+  <v-app-bar v-if="!isMobile" color="white" flat class="appbar-desktop">
+    <!-- Logo -->
     <img
       src="@/assets/LogomaptreeHeaderpng.png"
-      alt="Logo"
-      style="width: 150px; height: 52px; margin-left: 25px; margin-top: 10px"
+      alt="Logo MapTree"
+      class="logo"
       @click="goToHome()"
     />
 
     <v-spacer />
 
-    <v-toolbar-items class="d-flex justify-center" style="margin-top: 10px">
+    <!-- Menu de Navegação -->
+    <v-toolbar-items class="d-flex justify-center mt-2">
       <v-btn
         v-for="item in currentMenu"
         :key="item.to"
         variant="text"
-        style="margin-right: 10px"
+        class="mr-2"
         :color="isActive(item.to) ? 'black' : 'grey-darken-2'"
         @click="goTo(item.to)"
       >
-        <v-icon size="24" style="margin-right: 5px" :color="isActive(item.to) ? green : 'black'">
+        <v-icon size="24" class="mr-1" :color="isActive(item.to) ? green : 'black'">
           {{ item.icon }}
         </v-icon>
-
         {{ item.title }}
       </v-btn>
     </v-toolbar-items>
 
     <v-spacer />
+
+    <!-- Notificações -->
     <v-btn
       icon
       :color="isActive('/notifications') ? green : 'black'"
-      style="background-color: #d9d9d9; margin-right: 20px; height: 45px; width: 45px"
+      class="notification-btn mr-5"
       @click="goToNotification()"
     >
       <v-icon>mdi-bell-outline</v-icon>
     </v-btn>
 
+    <!-- Menu do Usuário -->
     <v-menu min-width="200px">
       <template v-slot:activator="{ props }">
-        <div
-          v-bind="props"
-          style="display: flex; align-items: center; cursor: pointer; gap: 10px; padding: 5px 10px"
-        >
-          <v-avatar
-            size="40"
-            style="background-color: #c1e328; align-items: center; justify-content: center"
-          >
-            <img
-              src="@/assets/Logomaptreeverde.png"
-              alt="Perfil"
-              style="
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                align-items: center;
-                justify-content: center;
-              "
-            />
+        <div v-bind="props" class="user-menu-trigger">
+          <v-avatar size="40" class="user-avatar">
+            <img src="@/assets/Logomaptreeverde.png" alt="Perfil" class="avatar-img" />
           </v-avatar>
-
-          <span style="font-size: 16px; color: black">
-            {{ user?.name || 'Usuário' }}
-          </span>
-
+          <span class="user-name">{{ user?.name || 'Usuário' }}</span>
           <v-icon size="20">mdi-menu-down</v-icon>
         </div>
       </template>
+
       <v-card>
         <v-card-text>
           <div class="mx-auto text-center">
-            <v-avatar
-              size="40"
-              style="background-color: #c1e328; align-items: center; justify-content: center"
-            >
-              <img
-                src="@/assets/Logomaptreeverde.png"
-                alt="Perfil"
-                style="
-                  width: 40px;
-                  height: 40px;
-                  border-radius: 50%;
-                  align-items: center;
-                  justify-content: center;
-                "
-              />
+            <v-avatar size="40" class="user-avatar">
+              <img src="@/assets/Logomaptreeverde.png" alt="Perfil" class="avatar-img" />
             </v-avatar>
             <h3>{{ user?.name }}</h3>
-            <p class="text-caption mt-1">
-              {{ user?.email }}
-            </p>
-            <v-divider class="my-3"></v-divider>
-            <v-btn variant="text" rounded @click="editAccount"> Edit Account </v-btn>
-            <v-divider class="my-3"></v-divider>
-            <v-btn variant="text" rounded @click="logout"> Disconnect </v-btn>
+            <p class="text-caption mt-1">{{ user?.email }}</p>
+            <v-divider class="my-3" />
+            <v-btn variant="text" rounded @click="editAccount">Edit Account</v-btn>
+            <v-divider class="my-3" />
+            <v-btn variant="text" rounded @click="logout">Disconnect</v-btn>
           </div>
         </v-card-text>
       </v-card>
     </v-menu>
   </v-app-bar>
 
-  <v-app-bar flat v-else>
+  <!-- ===== Mobile AppBar ===== -->
+  <v-app-bar v-else flat>
     <v-btn icon @click="drawer = !drawer">
       <v-icon>mdi-menu</v-icon>
     </v-btn>
 
     <v-navigation-drawer v-model="drawer" temporary>
       <v-list>
-        <v-list-item v-for="item in currentMenu" :key="item.to" @click="goTo(item.to)">
-          <v-list-item-icon>
-            <v-icon>{{ item.icon }}</v-icon>
-          </v-list-item-icon>
-          <v-list-item-title>
-            {{ item.title }}
-          </v-list-item-title>
+        <v-list-item v-for="item in currentMenu" :key="item.to" :prepend-icon="item.icon" @click="goTo(item.to)">
+          <v-list-item-title>{{ item.title }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -122,7 +89,11 @@
 <script lang="ts">
 import { useAppStore } from '@/stores/app'
 import { getHomeRouteByRole } from '@/router/helpers/getHomeRoute'
-import { getNotificationRoute } from '@/router/helpers/getNotificationRoute.ts'
+import { getNotificationRoute } from '@/router/helpers/getNotificationRoute'
+
+/* ===================================
+   TIPOS
+=================================== */
 
 interface MenuItem {
   title: string
@@ -137,44 +108,41 @@ interface User {
   role: string
 }
 
+/* ===================================
+   MENUS POR ROLE
+=================================== */
+
+const MENUS: Record<string, MenuItem[]> = {
+  ADMIN: [
+    { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
+    { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
+    { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
+  ],
+  MANAGER: [
+    { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
+    { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
+    { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
+  ],
+  USER: [
+    { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
+    { title: 'Podas', icon: 'mdi-content-cut', to: '' },
+    { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
+    { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
+  ],
+  GUEST: [
+    { title: 'Login', icon: 'mdi-login', to: '/login' },
+    { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' },
+  ],
+}
+
 export default {
   name: 'AppBarComponent',
 
-  // Configuração da Options API
   data() {
     return {
       drawer: false,
       green: '#C1E328',
       user: null as User | null,
-
-      // Definição dos menus
-      menus: {
-        ADMIN: [
-          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
-          { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
-          { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
-        ] as MenuItem[], // Tipagem para o array
-        MANAGER: [
-          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
-          { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
-          { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
-        ] as MenuItem[],
-        USER: [
-          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
-          { title: 'Podas', icon: 'mdi-content-cut' },
-          { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
-          { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
-        ] as MenuItem[],
-        USER_CREDENCIADO: [
-          { title: 'Painel', icon: 'mdi-view-dashboard', to: '/credenciado' },
-          { title: 'Rotas', icon: 'mdi-map', to: '/credenciado/rotas' },
-          { title: 'Podas', icon: 'mdi-leaf', to: '/credenciado/podas' },
-        ] as MenuItem[],
-        GUEST: [
-          { title: 'Login', icon: 'mdi-login', to: '/login' },
-          { title: 'Criar Conta', icon: 'mdi-account-plus', to: '/register' },
-        ] as MenuItem[],
-      },
     }
   },
 
@@ -185,22 +153,28 @@ export default {
 
     currentMenu(): MenuItem[] {
       const role = this.store.user?.role
-
-      console.log(role)
-      return this.menus[role as keyof typeof this.menus] ?? this.menus.ADMIN
+      return MENUS[role as string] || MENUS.GUEST
     },
 
-    // Verifica se o componente está em modo mobile (baseado na store)
     isMobile(): boolean {
       return this.store.isMobile
     },
   },
 
   watch: {
-    // Observa a mudança de rota para fechar o drawer no mobile
     '$route.path'() {
       this.drawer = false
     },
+  },
+
+  mounted() {
+    this.checkMobile()
+    window.addEventListener('resize', this.checkMobile)
+    this.getUser()
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.checkMobile)
   },
 
   methods: {
@@ -211,68 +185,87 @@ export default {
     goToHome(): void {
       const role = this.store.user?.role
       const home = getHomeRouteByRole(this.$router, role)
-
-      if (this.$route.path !== home) {
-        this.$router.push(home)
-      }
+      if (this.$route.path !== home) this.$router.push(home)
     },
 
     goToNotification(): void {
       const role = this.store.user?.role
       const notification = getNotificationRoute(this.$router, role)
-
-      if (this.$route.path !== notification) {
-        this.$router.push(notification)
-      }
+      if (this.$route.path !== notification) this.$router.push(notification)
     },
 
     getUser() {
       this.$api
-        .get('/users/me/profile')
+        .get<User>('/users/me/profile')
         .then((response) => {
-          if (response.data) {
-            this.user = response.data as User
-          }
+          if (response.data) this.user = response.data as User
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           console.error('Error fetching user profile:', error)
         })
     },
 
-    // Navega para a rota e fecha o drawer (se aberto)
     goTo(path: string): void {
-      this.$router.push(path)
+      if (path) this.$router.push(path)
       this.drawer = false
     },
 
-    // Verifica o tamanho da tela para definir se é mobile
     checkMobile(): void {
       this.store.setIsMobile(window.innerWidth < 960)
     },
 
-    // Lida com o logout
     logout(): void {
-      // Acessa o plugin $api injetado globalmente
       this.$api.logout()
       this.$router.push('/login')
     },
 
-    // Navega para a edição da conta
     editAccount(): void {
       this.$router.push('/edit-account')
     },
   },
-
-  // Lifecycle hook para configurar o listener de redimensionamento
-  mounted() {
-    this.checkMobile()
-    window.addEventListener('resize', this.checkMobile)
-    this.getUser()
-  },
-
-  // Lifecycle hook para limpar o listener de redimensionamento
-  beforeUnmount() {
-    window.removeEventListener('resize', this.checkMobile)
-  },
 }
 </script>
+
+<style scoped>
+.appbar-desktop {
+  margin: 1px 0;
+}
+
+.logo {
+  width: 150px;
+  height: 52px;
+  margin-left: 25px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.notification-btn {
+  background-color: #d9d9d9;
+  height: 45px;
+  width: 45px;
+}
+
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 10px;
+  padding: 5px 10px;
+}
+
+.user-avatar {
+  background-color: #c1e328;
+}
+
+.avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.user-name {
+  font-size: 16px;
+  color: black;
+}
+</style>
+

@@ -1,27 +1,39 @@
 <script setup lang="ts">
-import AppBarComponent from '@/components/MainView/AppBarComponent.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import AppBarComponent from '@/components/MainView/AppBarComponent.vue'
+
+/* ---------- Responsividade ---------- */
 
 const isMobile = ref(false)
-const route = useRoute()
 
 function checkMobile() {
   isMobile.value = window.innerWidth < 768
 }
 
-// executa ao montar e desmontar
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 })
+
 onUnmounted(() => window.removeEventListener('resize', checkMobile))
 
-// 🔹 Computed: mostra AppBar apenas quando NÃO estiver em login/cadastro
-const showAppBar = computed(() => {
-  const hiddenRoutes = ['/login', '/register', '/recovery', '/reset', '/editPerfil', '/mensageEmail', '/resetSenha', '/recovery-code']
-  return !hiddenRoutes.includes(route.path)
-})
+/* ---------- Visibilidade do AppBar ---------- */
+
+const route = useRoute()
+
+const HIDDEN_ROUTES = [
+  '/login',
+  '/register',
+  '/recovery',
+  '/reset',
+  '/editPerfil',
+  '/mensageEmail',
+  '/resetSenha',
+  '/recovery-code',
+]
+
+const showAppBar = computed(() => !HIDDEN_ROUTES.includes(route.path))
 </script>
 
 <template>

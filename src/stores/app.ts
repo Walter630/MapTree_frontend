@@ -1,8 +1,15 @@
+/**
+ * stores/app.ts
+ *
+ * Store global da aplicação — gerencia estado de autenticação, loading e podas.
+ */
+
 // Utilities
 import { defineStore } from 'pinia'
 import type { Pruning, User } from '@/plugins/apiConnect'
 
 export const useAppStore = defineStore('app', {
+  /* ---------- Estado ---------- */
   state: () => ({
     user: null as User | null,
     isMobile: false,
@@ -10,10 +17,12 @@ export const useAppStore = defineStore('app', {
     pruningTypes: [] as Pruning[],
   }),
 
+  /* ---------- Actions ---------- */
   actions: {
     setUser(user: User | null) {
       this.user = user
     },
+
     getUser(user: User | null) {
       this.user = user
     },
@@ -21,6 +30,7 @@ export const useAppStore = defineStore('app', {
     setPruningTypes(pruningTypes: Pruning[]) {
       this.pruningTypes = pruningTypes
     },
+
     addPruning(pruning: Pruning) {
       this.pruningTypes.unshift(pruning)
     },
@@ -34,6 +44,7 @@ export const useAppStore = defineStore('app', {
     },
   },
 
+  /* ---------- Getters ---------- */
   getters: {
     getOrganizationId(): string | null {
       return this.user?.organization?.id || null

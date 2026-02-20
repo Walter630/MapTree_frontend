@@ -1,13 +1,16 @@
 /**
- * Composable for Authentication
+ * hooks/useAuth.ts
  *
- * Provides methods for login, logout, and auth state management
- * Uses the ApiConnect plugin for HTTP requests
+ * Composable de autenticação — login, logout e gerenciamento de estado do usuário.
  */
 
 import { ref, computed } from 'vue'
 import { apiConnect } from '@/plugins/apiConnect'
 import { useRouter } from 'vue-router'
+
+/* ===================================
+   TIPOS
+=================================== */
 
 interface User {
   id: string
@@ -26,22 +29,27 @@ interface LoginResponse {
   user: User
 }
 
+/* ===================================
+   COMPOSABLE
+=================================== */
+
 export function useAuth() {
   const router = useRouter()
 
-  // State
+  /* ---------- Estado ---------- */
+
   const user = ref<User | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // Computed
+  /* ---------- Computed ---------- */
+
   const isAuthenticated = computed(() => apiConnect.isAuthenticated())
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isGestor = computed(() => user.value?.role === 'gestor')
 
-  /**
-   * Login user
-   */
+  /* ---------- Login ---------- */
+
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     loading.value = true
     error.value = null
@@ -50,12 +58,8 @@ export function useAuth() {
       const response = await apiConnect.post<LoginResponse>('/auth/login', credentials)
 
       if (response.data) {
-        // Save access token (refresh token comes via HTTP-only cookie)
         apiConnect.setToken(response.data.accessToken)
-
-        // Save user data
         user.value = response.data.user
-
         return true
       }
 
@@ -81,26 +85,18 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Logout user
-   */
+  /* ---------- Logout ---------- */
+
   const logout = async (): Promise<void> => {
     loading.value = true
     error.value = null
 
     try {
-      // Call backend to clear refresh token cookie
       await apiConnect.logout()
-
-      // Clear user data
       user.value = null
-
-      // Redirect to login
       router.push('/login')
     } catch (err: unknown) {
       console.error('Logout error:', err)
-
-      // Clear local data anyway
       user.value = null
       router.push('/login')
     } finally {
@@ -108,13 +104,10 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Get current user data
-   */
+  /* ---------- Buscar Usuário Atual ---------- */
+
   const getCurrentUser = async (): Promise<User | null> => {
-    if (!isAuthenticated.value) {
-      return null
-    }
+    if (!isAuthenticated.value) return null
 
     loading.value = true
     error.value = null
@@ -131,10 +124,9 @@ export function useAuth() {
     } catch (err: unknown) {
       console.error('Get current user error:', err)
 
-      const error_data = err as { response?: { status?: number } }
+      const errorData = err as { response?: { status?: number } }
 
-      if (error_data.response?.status === 401) {
-        // Token expired, logout
+      if (errorData.response?.status === 401) {
         await logout()
       }
 
@@ -145,29 +137,22 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Check if user has a specific role
-   */
-  const hasRole = (role: string): boolean => {
-    return user.value?.role === role
-  }
+  /* ---------- Helpers de Role ---------- */
 
-  /**
-   * Check if user has any of the specified roles
-   */
-  const hasAnyRole = (roles: string[]): boolean => {
-    return roles.some(role => user.value?.role === role)
-  }
+  const hasRole = (role: string): boolean => user.value?.role === role
 
-  /**
-   * Clear error message
-   */
+  const hasAnyRole = (roles: string[]): boolean => roles.some((role) => user.value?.role === role)
+
+  /* ---------- Limpar Erro ---------- */
+
   const clearError = (): void => {
     error.value = null
   }
 
+  /* ---------- Retorno ---------- */
+
   return {
-    // State
+    // Estado
     user,
     loading,
     error,
@@ -177,7 +162,7 @@ export function useAuth() {
     isAdmin,
     isGestor,
 
-    // Methods
+    // Métodos
     login,
     logout,
     getCurrentUser,
@@ -186,4 +171,3 @@ export function useAuth() {
     clearError,
   }
 }
-

@@ -1,33 +1,29 @@
 <template>
-  <v-container class="cadastro-funcionario-container" >
-    <div class="text-caption grey--text text--darken-1" style="margin-bottom: 20px; color: #667085;">
+  <v-container class="cadastro-funcionario-container">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb text-caption text-grey-darken-1">
       Meu Painel > Funcionários > #CadastrarFuncionário
     </div>
-    <v-row class="mb-5 align-center">
 
+    <!-- Cabeçalho -->
+    <v-row class="mb-5 align-center">
       <v-col cols="12" sm="auto" class="py-0">
-        <v-btn class="mr-4" style="box-shadow: none; border: 1px solid; height: 56px; border-radius: 8px; background-color: #D0D5DD; width: 56px" @click="goBack">
+        <v-btn class="back-btn mr-4" @click="goBack">
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
-
       </v-col>
 
-      <v-col cols="12" sm="auto"  class="py-1">
-
-        <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367; margin-top: 20px; ">
-          Cadastro de Funcionário
-        </h1>
-        <p class="text-subtitle-1 grey--text">
-          Cadastre Os Funcionários E Suas Funções.
-        </p>
+      <v-col cols="12" sm="auto" class="py-1">
+        <h1 class="page-title">Cadastro de Funcionário</h1>
+        <p class="page-subtitle">Cadastre Os Funcionários E Suas Funções.</p>
       </v-col>
     </v-row>
 
-
-
-    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px; " >
-      <v-row style="display: flex; justify-content: center; gap: 15px">
-        <v-col cols="12" md="4" >
+    <!-- Formulário -->
+    <v-form ref="form" v-model="valid" lazy-validation class="mt-12">
+      <v-row class="d-flex justify-center" style="gap: 15px">
+        <!-- Coluna Esquerda -->
+        <v-col cols="12" md="4">
           <p>Nome do Funcionario</p>
           <v-text-field
             v-model="formData.name"
@@ -36,7 +32,8 @@
             placeholder="Digite o nome"
             outlined
             dense
-          ></v-text-field>
+          />
+
           <p>Email</p>
           <v-text-field
             v-model="formData.email"
@@ -50,6 +47,7 @@
               Email <span class="grey--text">— Endereço de Email</span>
             </template>
           </v-text-field>
+
           <p>Senha</p>
           <v-text-field
             v-model="formData.password"
@@ -59,10 +57,10 @@
             type="password"
             outlined
             dense
-          ></v-text-field>
-
+          />
         </v-col>
 
+        <!-- Coluna Direita -->
         <v-col cols="12" md="4">
           <p>CPF</p>
           <v-text-field
@@ -72,8 +70,8 @@
             placeholder="000.000.000-00"
             outlined
             dense
-            mask="###.###.###-##"
-          ></v-text-field>
+          />
+
           <p>Numero do Contato</p>
           <v-text-field
             v-model="formData.phone"
@@ -82,38 +80,24 @@
             placeholder="(88) 00000-0000"
             outlined
             dense
-            mask="(##) #####-####"
           >
             <template v-slot:prepend-inner>
               <div class="d-flex align-center mr-2">
-                <span class="mr-2">+1</span>
-                <v-divider vertical></v-divider>
+                <span class="mr-2">+55</span>
+                <v-divider vertical />
               </div>
             </template>
-
           </v-text-field>
         </v-col>
       </v-row>
 
+      <!-- Botões de Ação -->
       <v-row class="mt-4">
         <v-col cols="12" class="d-flex justify-center">
-          <v-btn
-            :disabled="!valid"
-            color="#A7D129"
-            dark
-            large
-            class="mr-4"
-            @click="registrar"
-          >
+          <v-btn :disabled="!valid" color="#A7D129" dark large class="mr-4" @click="registrar">
             SALVAR
           </v-btn>
-
-          <v-btn
-            color="black"
-            dark
-            large
-            @click="cancelForm"
-          >
+          <v-btn color="black" dark large @click="cancelForm">
             CANCELAR
           </v-btn>
         </v-col>
@@ -123,110 +107,109 @@
 </template>
 
 <script lang="ts">
-import type { User } from '@/plugins/apiConnect.ts'
+import type { User } from '@/plugins/apiConnect'
 
 export default {
   name: 'CadastroFuncionario',
+
   data() {
     return {
+      valid: false,
+
       formData: {
         name: '',
         email: '',
         phone: '',
         password: '',
         cpf: '',
-
       },
-      valid: false,
-      search: '',
-      funcoes: ['Poda', 'Plantio', 'Irrigação', 'Administrativo'],
-      cidades: ['Fortaleza, Ce', 'Limoeiro do Norte, Ce', 'Aquiraz, Ce', 'Eusébio, Ce'],
+
       rules: {
-        required: value => !!value || 'Campo obrigatório.',
-        email: value => {
-          const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        required: (value: string) => !!value || 'Campo obrigatório.',
+        email: (value: string) => {
+          const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
           return pattern.test(value) || 'Email inválido.'
         },
-        minPassword: v => v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
-        // Uma regra de validação básica para o formato de contato (pode ser ajustada)
-        contactFormat: v => (v && v.replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).'
+        minPassword: (v: string) => v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
+        contactFormat: (v: string) =>
+          (v && v.replace(/[^0-9]/g, '').length >= 10) ||
+          'Contato deve ter pelo menos 10 dígitos (DDD + Número).',
       },
-    };
+    }
   },
+
   methods: {
     goBack() {
-      this.$router.push("/manager/employees")
+      this.$router.push('/manager/employees')
     },
+
     async registrar() {
       try {
-        const response = await this.$api.post<User>('/users', this.formData);
+        const response = await this.$api.post<User>('/users', this.formData)
         if (response.status === 201) {
           this.$router.push('/manager/employees')
         } else {
-          console.log('Erro no registro: ', response);
+          console.log('Erro no registro: ', response)
         }
       } catch (error) {
-        console.error('Erro no registro: ', error);
+        console.error('Erro no registro: ', error)
         alert('Erro no registro: ' + error)
       }
     },
-    performSearch() {
-      // Lógica de pesquisa
-      console.log('Pesquisar por:', this.search);
-    },
-    clearSearch() {
-      this.search = '';
-    },
-    async submitForm() {
-      // A função validate() do v-form retorna um objeto de promessa
-      const { valid } = await this.$refs.form.validate();
 
-      if (valid) {
-        console.log('Formulário Válido, enviando dados:', this.formData);
-        // Lógica de envio de dados para a API/Backend
-        alert('Funcionário Cadastrado com Sucesso!');
-        this.resetForm();
-      } else {
-        console.log('Formulário Inválido');
-      }
-    },
     resetForm() {
-      this.$refs.form.reset();
-      this.formData = {
-        name: '',
-        email: '',
-        password: '',
-        cpf: '',
-        phone: '',
-      };
+      ;(this.$refs.form as HTMLFormElement)?.reset()
+      this.formData = { name: '', email: '', password: '', cpf: '', phone: '' }
     },
+
     cancelForm() {
-      // Lógica para cancelar, como resetar o formulário ou redirecionar
-      console.log('Ação de Cancelar');
-      this.resetForm();
+      this.resetForm()
       this.$router.push('/manager/employees')
     },
   },
-};
+}
 </script>
 
 <style scoped>
-/* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
 .cadastro-funcionario-container {
   margin-top: 20px;
   padding: 24px;
 }
 
-/* Ajuste para o campo de contato, simulando o campo de código de país como parte do input */
-.v-text-field:deep(.v-input__prepend-inner) .v-divider {
-  height: 70%; /* Altura da linha vertical */
-  margin-right: 8px;
-  margin-left: -4px; /* Move um pouco para a esquerda */
+.breadcrumb {
+  margin-bottom: 20px;
+  color: #667085;
 }
 
-/* Estilo para ajustar o alinhamento da label "Email - Endereço de Email" */
+.back-btn {
+  box-shadow: none;
+  border: 1px solid #d0d5dd;
+  height: 56px;
+  width: 56px;
+  border-radius: 8px;
+  background-color: #d0d5dd;
+}
+
+.page-title {
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: #2f3367;
+  margin-top: 20px;
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: #667085;
+}
+
+.v-text-field:deep(.v-input__prepend-inner) .v-divider {
+  height: 70%;
+  margin-right: 8px;
+  margin-left: -4px;
+}
+
 .v-text-field:deep(.v-label) span {
-  font-size: 0.75rem; /* Menor que a label principal */
+  font-size: 0.75rem;
   font-weight: 400;
 }
 </style>

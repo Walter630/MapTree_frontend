@@ -1,11 +1,15 @@
 /**
  * plugins/apiConnect.ts
  *
- * API Connect Plugin - Axios configuration with automatic token refresh
+ * Plugin de conexão com a API — Configuração Axios com refresh automático de token.
  */
 
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { App } from 'vue'
+
+/* ===================================
+   TIPOS — Autenticação
+=================================== */
 
 interface TokenData {
   accessToken: string | null
@@ -15,11 +19,36 @@ interface RefreshTokenResponse {
   accessToken: string
 }
 
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface LoginResponse {
+  accessToken: string
+  user: User
+}
+
+/* ===================================
+   TIPOS — Enums
+=================================== */
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
-  USER = 'USER'
+  USER = 'USER',
 }
+
+export enum TreeStatus {
+  PRUNED = 'PRUNED',
+  TO_PRUNE = 'TO_PRUNE',
+  UNDER_OBSERVATION = 'UNDER_OBSERVATION',
+  NORMAL = 'NORMAL',
+}
+
+/* ===================================
+   TIPOS — Entidades
+=================================== */
 
 export interface User {
   id: string
@@ -35,27 +64,6 @@ export interface User {
   isActive: boolean
 }
 
-export interface LoginRequest {
-  email: string
-  password: string
-}
-
-export interface LoginResponse {
-  accessToken: string
-  user: User
-}
-
-export interface Company {
-  id: string
-  name: string
-  taxId: string        // CNPJ ou CPF da empresa
-  isOutsourced: boolean     //se é terceirizada
-  managerId?: string
-  manager: Manager
-  isActive: boolean
-  createdAt?: Date
-}
-
 export interface Manager {
   id: string
   name: string
@@ -66,11 +74,23 @@ export interface Manager {
   organizationId: string | null
 }
 
-export enum TreeStatus {
-  PRUNED = 'PRUNED',
-  TO_PRUNE = 'TO_PRUNE',
-  UNDER_OBSERVATION = 'UNDER_OBSERVATION',
-  NORMAL = 'NORMAL',
+export interface Company {
+  id: string
+  name: string
+  taxId: string
+  isOutsourced: boolean
+  managerId?: string
+  manager: Manager
+  isActive: boolean
+  createdAt?: Date
+}
+
+export interface Species {
+  id: string
+  commonName: string
+  scientificName: string
+  family: string
+  description: string
 }
 
 export interface Tree {
@@ -80,14 +100,6 @@ export interface Tree {
   lng: number
   status: TreeStatus
   speciesId: string
-}
-
-export interface Species {
-  id: string
-  commonName: string
-  scientificName: string
-  family: string
-  description: string
 }
 
 export interface Pruning {
@@ -100,6 +112,10 @@ export interface Pruning {
   type: 'LIGHT' | 'MODERATE' | 'HEAVY'
 }
 
+/* ===================================
+   CLASSE — ApiConnect
+=================================== */
+
 class ApiConnect {
   private axiosInstance: AxiosInstance
   private isRefreshing = false
@@ -109,56 +125,44 @@ class ApiConnect {
   }> = []
 
   constructor() {
-    // Create axios instance with base configuration
     this.axiosInstance = axios.create({
       baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
       timeout: 30000,
-      withCredentials: true, // Send cookies with requests
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      withCredentials: true,
+      headers: { 'Content-Type': 'application/json' },
     })
 
     this.setupInterceptors()
   }
 
-  /**
-   * Setup request and response interceptors
-   */
+  /* ---------- Interceptors ---------- */
+
   private setupInterceptors(): void {
-    // Request interceptor - Add token to headers
+    // Request — adiciona token ao header
     this.axiosInstance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const token = this.getAccessToken()
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
-        }
+        if (token) config.headers.Authorization = `Bearer ${token}`
         return config
       },
-      (error) => {
-        return Promise.reject(error)
-      }
+      (error) => Promise.reject(error),
     )
 
-    // Response interceptor - Handle 401 and refresh token
+    // Response — trata 401 e faz refresh automático
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-        // Check if error is 401 and we haven't retried yet
         if (error.response?.status === 401 && !originalRequest._retry) {
           if (this.isRefreshing) {
-            // If already refreshing, queue the request
             return new Promise((resolve, reject) => {
               this.failedRequestsQueue.push({
                 onSuccess: (token: string) => {
                   originalRequest.headers.Authorization = `Bearer ${token}`
                   resolve(this.axiosInstance(originalRequest))
                 },
-                onFailure: (err: AxiosError) => {
-                  reject(err)
-                },
+                onFailure: (err: AxiosError) => reject(err),
               })
             })
           }
@@ -168,21 +172,13 @@ class ApiConnect {
 
           try {
             const newToken = await this.refreshAccessToken()
-
-            // Process queued requests
             this.processQueue(null, newToken)
-
-            // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${newToken}`
             return this.axiosInstance(originalRequest)
           } catch (refreshError) {
-            // Failed to refresh token
             this.processQueue(refreshError as AxiosError, null)
             this.clearTokens()
-
-            // Redirect to login or emit event
             this.handleAuthenticationError()
-
             return Promise.reject(refreshError)
           } finally {
             this.isRefreshing = false
@@ -190,140 +186,86 @@ class ApiConnect {
         }
 
         return Promise.reject(error)
-      }
+      },
     )
   }
 
-  /**
-   * Process queued requests after token refresh
-   */
+  /* ---------- Fila de Requisições ---------- */
+
   private processQueue(error: AxiosError | null, token: string | null = null): void {
     this.failedRequestsQueue.forEach((promise) => {
-      if (error) {
-        promise.onFailure(error)
-      } else if (token) {
-        promise.onSuccess(token)
-      }
+      if (error) promise.onFailure(error)
+      else if (token) promise.onSuccess(token)
     })
-
     this.failedRequestsQueue = []
   }
 
-  /**
-   * Refresh the access token using refresh token
-   */
+  /* ---------- Refresh Token ---------- */
+
   private async refreshAccessToken(): Promise<string> {
-    try {
-      // The refresh token is automatically sent via httpOnly cookie
-      const response = await axios.post<RefreshTokenResponse>(
-        `${this.axiosInstance.defaults.baseURL}/auth/refresh`,
-        {}, // Empty body - refresh token comes from cookie
-        {
-          withCredentials: true, // Include cookies in request
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      const { accessToken } = response.data
-
-      // Save new access token (refresh token is managed by cookies)
-      this.setAccessToken(accessToken)
-
-      return accessToken
-    } catch (error) {
-      throw error
-    }
+    const response = await axios.post<RefreshTokenResponse>(
+      `${this.axiosInstance.defaults.baseURL}/auth/refresh`,
+      {},
+      { withCredentials: true, headers: { 'Content-Type': 'application/json' } },
+    )
+    const { accessToken } = response.data
+    this.setAccessToken(accessToken)
+    return accessToken
   }
 
-  /**
-   * Handle authentication error (redirect to login, etc.)
-   */
-  private handleAuthenticationError(): void {
-    // Emit custom event that can be listened to in the app
-    window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+  /* ---------- Tratamento de Erro de Auth ---------- */
 
-    // Optional: Redirect to login
+  private handleAuthenticationError(): void {
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'))
     if (window.location.pathname !== '/login') {
       window.location.href = '/login'
     }
   }
 
-  /**
-   * Get access token from storage
-   */
+  /* ---------- Gerenciamento de Token ---------- */
+
   private getAccessToken(): string | null {
     return localStorage.getItem('accessToken')
   }
 
-  /**
-   * Set access token in storage
-   */
   private setAccessToken(token: string): void {
     localStorage.setItem('accessToken', token)
   }
 
-  /**
-   * Clear all tokens from storage
-   */
   private clearTokens(): void {
     localStorage.removeItem('accessToken')
-    // Refresh token is cleared by the backend (cookie expiration)
   }
 
-  /**
-   * Public API methods
-   */
+  /* ---------- API Pública ---------- */
 
-  /**
-   * Set access token (refresh token comes from cookie set by backend)
-   */
   public setToken(accessToken: string): void {
     this.setAccessToken(accessToken)
   }
 
-  /**
-   * Get current access token
-   */
   public getToken(): TokenData {
-    return {
-      accessToken: this.getAccessToken(),
-    }
+    return { accessToken: this.getAccessToken() }
   }
 
-  /**
-   * Logout - clear tokens and call backend to clear cookie
-   */
   public async logout(): Promise<void> {
     try {
-      // Call backend to clear refresh token cookie
       await this.axiosInstance.post('/auth/logout')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      // Always clear local access token
       this.clearTokens()
     }
   }
 
-  /**
-   * Check if user is authenticated
-   */
   public isAuthenticated(): boolean {
     return !!this.getAccessToken()
   }
 
-  /**
-   * Get axios instance for making requests
-   */
   public get api(): AxiosInstance {
     return this.axiosInstance
   }
 
-  /**
-   * Convenience methods for HTTP requests
-   */
+  /* ---------- Métodos HTTP ---------- */
+
   public get<T = unknown>(url: string, config = {}) {
     return this.axiosInstance.get<T>(url, config)
   }
@@ -345,27 +287,28 @@ class ApiConnect {
   }
 }
 
-// Create singleton instance
+/* ===================================
+   INSTÂNCIA SINGLETON & PLUGIN VUE
+=================================== */
+
 const apiConnect = new ApiConnect()
 
-// Vue plugin
 export default {
   install: (app: App) => {
-    // Make apiConnect available globally
     app.config.globalProperties.$api = apiConnect
     app.provide('$api', apiConnect)
   },
 }
 
-// Export instance for use outside Vue components
 export { apiConnect }
-
 export type { ApiConnect }
 
-// Type augmentation for Vue
+/* ===================================
+   TYPE AUGMENTATION
+=================================== */
+
 declare module '@vue/runtime-core' {
   interface ComponentCustomProperties {
     $api: ApiConnect
   }
 }
-
