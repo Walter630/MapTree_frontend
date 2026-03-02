@@ -1,28 +1,14 @@
 <template>
-  <v-container class="py-10 px-8">
+  <v-container class="pa-6">
     <!-- Cabeçalho -->
-    <v-row align="center" class="mb-2">
-      <v-col cols="12">
-        <div class="breadcrumb d-flex align-center">
-          <span class="text-caption text-grey-darken-1">Meu Painel</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold page-title">#Notificações</span>
-        </div>
-      </v-col>
-    </v-row>
-
-    <v-row class="mb-6">
-      <div class="d-flex align-center mb-2">
-        <!-- Back button (square) -->
-        <v-btn icon class="back-btn mr-3" @click="goBack">
-          <v-icon>mdi-arrow-left</v-icon>
-        </v-btn>
-        <div>
-          <h2 class="title mb-1">Notificações</h2>
-          <p class="subtitle">Gerencie as notificações do sistema</p>
-        </div>
-      </div>
-    </v-row>
+    <PageHeader
+      title="Notificações"
+      subtitle="Gerencie as notificações do sistema"
+      :breadcrumbs="[
+        { text: 'Meu Painel', to: '/manager' },
+        { text: '#Notificações' },
+      ]"
+    />
 
     <!-- Abas -->
     <v-tabs v-model="tab" density="comfortable" class="mb-4 tabs-container" grow>
@@ -86,6 +72,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Notificacao {
   titulo: string
@@ -102,6 +89,7 @@ interface Notificacao {
 
 export default defineComponent({
   name: 'ManagerNotificacoesView',
+  components: { PageHeader },
 
   data: () => ({
     tab: 'todas',
@@ -167,17 +155,6 @@ export default defineComponent({
   border-radius: 8px;
 }
 
-.back-btn {
-  border: 1px solid #e6e6e6;
-  background: #f6f6f6;
-  min-width: 36px;
-  min-height: 36px;
-  border-radius: 8px;
-}
-
-.page-title {
-  color: #2f3367;
-}
 
 .v-tab {
   text-transform: none !important;

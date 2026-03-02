@@ -44,6 +44,8 @@ import UserPage from '@/pages/UserPage.vue'
 import MapPage from '@/pages/map/MapPage.vue'
 import ReportsPage from '@/pages/ReportsPage.vue'
 import NotificationPage from '@/pages/NotificationPage.vue'
+import PodasLista from '@/pages/PodasLista.vue'
+import PodasCadastro from '@/pages/PodasCadastro.vue'
 
 /* ===================================
    DEFINIÇÃO DAS ROTAS
@@ -108,6 +110,8 @@ const router = createRouter({
             { path: '', name: 'UserHome', component: MainComponent },
             { path: 'reports', name: 'UserReports', component: ReportsPage },
             { path: 'mapUser', name: 'Map', component: MapPage },
+            { path: 'podas', name: 'PodasLista', component: PodasLista },
+            { path: 'podas/nova', name: 'PodasCadastro', component: PodasCadastro },
             {
               path: 'notifications',
               name: 'UserNotifications',

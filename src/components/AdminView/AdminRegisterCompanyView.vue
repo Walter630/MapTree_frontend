@@ -1,37 +1,15 @@
 <template>
-  <v-container class="cadastro-funcionario-container">
+  <v-container class="pa-6">
 
-    <v-row>
-      <v-col cols="12">
-        <div class="d-flex align-center mb-6">
-          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption text-grey-darken-1" @click="goBack">Empresas</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" style="color: #2f3367">#CadastrarEmpresas</span>
-        </div>
-      </v-col>
-    </v-row>
-
-    <!-- Header -->
-    <v-row class="mb-6" style="align-items: center; margin: 0 0">
-      <v-col cols="auto" class="d-flex align-center" style="margin-right: auto">
-        <v-btn
-          style="border: 1px solid #d0d5dd; height: 48px; width: 48px; background-color: #f9fafb"
-          class="rounded-lg"
-          @click="goBack"
-        >
-          <v-icon color="#344054">mdi-chevron-left</v-icon>
-        </v-btn>
-      </v-col>
-
-      <v-col>
-        <h1 style="color: #2F3367; font-size: 20px; font-weight: 600; margin-bottom: 4px">
-          Cadastro de Empresas
-        </h1>
-        <p style="color: #667085; font-size: 16px">Cadastre as empresas e seus dados principais.</p>
-      </v-col>
-    </v-row>
+    <PageHeader
+      title="Cadastro de Empresas"
+      subtitle="Cadastre as empresas e seus dados principais."
+      :breadcrumbs="[
+        { text: 'Meu Painel', to: '/admin' },
+        { text: 'Empresas', to: '/admin/companies' },
+        { text: '#CadastrarEmpresas' },
+      ]"
+    />
 
     <!-- CARD DO FORMULÁRIO -->
     <v-card
@@ -120,8 +98,10 @@
 import { defineComponent } from 'vue'
 import { type Company } from '@/plugins/apiConnect.ts'
 import { type User } from '@/plugins/apiConnect.ts'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 export default defineComponent ({
+  components: { PageHeader },
   data() {
     return {
       managers: [] as User[],
@@ -201,10 +181,6 @@ export default defineComponent ({
 
 <style scoped>
 /* Estilos opcionais para dar um respiro maior e garantir que o layout se pareça com a imagem */
-.cadastro-funcionario-container {
-  margin-top: 20px;
-  padding: 24px;
-}
 .field-label {
   font-size: 14px;
   font-weight: 500;

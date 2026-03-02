@@ -1,23 +1,14 @@
 <template>
-  <v-container class="cadastro-funcionario-container">
-    <!-- Breadcrumb -->
-    <div class="breadcrumb text-caption text-grey-darken-1">
-      Meu Painel > Funcionários > #CadastrarFuncionário
-    </div>
-
-    <!-- Cabeçalho -->
-    <v-row class="mb-5 align-center">
-      <v-col cols="12" sm="auto" class="py-0">
-        <v-btn class="back-btn mr-4" @click="goBack">
-          <v-icon>mdi-arrow-left</v-icon>
-        </v-btn>
-      </v-col>
-
-      <v-col cols="12" sm="auto" class="py-1">
-        <h1 class="page-title">Cadastro de Funcionário</h1>
-        <p class="page-subtitle">Cadastre Os Funcionários E Suas Funções.</p>
-      </v-col>
-    </v-row>
+  <v-container class="pa-6">
+    <PageHeader
+      title="Cadastro de Funcionário"
+      subtitle="Cadastre Os Funcionários E Suas Funções."
+      :breadcrumbs="[
+        { text: 'Meu Painel', to: '/manager' },
+        { text: 'Funcionários', to: '/manager/employees' },
+        { text: '#CadastrarFuncionário' },
+      ]"
+    />
 
     <!-- Formulário -->
     <v-form ref="form" v-model="valid" lazy-validation class="mt-12">
@@ -108,9 +99,11 @@
 
 <script lang="ts">
 import type { User } from '@/plugins/apiConnect'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 export default {
   name: 'CadastroFuncionario',
+  components: { PageHeader },
 
   data() {
     return {
@@ -171,36 +164,6 @@ export default {
 </script>
 
 <style scoped>
-.cadastro-funcionario-container {
-  margin-top: 20px;
-  padding: 24px;
-}
-
-.breadcrumb {
-  margin-bottom: 20px;
-  color: #667085;
-}
-
-.back-btn {
-  box-shadow: none;
-  border: 1px solid #d0d5dd;
-  height: 56px;
-  width: 56px;
-  border-radius: 8px;
-  background-color: #d0d5dd;
-}
-
-.page-title {
-  font-size: 1.25rem;
-  font-weight: 400;
-  color: #2f3367;
-  margin-top: 20px;
-}
-
-.page-subtitle {
-  font-size: 1rem;
-  color: #667085;
-}
 
 .v-text-field:deep(.v-input__prepend-inner) .v-divider {
   height: 70%;

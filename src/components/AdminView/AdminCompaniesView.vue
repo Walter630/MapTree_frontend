@@ -1,22 +1,15 @@
 <template>
-  <v-container class="pa-6 empresas-container">
+  <v-container class="pa-6">
     <v-row>
       <v-col cols="12">
-        <div class="d-flex align-center mb-6">
-          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" style="color: #2f3367">#Empresas</span>
-        </div>
-
-        <div class="d-flex align-center">
-          <v-btn icon depressed class="mr-3 back-btn" @click="goBack">
-            <v-icon>mdi-chevron-left</v-icon>
-          </v-btn>
-          <div>
-            <p class="title-text">Empresas</p>
-            <p class="subtitle-text">Gerencie empresas cadastradas no sistema</p>
-          </div>
-        </div>
+        <PageHeader
+          title="Empresas"
+          subtitle="Gerencie empresas cadastradas no sistema"
+          :breadcrumbs="[
+            { text: 'Meu Painel', to: '/admin' },
+            { text: '#Empresas' },
+          ]"
+        />
       </v-col>
     </v-row>
 
@@ -258,6 +251,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import type { Manager } from '@/plugins/apiConnect.ts'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Company {
   id: string;
@@ -271,6 +265,7 @@ interface Company {
 
 export default defineComponent({
   name: 'EmpresasAdminView',
+  components: { PageHeader },
 
   data() {
     return {
@@ -411,29 +406,6 @@ export default defineComponent({
 
 <style scoped>
 
-.empresas-container {
-  margin-top: 20px;
-  padding: 24px;
-}
-
-/* Título + voltar */
-.back-btn {
-  height: 40px !important;
-  width: 40px !important;
-  border-radius: 8px;
-}
-
-/* Título principal compacto */
-.title-text {
-  font-size: 22px;
-  margin-bottom: 2px;
-}
-
-/* Subtítulo reduzido */
-.subtitle-text {
-  font-size: 14px;
-  color: #667085;
-}
 
 /* Botão Novo Empresa — estilo Gestores */
 .new-empresa-btn {

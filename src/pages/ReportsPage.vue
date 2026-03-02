@@ -1,29 +1,15 @@
 <template>
-  <v-container class="relatorios-gerenciais-container" style="margin-top: 20px">
+  <v-container fluid class="pa-6">
     <v-row>
       <v-col cols="12">
-        <div class="d-flex align-center mb-6">
-          <span class="text-caption text-grey-darken-1" @click="$router.push('/user')"
-            >Meu Painel</span
-          >
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" style="color: #2f3367">#Relatórios</span>
-        </div>
-
-        <div class="d-flex align-center">
-          <v-btn icon depressed class="mr-3 back-btn" @click="goBack">
-            <v-icon>mdi-chevron-left</v-icon>
-          </v-btn>
-          <div style="display: flex; flex-direction: column" class="ml-2">
-            <p
-              class="title-text"
-              style="color: #2f3367; font-weight: bold; font-size: 24px; margin-bottom: 5px"
-            >
-              Relatórios Gerenciais
-            </p>
-            <p class="subtitle-text">Gerencie seus relatorios cadastradas no sistema</p>
-          </div>
-        </div>
+        <PageHeader
+          title="Relatórios Gerenciais"
+          subtitle="Gerencie seus relatórios cadastrados no sistema"
+          :breadcrumbs="[
+            { text: 'Meu Painel', to: '/user' },
+            { text: '#Relatórios' },
+          ]"
+        />
       </v-col>
 
       <v-col cols="12" sm="6" md="12" class="d-flex justify-end align-center search-bar-container">
@@ -260,9 +246,11 @@
 
 <script lang="ts">
 import { useAppStore } from '@/stores/app'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 export default {
   name: 'RelatoriosGestorView',
+  components: { PageHeader },
   data() {
     return {
       search: '',
@@ -382,10 +370,6 @@ export default {
 </script>
 
 <style scoped>
-.relatorios-gerenciais-container {
-  margin: auto;
-  padding: 24px;
-}
 
 /* Ajuste fino para a barra de pesquisa superior */
 .search-bar-container .custom-search-field {
@@ -458,12 +442,5 @@ export default {
   margin: 0;
 }
 
-/* Título + voltar */
-.back-btn {
-  height: 50px !important;
-  width: 50px !important;
-  border-radius: 8px;
-  box-shadow: none;
-  border: 1px solid #d9d9d9;
-}
+/* Título + voltar — agora via PageHeader */
 </style>

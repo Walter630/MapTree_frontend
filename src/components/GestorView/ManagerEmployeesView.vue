@@ -2,26 +2,13 @@
   <v-container class="pa-6">
     <v-row align="center" class="mb-2">
       <v-col cols="12">
-        <div class="d-flex align-center mb-6">
-          <span class="text-caption text-grey-darken-1" @click="$router.push('/manager')"
-            >Meu Painel</span
-          >
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" style="color: #2f3367">#Funcionários</span>
-        </div>
-        <div class="d-flex align-center mb-2">
-          <!-- Back button (square) -->
-          <v-btn icon class="back-btn mr-3" @click="goBack">
-            <v-icon>mdi-arrow-left</v-icon>
-          </v-btn>
+        <PageHeader
+          title="Funcionários"
+          subtitle="Gerencie usuários e suas permissões no sistema"
+          :breadcrumbs="[{ text: 'Meu Painel', to: '/manager' }, { text: '#Funcionários' }]"
+        />
 
-          <div>
-            <h2 class="title mb-1">Funcionários</h2>
-            <p class="subtitle">Gerencie usuários e suas permissões no sistema</p>
-          </div>
-        </div>
-
-        <!-- Novo Gestor abaixo do título -->
+        <!-- Novo Funcionário abaixo do título -->
         <v-row class="mt-3">
           <v-col cols="12">
             <v-btn
@@ -40,13 +27,14 @@
 
     <v-row class="mt-12" style="background-color: #f6f6f6; border-radius: 8px">
       <v-col cols="12" class="pa-0">
-        <p class="table-title-text mb-4" style="font-size: 14px">Gestores Cadastradas</p>
+        <p class="table-title-text mb-4" style="font-size: 20px">Gestores Cadastradas</p>
         <v-data-table
           :headers="headers"
           :items="users"
           :search="search"
           :sort-by="[{ key: 'nome', order: 'asc' }]"
           class="elevation-0 data-table-custom"
+          style="background-color: #f6f6f6"
           hide-default-footer
         >
           <template #item="{ item }">
@@ -143,6 +131,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import type { Manager, User } from '@/plugins/apiConnect.ts'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Company {
   id: string
@@ -167,6 +156,7 @@ interface Funcionario {
 }
 
 export default defineComponent({
+  components: { PageHeader },
   data() {
     return {
       users: [] as Funcionario[],
@@ -331,13 +321,6 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.back-btn {
-  border: 1px solid #e6e6e6;
-  background: #f6f6f6;
-  min-width: 36px;
-  min-height: 36px;
-  border-radius: 8px;
-}
 .v-select.ml-2 :deep(.v-field__input) {
   padding-top: 5px;
   padding-bottom: 5px;
@@ -349,15 +332,9 @@ export default defineComponent({
   margin-top: 10px !important;
   margin-bottom: 10px !important;
 }
-
-.title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-}
-.subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 13px;
+.table-title-text {
+  font-size: 15px;
+  margin-bottom: 8px !important;
+  padding: 10px !important;
 }
 </style>

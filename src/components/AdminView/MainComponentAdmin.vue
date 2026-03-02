@@ -90,7 +90,7 @@ export default defineComponent({
 });
 </script>
 <template>
-  <v-container style="margin-top: 40px;">
+  <v-container class="pa-6">
     <!-- Cabeçalho -->
     <v-row align="center" justify="space-between" class="mb-6">
       <v-col cols="12" md="7">
@@ -122,80 +122,80 @@ export default defineComponent({
     <!-- Cards de Resumo -->
     <v-row style="margin-top: 25px;" class="d-flex" justify="start">
       <v-col cols="12" md="3" >
-        <v-card class="cardResumo">
-          <div class="cardHeader">
+        <v-card class="card-resumo ">
+          <div class="card-header">
             <span>Empresas</span>
             <v-icon>mdi-domain</v-icon>
           </div>
-          <p class="cardNumero">{{ totalCompanies }}</p>
-          <p class="cardInfo">+3 este mês</p>
+          <p class="card-numero">{{ totalCompanies }}</p>
+          <p class="card-info">+3 este mês</p>
         </v-card>
       </v-col>
 
       <v-col cols="12" md="3">
-        <v-card class="cardResumo">
-          <div class="cardHeader">
+        <v-card class="card-resumo">
+          <div class="card-header">
             <span>Gestores</span>
             <v-icon>mdi-account-group</v-icon>
           </div>
-          <p class="cardNumero">{{ totalManagers }}</p>
-          <p class="cardInfo">+7 este mês</p>
+          <p class="card-numero">{{ totalManagers }}</p>
+          <p class="card-info">+7 este mês</p>
         </v-card>
       </v-col>
 
       <v-col cols="12" md="3">
-        <v-card class="cardResumo">
-          <div class="cardHeader">
+        <v-card class="card-resumo">
+          <div class="card-header">
             <span>Espécies</span>
             <v-icon>mdi-sprout</v-icon>
           </div>
-          <p class="cardNumero">156</p>
-          <p class="cardInfo">Catalogadas</p>
+          <p class="card-numero">156</p>
+          <p class="card-info">Catalogadas</p>
         </v-card>
       </v-col>
     </v-row>
 
     <v-row class="mt-10">
       <v-col cols="12" md="6">
-        <v-card class="cardBox">
-          <h4 class="titleBox">Distribuição de Planos</h4>
-          <div v-if="loading" class="centerBox">
+        <v-card class="card-box">
+          <h4 class="title-box">Distribuição de Planos</h4>
+          <div v-if="loading" class="center-box">
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
             <p class="ml-3">Carregando empresas...</p>
           </div>
-          <div v-else-if="error" class="centerBox" style="color: #F44336;">
+          <div v-else-if="error" class="center-box" style="color: #F44336;">
             <p>{{ error }}</p>
             <v-btn small color="error" @click="getCompanies">Tentar Novamente</v-btn>
           </div>
-          <div v-else class="centerBox">
+          <div v-else class="center-box">
             <p style="color: #000000;">Nenhuma ação realizada.</p>
           </div>
         </v-card>
       </v-col>
       <v-col cols="12" md="6" >
-        <v-card class="cardBox">
-          <h4 class="titleBox">Empresas Cadastradas Recentemente</h4>
+        <v-card class="card-box">
+          <h4 class="title-box">Empresas Cadastradas Recentemente</h4>
 
           <!-- Indicador de Carregamento -->
-          <div v-if="loading" class="centerBox">
+          <div v-if="loading" class="center-box">
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
             <p class="ml-3">Carregando empresas...</p>
           </div>
 
           <!-- Mensagem de Erro -->
-          <div v-else-if="error" class="centerBox" style="color: #F44336;">
+          <div v-else-if="error" class="center-box" style="color: #F44336;">
             <p>{{ error }}</p>
             <v-btn small color="error" @click="getCompanies">Tentar Novamente</v-btn>
           </div>
 
           <!-- Lista Vazia -->
-          <div v-else-if="empresas.length === 0" class="centerBox">
+          <div v-else-if="empresas.length === 0" class="center-box">
             Nenhuma empresa encontrada ou cadastrada recentemente.
           </div>
 
           <!-- Lista de Empresas -->
           <div v-else>
-            <v-row class="headerTable">
+            <v-row class="header-table">
               <v-col cols="4">Empresa</v-col>
               <v-col cols="4">Gestor</v-col>
               <v-col cols="4">Status</v-col>
@@ -204,19 +204,19 @@ export default defineComponent({
             <div
               v-for="(empresa, i) in empresas"
               :key="empresa.name"
-              class="linhaEmpresa"
+              class="linha-empresa"
             >
               <v-row align="center" >
                 <v-col cols="4">
                   <div>{{ empresa.name }}</div>
-                  <div class="dataEmpresa">{{ empresa.createdAt }}</div>
+                  <div class="data-empresa">{{ empresa.createdAt }}</div>
                 </v-col>
 
                 <v-col cols="4">{{ empresa.manager }}</v-col>
 
                 <v-col cols="4">
                   <span
-                    class="badgeStatus"
+                    class="badge-status"
                     :style="{ backgroundColor: empresa.isActive ? '#4CAF50' : '#F44336' }"
                   >
                     {{ empresa.isActive ? 'Ativo' : 'Inativo' }}
@@ -235,7 +235,7 @@ export default defineComponent({
 </template>
 
 <style scoped>
-.cardResumo {
+.card-resumo {
   background: #F6F6F6;
   border: 1px solid #CDCDCD;
   height: 150px;
@@ -244,25 +244,25 @@ export default defineComponent({
   box-shadow: none;
 }
 
-.cardHeader {
-display: flex;
-justify-content: space-between;
-font-weight: 600;
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
 }
 
-.cardNumero {
-font-size: 26px;
-margin-top: 25px;
-font-weight: bold;
+.card-numero {
+  font-size: 26px;
+  margin-top: 25px;
+  font-weight: bold;
 }
 
-.cardInfo {
-margin-top: 5px;
-font-size: 13px;
-color: #777;
+.card-info {
+  margin-top: 5px;
+  font-size: 13px;
+  color: #777;
 }
 
-.cardBox {
+.card-box {
   background: #F6F6F6;
   border: 1px solid #CDCDCD;
   border-radius: 8px;
@@ -271,38 +271,39 @@ color: #777;
   box-shadow: none;
 }
 
-.titleBox {
+.title-box {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 20px;
 }
 
-.centerBox {
-display: flex;
-align-items: center;
-justify-content: center;
-height: 220px;
-color: #555;
+.center-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  color: #555;
 }
 
-.headerTable {
-font-weight: bold;
-padding-bottom: 5px;
-color: #444;
+.header-table {
+  font-weight: bold;
+  padding-bottom: 5px;
+  color: #444;
 }
 
-.dataEmpresa {
-font-size: 12px;
-color: #999;
+.data-empresa {
+  font-size: 12px;
+  color: #999;
 }
 
-.badgeStatus {
-padding: 5px 14px;
-border-radius: 12px;
-font-size: 13px;
-display: inline-block;
+.badge-status {
+  padding: 5px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  display: inline-block;
 }
-.linhaEmpresa {
+
+.linha-empresa {
   padding: 15px 0 3px 6px;
 }
 </style>
