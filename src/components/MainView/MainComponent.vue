@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-8">
+  <v-container class="pa-8">
     <!-- ===== Cabeçalho ===== -->
     <v-row align="center" justify="space-between" class="mb-8">
       <v-col cols="12" md="6">
@@ -110,16 +110,7 @@
 
     <!-- ===== Seção: Espécies + Relatórios ===== -->
     <v-row dense>
-      <!-- Espécies por localidade -->
-      <v-col cols="12" md="6">
-        <v-card flat class="pa-4 section-card">
-          <p class="section-title">
-            <v-icon class="mr-2">mdi-leaf-maple</v-icon>
-            Espécies por localidade
-          </p>
-          <SpeciesMap />
-        </v-card>
-      </v-col>
+
 
       <!-- Últimos Relatórios de Poda -->
       <v-col cols="12" md="6">

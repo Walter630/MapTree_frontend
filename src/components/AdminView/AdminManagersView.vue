@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="bg-grey-lighten-4 pa-6">
+  <v-container class="pa-6">
     <!-- Breadcrumb / Header -->
     <v-row align="center" class="mb-2">
       <v-col cols="12">

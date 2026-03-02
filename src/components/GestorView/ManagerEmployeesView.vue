@@ -1,14 +1,11 @@
 <template>
-  <v-container fluid class="bg-grey-lighten-4 pa-6">
+  <v-container class="pa-6">
     <v-row align="center" class="mb-2">
       <v-col cols="12">
         <PageHeader
           title="Funcionários"
           subtitle="Gerencie usuários e suas permissões no sistema"
-          :breadcrumbs="[
-            { text: 'Meu Painel', to: '/manager' },
-            { text: '#Funcionários' },
-          ]"
+          :breadcrumbs="[{ text: 'Meu Painel', to: '/manager' }, { text: '#Funcionários' }]"
         />
 
         <!-- Novo Funcionário abaixo do título -->
@@ -30,13 +27,14 @@
 
     <v-row class="mt-12" style="background-color: #f6f6f6; border-radius: 8px">
       <v-col cols="12" class="pa-0">
-        <p class="table-title-text mb-4" style="font-size: 14px">Gestores Cadastradas</p>
+        <p class="table-title-text mb-4" style="font-size: 20px">Gestores Cadastradas</p>
         <v-data-table
           :headers="headers"
           :items="users"
           :search="search"
           :sort-by="[{ key: 'nome', order: 'asc' }]"
           class="elevation-0 data-table-custom"
+          style="background-color: #f6f6f6"
           hide-default-footer
         >
           <template #item="{ item }">
@@ -333,5 +331,10 @@ export default defineComponent({
   border-radius: 8px;
   margin-top: 10px !important;
   margin-bottom: 10px !important;
+}
+.table-title-text {
+  font-size: 15px;
+  margin-bottom: 8px !important;
+  padding: 10px !important;
 }
 </style>

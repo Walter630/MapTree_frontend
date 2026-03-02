@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="bg-grey-lighten-4 pa-6">
+  <v-container class="pa-6">
     <!-- Cabeçalho -->
     <PageHeader
       title="Notificações"

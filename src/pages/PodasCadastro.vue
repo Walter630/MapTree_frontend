@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="bg-grey-lighten-4 pa-6" style="min-height: 100vh">
+  <v-container fluid class="pa-6" style="min-height: 100vh">
     <PageHeader
       title="Agendamento de Podas"
       subtitle="Confirme As Informações Para Agendar Uma Nova Poda"

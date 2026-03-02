@@ -5,18 +5,12 @@ import PruningMap from '@/components/functions/MapsView/PruningMap.vue'
 export default defineComponent({
   name: 'MapPage',
   components: { PruningMap },
-
-  data() {
-    return {
-      tasks: [],
-    }
-  },
 })
 </script>
 
 <template>
   <div class="full-map-page">
-    <PruningMap :tasks="tasks" />
+    <PruningMap />
   </div>
 </template>
 

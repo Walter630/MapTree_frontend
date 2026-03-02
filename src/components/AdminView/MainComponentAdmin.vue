@@ -90,7 +90,7 @@ export default defineComponent({
 });
 </script>
 <template>
-  <v-container fluid class="bg-grey-lighten-4 pa-6">
+  <v-container class="pa-6">
     <!-- Cabeçalho -->
     <v-row align="center" justify="space-between" class="mb-6">
       <v-col cols="12" md="7">
@@ -122,7 +122,7 @@ export default defineComponent({
     <!-- Cards de Resumo -->
     <v-row style="margin-top: 25px;" class="d-flex" justify="start">
       <v-col cols="12" md="3" >
-        <v-card class="card-resumo">
+        <v-card class="card-resumo ">
           <div class="card-header">
             <span>Empresas</span>
             <v-icon>mdi-domain</v-icon>
