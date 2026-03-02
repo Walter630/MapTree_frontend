@@ -22,8 +22,8 @@ export default defineComponent({
 
 <style scoped>
 .full-map-page {
-  width: 100vw;
-  height: 80vh;
+  width: 100%;
+  height: calc(100vh - 64px);
   padding: 0;
   margin: 0;
   overflow: hidden;

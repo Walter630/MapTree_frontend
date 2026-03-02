@@ -1,24 +1,16 @@
 <template>
-  <v-container class="gestores-page pa-6" >
+  <v-container fluid class="bg-grey-lighten-4 pa-6">
     <!-- Breadcrumb / Header -->
     <v-row align="center" class="mb-2">
       <v-col cols="12">
-        <div class="d-flex align-center mb-6">
-          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" style="color: #2f3367">#Gestores</span>
-        </div>
-        <div class="d-flex align-center mb-2">
-          <!-- Back button (square) -->
-          <v-btn icon class="back-btn mr-3" @click="goBack">
-            <v-icon>mdi-arrow-left</v-icon>
-          </v-btn>
-
-          <div>
-            <h2 class="title mb-1">Gestores</h2>
-            <p class="subtitle">Gerencie usuários e suas permissões no sistema</p>
-          </div>
-        </div>
+        <PageHeader
+          title="Gestores"
+          subtitle="Gerencie usuários e suas permissões no sistema"
+          :breadcrumbs="[
+            { text: 'Meu Painel', to: '/admin' },
+            { text: '#Gestores' },
+          ]"
+        />
 
         <!-- Novo Gestor abaixo do título -->
         <v-row class="mt-3">
@@ -266,6 +258,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import type { User } from '@/plugins/apiConnect.ts'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Gestor {
   id: string
@@ -283,6 +276,7 @@ interface EmpresaFiltro {
 }
 
 export default defineComponent({
+  components: { PageHeader },
   data() {
     return {
       gestores: [] as Gestor[],
@@ -448,31 +442,6 @@ export default defineComponent({
 
 
 <style scoped>
-.gestores-page {
-  margin-top: 20px;
-  padding: 24px;
-}
-
-/* Title / subtitle */
-.title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-}
-.subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-/* Back button */
-.back-btn {
-  border: 1px solid #e6e6e6;
-  background: #f6f6f6;
-  min-width: 36px;
-  min-height: 36px;
-  border-radius: 8px;
-}
 
 .filters-box {
   border-radius: 8px;
@@ -564,9 +533,6 @@ export default defineComponent({
 
 /* Responsive tweaks */
 @media (max-width: 768px) {
-  .gestores-page {
-    padding: 12px;
-  }
   .summary-card {
     min-height: 100px;
   }

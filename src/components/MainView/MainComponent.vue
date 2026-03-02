@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-8">
+  <v-container fluid class="pa-8">
     <!-- ===== Cabeçalho ===== -->
     <v-row align="center" justify="space-between" class="mb-8">
       <v-col cols="12" md="6">

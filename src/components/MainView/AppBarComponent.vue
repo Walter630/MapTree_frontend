@@ -125,7 +125,7 @@ const MENUS: Record<string, MenuItem[]> = {
   ],
   USER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
-    { title: 'Podas', icon: 'mdi-content-cut', to: '' },
+    { title: 'Podas', icon: 'mdi-content-cut', to: '/user/podas' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
     { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
   ],

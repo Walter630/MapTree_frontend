@@ -81,13 +81,12 @@ export default defineComponent({
 
     let map: L.Map | null = null
     let markersLayer: L.LayerGroup | null = null
-    let userLayer: L.LayerGroup | null = null
-    let markedLayer: L.LayerGroup | null = null
+    let _userLayer: L.LayerGroup | null = null
+    let _markedLayer: L.LayerGroup | null = null
     let powerLinesLayer: L.LayerGroup | null = null
 
     /* ---------- Estado Reativo ---------- */
 
-    const following = ref(true)
     const markMode = ref(false)
     const locationStatus = ref<'idle' | 'requesting' | 'found' | 'denied' | 'error'>('idle')
     const isExpanded = ref(false)
@@ -183,8 +182,8 @@ export default defineComponent({
 
         powerLines.value.forEach((line) => {
           for (let i = 0; i < line.path.length - 1; i++) {
-            const start = L.latLng(line.path[i])
-            const end = L.latLng(line.path[i + 1])
+            const start = L.latLng(line.path[i]!)
+            const end = L.latLng(line.path[i + 1]!)
             if (distancePointToSegment(point, start, end) < POWER_LINE_THRESHOLD) {
               tree.near_trees = true
               return
@@ -233,11 +232,13 @@ export default defineComponent({
     const initializeMap = () => {
       map = L.map('map-container').setView([-23.5505, -46.6333], 15)
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map)
 
       markersLayer = L.layerGroup().addTo(map)
-      markedLayer = L.layerGroup().addTo(map)
-      userLayer = L.layerGroup().addTo(map)
+      _markedLayer = L.layerGroup().addTo(map)
+      _userLayer = L.layerGroup().addTo(map)
       powerLinesLayer = L.layerGroup().addTo(map)
 
       // Desenha linhas de fiação
@@ -290,23 +291,82 @@ export default defineComponent({
     <div id="map-container" />
 
     <!-- Painel de Controle -->
-    <div class="map-overlay-panel">
-      <button @click="doLocate">📍 Localizar</button>
-      <button @click="toggleMarkMode">📌 Marcar</button>
+    <v-card class="map-overlay-panel" elevation="4" rounded="lg">
+      <v-card-text class="pa-3">
+        <!-- Botões de ação -->
+        <div class="d-flex flex-column ga-2 mb-3">
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-crosshairs-gps"
+            @click="doLocate"
+          >
+            Localizar
+          </v-btn>
+          <v-btn
+            size="small"
+            :variant="markMode ? 'flat' : 'tonal'"
+            :color="markMode ? 'warning' : 'secondary'"
+            prepend-icon="mdi-map-marker-plus"
+            @click="toggleMarkMode"
+          >
+            {{ markMode ? 'Marcando...' : 'Marcar' }}
+          </v-btn>
+        </div>
 
-      <div v-if="loadingTrees">Carregando...</div>
-      <div v-else>
-        <div><b>Árvores:</b> {{ treeCount }}</div>
-        <div><b>⚠️ Risco por fiação:</b> {{ crowdedTreeCount }}</div>
-        <div><b>📌 Marcações:</b> {{ markedCount }}</div>
-      </div>
-    </div>
+        <v-divider class="mb-3" />
+
+        <!-- Loading ou Contagens -->
+        <v-progress-linear
+          v-if="loadingTrees"
+          indeterminate
+          color="green"
+          class="mb-2"
+        />
+        <div v-else class="text-body-2">
+          <div class="d-flex align-center mb-1">
+            <v-icon size="16" color="green" class="mr-1">mdi-tree</v-icon>
+            <b>Árvores:</b>&nbsp;{{ treeCount }}
+          </div>
+          <div class="d-flex align-center mb-1">
+            <v-icon size="16" color="red" class="mr-1">mdi-alert</v-icon>
+            <b>Risco fiação:</b>&nbsp;{{ crowdedTreeCount }}
+          </div>
+          <div class="d-flex align-center">
+            <v-icon size="16" color="orange" class="mr-1">mdi-map-marker</v-icon>
+            <b>Marcações:</b>&nbsp;{{ markedCount }}
+          </div>
+        </div>
+
+        <v-divider class="my-3" />
+
+        <!-- Legenda -->
+        <p class="text-caption font-weight-bold mb-2">Legenda</p>
+        <div class="d-flex align-center mb-1">
+          <span class="legend-dot" style="background: #4CAF50"></span>
+          <span class="text-caption">Normal</span>
+        </div>
+        <div class="d-flex align-center mb-1">
+          <span class="legend-dot" style="background: #FFC107"></span>
+          <span class="text-caption">Para podar</span>
+        </div>
+        <div class="d-flex align-center mb-1">
+          <span class="legend-dot" style="background: #FF3B3B"></span>
+          <span class="text-caption">Risco (fiação)</span>
+        </div>
+        <div class="d-flex align-center">
+          <span class="legend-line"></span>
+          <span class="text-caption">Rede elétrica</span>
+        </div>
+      </v-card-text>
+    </v-card>
   </div>
 </template>
 
 <style scoped>
 .map-wrapper {
-  height: 100vh;
+  height: 100%;
   position: relative;
 }
 
@@ -318,17 +378,26 @@ export default defineComponent({
   position: absolute;
   top: 12px;
   left: 12px;
-  background: white;
-  padding: 12px;
-  border-radius: 8px;
   z-index: 1000;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  max-width: 220px;
+  background: white;
 }
 
-.map-overlay-panel button {
-  display: block;
-  margin-bottom: 6px;
-  cursor: pointer;
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.legend-line {
+  width: 18px;
+  height: 0;
+  border-top: 3px dashed #ff0000;
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 @keyframes pulse {

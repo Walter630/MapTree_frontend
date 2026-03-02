@@ -1,32 +1,14 @@
 <template>
-  <v-container class="cadastro-funcionario-container">
-    <v-row>
-      <v-col cols="12">
-        <div class="d-flex align-center mb-2">
-          <span class="text-caption text-grey-darken-1" @click="$router.push('/admin')">Meu Painel</span>
-          <v-icon small class="mx-1 text-grey-darken-1" color="#2F3367">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold"  @click="goBack">Empresas</span>
-          <v-icon small class="mx-1 text-grey-darken-1">mdi-chevron-right</v-icon>
-          <span class="text-caption font-weight-bold" >#CadastrarEmpresas</span>
-        </div>
-      </v-col>
-
-    </v-row>
-    <v-row class="mb-5 align-center">
-      <v-col cols="auto" class="py-0">
-        <v-btn icon depressed style="box-shadow: none; border: 1px solid #D0D5DD; height: 56px; width: 56px; border-radius: 8px; background-color: #FFF;" @click="goBack">
-          <v-icon>mdi-chevron-left</v-icon>
-        </v-btn>
-      </v-col>
-      <v-col cols="auto" class="py-1">
-        <h1 class="text-h5 font-weight-regular mt-1" style="color: #2F3367; margin-top: 20px;">
-          Cadastro de Gestores
-        </h1>
-        <p class="text-subtitle-1 grey--text" style="color: #667085;">
-          Cadastre Os Gestores E Suas Funções.
-        </p>
-      </v-col>
-    </v-row>
+  <v-container fluid class="bg-grey-lighten-4 pa-6">
+    <PageHeader
+      title="Cadastro de Gestores"
+      subtitle="Cadastre Os Gestores E Suas Funções."
+      :breadcrumbs="[
+        { text: 'Meu Painel', to: '/admin' },
+        { text: 'Gestores', to: '/admin/managers' },
+        { text: '#CadastrarGestores' },
+      ]"
+    />
 
     <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px;">
       <v-row justify="center">
@@ -149,6 +131,7 @@
 
 <script lang="ts">
 import type { User, Company } from '@/plugins/apiConnect.ts'
+import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Empresa {
   id: string;
@@ -161,6 +144,7 @@ interface Empresa {
 
 export default {
   name: 'CadastroFuncionario',
+  components: { PageHeader },
   data() {
     return {
       valid: false,
@@ -259,10 +243,6 @@ export default {
 </script>
 
 <style scoped>
-.cadastro-funcionario-container {
-  margin-top: 20px;
-  padding: 24px;
-}
 
 
 .input-label {
@@ -272,56 +252,54 @@ export default {
   font-weight: 500; /* Peso da fonte para as labels */
 }
 
-.custom-text-field.v-text-field--solo >>> ,
-.custom-text-field.v-select--solo >>> {
-  min-height: 44px; /* Altura padrão para os campos */
-
+.custom-text-field.v-text-field--solo :deep(.v-input__control),
+.custom-text-field.v-select--solo :deep(.v-input__control) {
+  min-height: 44px;
 }
 
-.custom-text-field.v-text-field--solo >>> ,
-.custom-text-field.v-select--solo >>> {
-  border: 1px solid #D0D5DD; /* Borda cinza clara */
-  border-radius: 8px; /* Borda arredondada */
-  background-color: #FFFFFF !important; /* Fundo branco */
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); /* Sombra sutil */
-  padding: 0 14px; /* Padding interno */
+.custom-text-field.v-text-field--solo :deep(.v-field),
+.custom-text-field.v-select--solo :deep(.v-field) {
+  border: 1px solid #D0D5DD;
+  border-radius: 8px;
+  background-color: #FFFFFF !important;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  padding: 0 14px;
 }
 
-.custom-text-field.v-text-field--solo >>> .v-input__slot input,
-.custom-text-field.v-select--solo >>>  {
-  color: #101828; /* Cor do texto do input */
-  font-size: 1rem; /* Tamanho da fonte do texto */
+.custom-text-field.v-text-field--solo :deep(.v-field__input),
+.custom-text-field.v-select--solo :deep(.v-field__input) {
+  color: #101828;
+  font-size: 1rem;
 }
 
-.custom-text-field.v-text-field--solo >>> ,
-.custom-text-field.v-select--solo >>> {
-  transform: translateY(-10px) scale(0.75); /* Ajuste para label flutuante */
+.custom-text-field.v-text-field--solo :deep(.v-label),
+.custom-text-field.v-select--solo :deep(.v-label) {
+  transform: translateY(-10px) scale(0.75);
   color: #667085 !important;
 }
 
 /* Estilo para a label "Email — Endereço de Email" */
-.custom-text-field >>> .v-label span {
-  font-size: 0.875rem !important; /* Menor que a label principal */
+.custom-text-field :deep(.v-label) span {
+  font-size: 0.875rem !important;
   font-weight: 400 !important;
   color: #667085 !important;
 }
 
-
 /* Prepend-inner do campo de contato */
-.contact-field >>>  {
-  margin-top: 0; /* Alinha o prepend-inner verticalmente */
+.contact-field :deep(.v-input__prepend-inner) {
+  margin-top: 0;
   align-items: center;
-  height: 100%; /* Garante que o container ocupe toda a altura */
+  height: 100%;
 }
 
-.contact-field >>>  {
-  height: 24px; /* Altura da linha vertical */
-  border-right: 1px solid #D0D5DD; /* Cor da linha */
-  margin-right: 8px; /* Espaçamento entre a linha e o número */
-  margin-left: -4px; /* Ajuste para centralizar visualmente */
+.contact-field :deep(.v-divider) {
+  height: 24px;
+  border-right: 1px solid #D0D5DD;
+  margin-right: 8px;
+  margin-left: -4px;
 }
 
-.contact-field >>> .v-input__prepend-inner span {
+.contact-field :deep(.v-input__prepend-inner) span {
   font-weight: 500;
 }
 
