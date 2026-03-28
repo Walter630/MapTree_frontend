@@ -8,4 +8,4 @@ registerPlugins(app)
 
 app.mount('#app')
 
-// Code made by Walter and suported by Henry;
+// Code made by Walter;
