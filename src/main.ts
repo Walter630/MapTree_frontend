@@ -8,5 +8,4 @@ registerPlugins(app)
 
 app.mount('#app')
 
-
-// Novo estagiario: HenrykSous
+// Code made by Walter and suported by Henry;
