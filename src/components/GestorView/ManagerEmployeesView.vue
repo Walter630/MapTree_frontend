@@ -159,15 +159,13 @@ export default defineComponent({
   components: { PageHeader },
   data() {
     return {
-      users: [] as Funcionario[],
+      users: [] as User[],
       cpfMask: '###.###.###-##',
       comparacaoPercentual: '',
-      comparacaoCor: 'text-success', // ou 'text-danger'
+      comparacaoCor: 'text-success',
       // filtros
       search: '',
       totalUsers: 0,
-
-      // selects
 
       // tabela
       itemsPerPage: 6,
@@ -215,22 +213,11 @@ export default defineComponent({
       await this.getAllUsers() // Em seguida, carrega os usuários
     },
 
-    //usar computed
     async getAllUsers(): Promise<void> {
       try {
-        const response = await this.$api.get<User[]>('/users') // Usando 'any' para flexibilidade
-        this.allUsers = response.data.map((user) => ({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          cpf: user.cpf,
-          phone: user.phone,
-          isActive: user.isActive,
-          companyId: user.companyId,
-        }))
-        // NOVO: Define o valor total
+        const response = await this.$api.get<User[]>('/users')
+        this.allUsers = response.data
         this.totalUsers = this.allUsers.length
-        // exibir na tabela
         this.users = [...this.allUsers]
       } catch (error) {
         console.error('Erro ao buscar usuários:', error)
@@ -294,7 +281,7 @@ export default defineComponent({
     applyFilters() {
       this.users = this.users.filter((g) => {
         const matchName = this.search
-          ? g.nome?.toLowerCase().includes(this.search.toLowerCase())
+          ? g.name?.toLowerCase().includes(this.search.toLowerCase())
           : true
 
         return matchName

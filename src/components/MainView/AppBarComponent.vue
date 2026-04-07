@@ -2,17 +2,18 @@
   <!-- ===== Desktop AppBar ===== -->
   <v-app-bar v-if="!isMobile" color="white" flat class="appbar-desktop">
     <!-- Logo -->
-    <img
-      src="@/assets/LogomaptreeHeaderpng.png"
-      alt="Logo MapTree"
-      class="logo"
-      @click="goToHome()"
-    />
+    <div class="logo-container" @click="goToHome()">
+      <img
+        src="@/assets/LogomaptreeHeaderpng.png"
+        alt="Logo MapTree"
+        class="logo-img"
+      />
+    </div>
 
     <v-spacer />
 
     <!-- Menu de Navegação -->
-    <v-toolbar-items class="d-flex justify-center mt-2">
+    <v-toolbar-items class="d-flex align-center">
       <v-btn
         v-for="item in currentMenu"
         :key="item.to"
@@ -122,6 +123,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
     { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
+    { title: 'Mapa', icon: 'mdi-map', to: '/manager/map' },
   ],
   USER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
@@ -153,7 +155,7 @@ export default {
 
     currentMenu(): MenuItem[] {
       const role = this.store.user?.role
-      return MENUS[role as string] || MENUS.GUEST
+      return (MENUS[role as string] ?? MENUS.GUEST) as MenuItem[]
     },
 
     isMobile(): boolean {
@@ -228,15 +230,29 @@ export default {
 
 <style scoped>
 .appbar-desktop {
-  margin: 1px 0;
+  border-bottom: 1px solid #f0f0f0 !important;
 }
 
-.logo {
-  width: 150px;
-  height: 52px;
-  margin-left: 25px;
-  margin-top: 1px;
+.logo-container {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  align-content: center;
+  padding-left: 20px;
   cursor: pointer;
+}
+
+.logo-img {
+  max-width: 160px;
+  max-height: 48px;
+  object-fit: contain;
+  /* Melhora a vivacidade da logo atual enquanto não trocamos */
+  filter: saturate(1.4) brightness(1.1);
+  transition: transform 0.2s;
+}
+
+.logo-img:hover {
+  transform: scale(1.05);
 }
 
 .notification-btn {

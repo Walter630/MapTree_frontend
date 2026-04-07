@@ -8,15 +8,16 @@ const snackbarText = ref('')
 const snackbarColor = ref('')
 const snackbarTimeout = ref(2000)
 const email = ref('')
-function validateEmail () {
+
+function isValidEmail(value: string): boolean {
   const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-  return re.test(String(email.value).toLowerCase())
+  return re.test(String(value).toLowerCase())
 }
 
-function sendVerificationCode () {
-  if (!validateEmail()) {
+function sendVerificationCode() {
+  if (!isValidEmail(email.value)) {
     snackbar.value = true
-    snackbarText.value = 'Email inválido email precisa ter @ e .'
+    snackbarText.value = 'Email inválido. O email precisa ter @ e .'
     snackbarColor.value = 'error'
     snackbarTimeout.value = 2000
     return
@@ -26,7 +27,8 @@ function sendVerificationCode () {
   snackbarTimeout.value = 2000
   router.push('/recovery-code')
 }
-function cancelarCode () {
+
+function cancel() {
   router.push('/login')
 }
 </script>
@@ -39,10 +41,10 @@ function cancelarCode () {
           <v-card-title>Recuperar Senha</v-card-title>
           <v-card-text class="text-center">
             <p>Insira o seu email cadastrado para receber o código de verificação.</p>
-            <v-text-field v-model="email" placeholder="Digite o email de registro" required :rules="[validateEmail]" />
+            <v-text-field v-model="email" placeholder="Digite o email de registro" required :rules="[v => isValidEmail(v) || 'Email inválido']" />
 
             <v-btn block color="#C6F513" :disabled="!email" @click="sendVerificationCode">Proximo <v-icon right>mdi-arrow-right</v-icon></v-btn>
-            <v-btn block color="black" style="margin-top: 10px;" @click="cancelarCode">Cancelar</v-btn>
+            <v-btn block color="black" style="margin-top: 10px;" @click="cancel">Cancelar</v-btn>
 
           </v-card-text>
           <div class="terms-privacy" style="margin-top: 20px; margin-bottom: 20px;">

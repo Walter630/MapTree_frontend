@@ -4,13 +4,18 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const senha = ref('')
+const password = ref('')
+const confirmPassword = ref('')
 
-function resetSenha () {
-  alert('Mensagem enviada para ' + senha.value)
+function resetPassword() {
+  if (password.value !== confirmPassword.value) {
+    alert('As senhas não coincidem')
+    return
+  }
   router.push('/login')
 }
-function cancelar () {
+
+function cancel() {
   router.push('/login')
 }
 </script>
@@ -28,14 +33,14 @@ function cancelar () {
     <v-row>
       <v-col cols="12">
         <v-card class="form-card" flat style="max-width: 400px; margin: 0 auto; ">
-          <v-card-title>Resetar Senha</v-card-title>
+          <v-card-title>Redefinir Senha</v-card-title>
           <v-card-text class="text-center">
             <p class="text-center" style="margin: 20px;">Nova Senha</p>
-            <v-text-field model="senha" placeholder="Digite a nova Senha"></v-text-field>
-            <p style="margin: 20px;">Confirme Senha</p>
-            <v-text-field model="senha" placeholder="Confirme a nova Senha"></v-text-field>
-            <v-btn block color="#C6F513" @click="resetSenha">Resetar</v-btn>
-            <v-btn block color="black" style="margin-top: 10px;" @click="cancelar">Cancelar</v-btn>
+            <v-text-field v-model="password" type="password" placeholder="Digite a nova senha"></v-text-field>
+            <p style="margin: 20px;">Confirmar Senha</p>
+            <v-text-field v-model="confirmPassword" type="password" placeholder="Confirme a nova senha"></v-text-field>
+            <v-btn block color="#C6F513" @click="resetPassword">Redefinir</v-btn>
+            <v-btn block color="black" style="margin-top: 10px;" @click="cancel">Cancelar</v-btn>
           </v-card-text>
         </v-card>
         <div class="terms-privacy" style="margin-top: 20px; margin-bottom: 20px;">

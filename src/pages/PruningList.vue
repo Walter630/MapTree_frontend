@@ -11,7 +11,7 @@
       class="mb-6 text-none font-weight-bold"
       prepend-icon="mdi-plus"
       elevation="0"
-      @click="novaPoda"
+      @click="createPruning"
     >
       Nova Poda
     </v-btn>
@@ -102,15 +102,15 @@
         </thead>
         <tbody>
           <tr v-for="item in items" :key="item.id">
-            <td>{{ item.local }}</td>
+            <td>{{ item.location }}</td>
             <td>{{ item.id }}</td>
             <td>
               <v-chip
-                :color="getPrioridadeColor(item.prioridade)"
+                :color="getPriorityColor(item.priority)"
                 size="small"
                 class="font-weight-bold"
               >
-                {{ item.prioridade }}
+                {{ item.priority }}
               </v-chip>
             </td>
             <td>
@@ -118,8 +118,8 @@
                 {{ item.status }}
               </v-chip>
             </td>
-            <td>{{ item.data }}</td>
-            <td>{{ item.responsavel }}</td>
+            <td>{{ item.date }}</td>
+            <td>{{ item.responsible }}</td>
             <td><a href="#" class="text-caption text-blue-darken-2">Ver Detalhes</a></td>
           </tr>
         </tbody>
@@ -134,40 +134,40 @@ import PageHeader from '@/components/shared/PageHeader.vue'
 
 const router = useRouter()
 
-const novaPoda = () => router.push('/user/podas/nova')
+const createPruning = () => router.push('/user/podas/nova')
 
 const items = [
   {
-    local: 'Av. Paulista, 1000',
+    location: 'Av. Paulista, 1000',
     id: '343t4g3',
-    prioridade: 'Média',
+    priority: 'Média',
     status: 'Concluída',
-    data: '2024-01-15',
-    responsavel: 'João Silva',
+    date: '2024-01-15',
+    responsible: 'João Silva',
   },
   {
-    local: 'Rua Augusta, 500',
+    location: 'Rua Augusta, 500',
     id: '343t4g3',
-    prioridade: 'Alta',
+    priority: 'Alta',
     status: 'Em progresso',
-    data: '2024-01-15',
-    responsavel: 'João Silva',
+    date: '2024-01-15',
+    responsible: 'João Silva',
   },
   {
-    local: 'Av. Paulista, 1000',
+    location: 'Av. Paulista, 1000',
     id: '343t4g3',
-    prioridade: 'Média',
+    priority: 'Média',
     status: 'Concluída',
-    data: '2024-01-15',
-    responsavel: 'João Silva',
+    date: '2024-01-15',
+    responsible: 'João Silva',
   },
   {
-    local: 'Av. Paulista, 1000',
+    location: 'Av. Paulista, 1000',
     id: '343t4g3',
-    prioridade: 'Média',
+    priority: 'Média',
     status: 'Pendente',
-    data: '2024-01-15',
-    responsavel: 'João Silva',
+    date: '2024-01-15',
+    responsible: 'João Silva',
   },
 ]
 
@@ -177,7 +177,7 @@ const getStatusColor = (status: string) => {
   return 'yellow-lighten-3'
 }
 
-const getPrioridadeColor = (p: string) => {
+const getPriorityColor = (p: string) => {
   if (p === 'Alta') return 'red'
   return 'orange'
 }

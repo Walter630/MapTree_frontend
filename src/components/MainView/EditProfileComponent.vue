@@ -4,13 +4,15 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const nome = ref('')
+const name = ref('')
+const email = ref('')
+const password = ref('')
 
-function salvarPerfil () {
-  alert('Mensagem enviada para ' + nome.value)
+function saveProfile() {
   router.push('/login')
 }
-function cancelar () {
+
+function cancel() {
   router.push('/login')
 }
 </script>
@@ -28,16 +30,16 @@ function cancelar () {
     <v-row>
       <v-col cols="12">
         <v-card class="form-card" flat style="max-width: 400px; margin: 0 auto; ">
-          <v-card-title>Edite Seu Perfil</v-card-title>
+          <v-card-title>Editar Perfil</v-card-title>
           <v-card-text class="text-center">
             <p class="text-center" style="margin: 20px;">Nome</p>
-            <v-text-field model="nome" placeholder="Digite o novo nome"></v-text-field>
+            <v-text-field v-model="name" placeholder="Digite o novo nome"></v-text-field>
             <p style="margin: 20px;">Email</p>
-            <v-text-field model="email" placeholder="Digite o novo email"></v-text-field>
+            <v-text-field v-model="email" placeholder="Digite o novo email"></v-text-field>
             <p style="margin: 20px;">Senha</p>
-            <v-text-field model="senha" placeholder="Digite a nova senha"></v-text-field>
-            <v-btn block color="#C6F513" @click="salvarPerfil">Salvar</v-btn>
-            <v-btn block color="black" style="margin-top: 10px;" @click="cancelar">Cancelar</v-btn>
+            <v-text-field v-model="password" type="password" placeholder="Digite a nova senha"></v-text-field>
+            <v-btn block color="#C6F513" @click="saveProfile">Salvar</v-btn>
+            <v-btn block color="black" style="margin-top: 10px;" @click="cancel">Cancelar</v-btn>
           </v-card-text>
         </v-card>
         <div class="terms-privacy" style="margin-top: 20px; margin-bottom: 20px;">

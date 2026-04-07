@@ -69,7 +69,7 @@
             <v-icon class="mr-2">mdi-map-marker-alert-outline</v-icon>
             Região em risco
           </p>
-          <PruningMap ref="pruningMapRef" :tasks="[]" style="height: 270px; border-radius: 8px; overflow: hidden" />
+          <MiniMap filter-status="TO_PRUNE" style="height: 270px; border-radius: 8px; overflow: hidden" />
           <v-btn icon @click="goToMap"><v-icon>mdi-map</v-icon></v-btn>
         </v-card>
       </v-col>
@@ -94,7 +94,7 @@
           </p>
 
           <v-card
-            v-for="tree in treesFiltradas"
+            v-for="tree in filteredTrees"
             :key="tree.id"
             class="pa-3 mb-2 rounded-lg alert-card"
             flat
@@ -155,7 +155,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
-import PruningMap from '@/components/functions/MapsView/PruningMap.vue'
+import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
 import { useAuth } from '@/hooks/useAuth'
 
 /* ===================================
@@ -208,7 +208,7 @@ interface ReportHeader {
 export default defineComponent({
   name: 'ManagerHomeView',
 
-  components: { PruningMap },
+  components: { MiniMap },
 
   data() {
     return {
@@ -216,7 +216,7 @@ export default defineComponent({
       user: null as User | null,
       trees: null as Tree[] | null,
       species: null as Species[] | null,
-      treesFiltradas: [] as Tree[],
+      filteredTrees: [] as Tree[],
       prunings: [] as Pruning[],
 
       // Contadores
@@ -245,7 +245,7 @@ export default defineComponent({
     },
 
     goToMap() {
-      this.$router.push('/user/mapUser')
+      this.$router.push('/manager/map')
     },
 
     /* ---------- Chamadas API ---------- */
@@ -276,7 +276,7 @@ export default defineComponent({
         .then((response) => {
           this.trees = response.data
           this.countTrees = this.trees.length
-          this.treesFiltradas = this.trees.filter((t) => t.status === 'TO_PRUNE')
+          this.filteredTrees = this.trees.filter((t) => t.status === 'TO_PRUNE')
         })
         .catch((error: unknown) => console.error('Erro ao buscar árvores:', error))
     },

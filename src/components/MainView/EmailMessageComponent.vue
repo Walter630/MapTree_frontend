@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const email = ref('')
-
-function sendMensageSuport () {
-  alert('Mensagem enviada para ' + email.value)
+function contactSupport() {
   router.push('/login')
 }
-function voltar () {
+
+function goBack() {
   router.push('/login')
 }
 </script>
@@ -32,8 +29,8 @@ function voltar () {
           <v-card-text class="text-center">
             <p class="text-center" style="margin: 20px;">Por favor, verifique seu e-mail para os próximos passos para redefinir sua senha.</p>
             <v-spacer />
-            <v-btn block color="#C6F513" @click="sendMensageSuport">Falar com Suporte</v-btn>
-            <v-btn block color="black" style="margin-top: 10px;" @click="voltar">Voltar</v-btn>
+            <v-btn block color="#C6F513" @click="contactSupport">Falar com Suporte</v-btn>
+            <v-btn block color="black" style="margin-top: 10px;" @click="goBack">Voltar</v-btn>
           </v-card-text>
         </v-card>
         <div class="terms-privacy" style="margin-top: 20px; margin-bottom: 20px;">

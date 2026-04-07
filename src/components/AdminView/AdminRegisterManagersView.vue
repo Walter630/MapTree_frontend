@@ -162,15 +162,14 @@ export default {
       allCompanies: [] as Empresa[],
       // ... dentro do data()
       rules: {
-        required: value => !!value || 'Campo obrigatório.',
-        email: value => {
+        required: (value: any) => !!value || 'Campo obrigatório.',
+        email: (value: any) => {
           const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-          return pattern.test(value) || 'Email inválido.'
+          return pattern.test(String(value)) || 'Email inválido.'
         },
-        minPassword: v => v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
-        contactFormat: v => (v && v.replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).',
-        // 👈 REGRA CPF ADICIONADA: Validação simples de 11 dígitos
-        cpfFormat: v => (v && v.replace(/[^0-9]/g, '').length === 11) || 'CPF inválido. Deve conter 11 dígitos.',
+        minPassword: (v: any) => String(v).length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
+        contactFormat: (v: any) => (v && String(v).replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).',
+        cpfFormat: (v: any) => (v && String(v).replace(/[^0-9]/g, '').length === 11) || 'CPF inválido. Deve conter 11 dígitos.',
       },
 // ...
     };
@@ -191,8 +190,8 @@ export default {
           name: comp.name,
           taxId: comp.taxId,
           isOutsourced: comp.isOutsourced,
-          managerId: comp.managerId,
-          isActive: comp.isActive
+          managerId: comp.managerId ?? '',
+          isActive: comp.isActive ?? true
         }));
         this.empresas = this.allCompanies.filter(comp => comp.isActive);
       } catch (error) {
@@ -232,6 +231,8 @@ export default {
         password: '',
         phone: '',
         empresa: '',
+        role: 'MANAGER',
+        isActive: true,
       };
     },
     cancelForm() {

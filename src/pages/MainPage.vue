@@ -26,11 +26,10 @@ const HIDDEN_ROUTES = [
   '/login',
   '/register',
   '/recovery',
-  '/reset',
-  '/editPerfil',
-  '/mensageEmail',
-  '/resetSenha',
   '/recovery-code',
+  '/reset-password',
+  '/edit-account',
+  '/logout',
 ]
 
 const showAppBar = computed(() => !HIDDEN_ROUTES.includes(route.path))

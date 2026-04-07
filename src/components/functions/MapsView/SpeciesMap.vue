@@ -30,8 +30,8 @@ import { useRouter } from 'vue-router'
 
 export interface TreeLocation {
   id: string
-  lat?: number
-  lng?: number
+  latitude: number
+  longitude: number
   species: Species
 }
 
@@ -86,9 +86,7 @@ export default defineComponent({
       const map = new Map<string, TreeLocation[]>()
 
       trees.forEach((tree) => {
-        if (tree.lat == null || tree.lng == null) return
-
-        const key = `${tree.lat.toFixed(5)}_${tree.lng?.toFixed(5)}`
+        const key = `${tree.latitude.toFixed(5)}_${tree.longitude.toFixed(5)}`
         if (!map.has(key)) map.set(key, [])
         map.get(key)!.push(tree)
       })
@@ -105,7 +103,7 @@ export default defineComponent({
 
       allTrees.value = data.filter(
         (t) =>
-          typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && !isNaN(t.lng),
+          typeof t.latitude === 'number' && typeof t.longitude === 'number' && !isNaN(t.latitude) && !isNaN(t.longitude),
       )
 
       speciesOptions.value = Array.from(new Set(allTrees.value.map((t) => t.species.commonName)))
@@ -126,14 +124,17 @@ export default defineComponent({
       const grouped = groupByLocation(filteredTrees)
 
       grouped.forEach((treesAtLocation) => {
-        const { lat, lng } = treesAtLocation[0]
+        const first = treesAtLocation[0]
+        if (!first) return
+        const lat = first.latitude
+        const lng = first.longitude
 
         const speciesCount = treesAtLocation.reduce<Record<string, number>>((acc, t) => {
           acc[t.species.commonName] = (acc[t.species.commonName] || 0) + 1
           return acc
         }, {})
 
-        const dominantSpecies = Object.entries(speciesCount).sort((a, b) => b[1] - a[1])[0][0]
+        const dominantSpecies = Object.entries(speciesCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Desconhecida'
 
         const popupContent = `
           <strong>Espécies na localidade</strong><br/>
@@ -146,7 +147,7 @@ export default defineComponent({
           </button>
         `
 
-        const marker = L.circleMarker([lat!, lng!], {
+        const marker = L.circleMarker([lat, lng], {
           radius: 10,
           color: getSpeciesColor(dominantSpecies),
           fillOpacity: 0.8,

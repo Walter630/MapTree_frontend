@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import RecoveryComponent from '@/components/MainView/RecoveryComponent.vue'
+import PasswordRecoveryComponent from '@/components/MainView/PasswordRecoveryComponent.vue'
 </script>
 
 <template>
-  <RecoveryComponent />
+  <PasswordRecoveryComponent />
 </template>
 
 <style scoped>

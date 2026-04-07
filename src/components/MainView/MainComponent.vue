@@ -93,14 +93,14 @@
             Árvores em risco
           </p>
 
-          <div v-if="treesFiltradas.length === 0" class="text-center text-grey py-6">
+          <div v-if="filteredTrees.length === 0" class="text-center text-grey py-6">
             <v-icon size="40" color="grey-lighten-1">mdi-tree-outline</v-icon>
             <p class="text-body-2 mt-2">Nenhuma árvore em risco no momento</p>
           </div>
 
           <div class="trees-risk-list flex-grow-1" style="overflow-y: auto; max-height: 320px;">
             <v-card
-              v-for="tree in treesFiltradas"
+              v-for="tree in filteredTrees"
               :key="tree.id"
               class="pa-3 mb-2 rounded-lg alert-card"
               flat
@@ -228,7 +228,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
-import PruningMap from '@/components/functions/MapsView/PruningMap.vue'
+import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
 import { useAuth } from '@/hooks/useAuth'
 
 /* ===================================
@@ -342,7 +342,7 @@ const TREE_STATUS_COLORS: Record<string, string> = {
 export default defineComponent({
   name: 'UserHomeView',
 
-  components: { PruningMap },
+  components: { MiniMap },
 
   data() {
     return {
@@ -350,7 +350,7 @@ export default defineComponent({
       user: null as User | null,
       trees: null as Tree[] | null,
       species: null as Species[] | null,
-      treesFiltradas: [] as Tree[],
+      filteredTrees: [] as Tree[],
       prunings: [] as Pruning[],
 
       // Contadores
@@ -483,10 +483,10 @@ export default defineComponent({
         const response = await this.$api.get<TreeApi[]>('/trees')
         this.trees = response.data.map((t) => this.normalizeTree(t))
         this.countTrees = this.trees.length
-        this.treesFiltradas = this.trees.filter(
+        this.filteredTrees = this.trees.filter(
           (t) => t.status === 'TO_PRUNE' || t.status === 'UNDER_OBSERVATION',
         )
-        this.countCritical = this.treesFiltradas.length
+        this.countCritical = this.filteredTrees.length
       } catch (error) {
         console.error('Erro ao buscar árvores:', error)
       }

@@ -14,7 +14,7 @@
       <v-col cols="12" md="6">
         <label class="text-caption font-weight-bold mb-1 d-block">Árvore/Local</label>
         <v-select
-          v-model="form.local"
+          v-model="form.location"
           :items="['#3r443t Rua da Felicidade', '#5t221r Av. Brasil']"
           variant="outlined"
           density="compact"
@@ -23,7 +23,7 @@
       <v-col cols="12" md="6">
         <label class="text-caption font-weight-bold mb-1 d-block">Horário</label>
         <v-text-field
-          v-model="form.horario"
+          v-model="form.time"
           placeholder="Digite o horário"
           variant="outlined"
           density="compact"
@@ -33,7 +33,7 @@
       <v-col cols="12" md="6">
         <label class="text-caption font-weight-bold mb-1 d-block">Data</label>
         <v-text-field
-          v-model="form.data"
+          v-model="form.date"
           placeholder="Digite a data"
           variant="outlined"
           density="compact"
@@ -42,7 +42,7 @@
       <v-col cols="12" md="6">
         <label class="text-caption font-weight-bold mb-1 d-block">Equipe Responsável</label>
         <v-select
-          v-model="form.equipe"
+          v-model="form.team"
           :items="['Equipe Verde', 'Equipe Azul']"
           variant="outlined"
           density="compact"
@@ -52,7 +52,7 @@
       <v-col cols="12" md="6">
         <label class="text-caption font-weight-bold mb-1 d-block">Prioridade</label>
         <v-text-field
-          v-model="form.prioridade"
+          v-model="form.priority"
           placeholder="Alta/Média/Baixa"
           variant="outlined"
           density="compact"
@@ -61,15 +61,15 @@
 
       <v-col cols="12">
         <label class="text-caption font-weight-bold mb-1 d-block">Observações</label>
-        <v-textarea v-model="form.obs" variant="outlined" rows="4"></v-textarea>
+        <v-textarea v-model="form.notes" variant="outlined" rows="4"></v-textarea>
       </v-col>
     </v-row>
 
     <div class="d-flex justify-center mt-6">
-      <v-btn color="#C5E11F" width="200" height="45" class="mr-4 font-weight-bold elevation-0" @click="agendar">
+      <v-btn color="#C5E11F" width="200" height="45" class="mr-4 font-weight-bold elevation-0" @click="schedule">
         AGENDAR
       </v-btn>
-      <v-btn color="black" width="200" height="45" class="font-weight-bold elevation-0" @click="cancelar">
+      <v-btn color="black" width="200" height="45" class="font-weight-bold elevation-0" @click="cancel">
         CANCELAR
       </v-btn>
     </div>
@@ -84,20 +84,19 @@ import PageHeader from '@/components/shared/PageHeader.vue'
 const router = useRouter()
 
 const form = reactive({
-  local: '#3r443t Rua da Felicidade',
-  horario: '',
-  data: '',
-  equipe: 'Equipe Verde',
-  prioridade: '',
-  obs: '',
+  location: '#3r443t Rua da Felicidade',
+  time: '',
+  date: '',
+  team: 'Equipe Verde',
+  priority: '',
+  notes: '',
 })
 
-const agendar = () => {
-  // TODO: chamada à API para criar agendamento
-  console.log('Agendar poda:', form)
+const schedule = () => {
+  console.log('Schedule pruning:', form)
 }
 
-const cancelar = () => {
+const cancel = () => {
   router.back()
 }
 </script>

@@ -101,6 +101,7 @@ export default defineComponent({
 
     notificacoes: [
       {
+        id: 1,
         titulo: 'Poda Urgente Necessária',
         descricao: 'Uma árvore na Avenida Central apresenta sinais de doença grave.',
         tempo: 'Há 10 minutos',
@@ -112,6 +113,7 @@ export default defineComponent({
         botaoCor: '#FF3C3C',
       },
       {
+        id: 2,
         titulo: 'Agendamento de Poda Confirmado',
         descricao: 'A poda para a Rua das Flores foi agendada para 15/09/2024.',
         tempo: 'Há 1 hora',
@@ -123,6 +125,7 @@ export default defineComponent({
         botaoCor: '#FBC02D',
       },
       {
+        id: 3,
         titulo: 'Relatório de Poda Disponível',
         descricao: 'O relatório da poda realizada no Parque Central está disponível.',
         tempo: 'Ontem',

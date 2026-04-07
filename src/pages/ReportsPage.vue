@@ -358,11 +358,10 @@ export default {
     generateReport() {
       console.log('Gerar Relatório com filtros:', this.filters)
     },
-    viewDetails(item) {
+    viewDetails(item: unknown) {
       console.log('Ver Detalhes:', item)
-      this.$router.push({ name: 'PruningDetails', params: { id: item.id } })
     },
-    downloadReport(item) {
+    downloadReport(item: unknown) {
       console.log('Baixar Relatório:', item)
     },
   },

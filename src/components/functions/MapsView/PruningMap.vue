@@ -6,6 +6,8 @@ import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { apiConnect } from '@/plugins/apiConnect'
+import 'leaflet-routing-machine'
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
 /* ===================================
    TIPOS
@@ -113,6 +115,7 @@ export default defineComponent({
     let refreshInterval: ReturnType<typeof setInterval> | null = null
     let streetLayer: L.TileLayer | null = null
     let satelliteLayer: L.TileLayer | null = null
+    let routingControl: any = null
 
     /* ---------- Estado Reativo ---------- */
     const trees = ref<TreeOnMap[]>([])
@@ -134,6 +137,12 @@ export default defineComponent({
     const snackbarText = ref('')
     const snackbarColor = ref('success')
     const selectedTree = ref<TreeOnMap | null>(null)
+    const isRouting = ref(false)
+    const isSimulationMode = ref(false)
+    const loadingRoute = ref(false)
+    const currentRouteDest = ref<{ lat: number; lng: number } | null>(null)
+    const showPowerLines = ref(true)
+    let lastPosition: L.LatLng | null = null
 
     /* ---------- Computed ---------- */
     const filteredTrees = computed(() => {
@@ -163,15 +172,21 @@ export default defineComponent({
       const cfg = getStatusCfg(status, danger)
       return L.divIcon({
         html: `<div style="
-          background:${cfg.bg};border:3px solid ${cfg.border};border-radius:50%;
-          width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-          font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.35);
-          cursor:pointer;transition:transform .15s;
-          ${danger ? 'animation:pulse 1.2s infinite;' : ''}
-        ">${cfg.emoji}</div>`,
-        iconSize: [40, 40],
-        iconAnchor: [20, 40],
-        popupAnchor: [0, -40],
+          background: linear-gradient(135deg, ${cfg.bg}, ${cfg.border});
+          border: 2px solid white;
+          border-radius: 50% 50% 50% 0;
+          width: 100%; height: 100%;
+          display: flex; align-items: center; justify-content: center;
+          transform: rotate(-45deg);
+          box-shadow: -3px 3px 8px rgba(0,0,0,0.4);
+          cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          ${danger ? 'animation:pulsePin 1.2s infinite;' : ''}
+        " onmouseover="this.style.transform='rotate(-45deg) scale(1.15)'" onmouseout="this.style.transform='rotate(-45deg) scale(1)'">
+          <span style="transform: rotate(45deg); font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">${cfg.emoji}</span>
+        </div>`,
+        iconSize: [38, 38],
+        iconAnchor: [19, 38],
+        popupAnchor: [0, -38],
         className: 'tree-icon-marker',
       })
     }
@@ -259,6 +274,86 @@ export default defineComponent({
       }
     }
 
+    /* ---------- Roteirização ---------- */
+    const stopRouting = () => {
+      if (routingControl && map) {
+        map.removeControl(routingControl)
+        routingControl = null
+      }
+      isRouting.value = false
+      currentRouteDest.value = null
+      notify('Rota finalizada', 'info')
+    }
+
+    const startRouting = (destLat: number, destLng: number, destName: string) => {
+      if (!userLat.value || !userLng.value) {
+        notify('Sua localização ainda não foi encontrada!', 'warning')
+        goToUserLocation()
+        return
+      }
+
+      if (!map) return
+
+      // Limpar rota anterior se houver
+      if (routingControl) {
+        map.removeControl(routingControl)
+      }
+
+      // @ts-ignore - Leaflet Routing Machine extends L
+      routingControl = L.Routing.control({
+        waypoints: [
+          L.latLng(userLat.value, userLng.value),
+          L.latLng(destLat, destLng)
+        ],
+        // @ts-ignore
+        lineOptions: {
+          styles: [
+            { color: '#000', opacity: 0.1, weight: 10 }, // Shadow
+            { color: '#007bff', opacity: 0.85, weight: 6 } // Main line
+          ]
+        },
+        addWaypoints: false,
+        draggableWaypoints: false,
+        priority: 1,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+        // @ts-ignore
+        show: false, // Esconde o painel de instruções branco
+        // @ts-ignore
+        createMarker: () => null // Não criar marcadores extras, já temos os nossos
+      }).addTo(map)
+
+      currentRouteDest.value = { lat: destLat, lng: destLng }
+      loadingRoute.value = true
+      isRouting.value = true
+
+      // @ts-ignore
+      routingControl.on('routesfound', () => {
+        loadingRoute.value = false
+        notify(`Rota calculada com sucesso para: ${destName}`, 'success')
+      })
+
+      // @ts-ignore
+      routingControl.on('routingerror', (e: any) => {
+        loadingRoute.value = false
+        isRouting.value = false
+        console.error('Routing error:', e)
+        notify('Não foi possível calcular a rota. Servidor OSRM ocupado ou inacessível.', 'error')
+      })
+      
+      // Fechar popups abertos
+      if (map) map.closePopup()
+    }
+
+    const toggleSimulationMode = () => {
+      isSimulationMode.value = !isSimulationMode.value
+      if (isSimulationMode.value) {
+        notify('Modo Simulação Ativo: Clique em qualquer lugar do mapa para definir sua posição.', 'info')
+      } else {
+        notify('Modo Simulação Desativado.', 'info')
+      }
+    }
+
     /* ---------- Renderização ---------- */
     const renderTrees = () => {
       if (!treeClusterGroup) return
@@ -271,20 +366,41 @@ export default defineComponent({
         const cfg = getStatusCfg(t.status, t.nearPowerLine)
 
         marker.bindPopup(`
-          <div style="min-width:220px;font-family:system-ui,sans-serif;">
-            <div style="background:${cfg.bg};color:#fff;padding:10px 14px;border-radius:10px 10px 0 0;margin:-20px -20px 10px -20px;">
-              <div style="font-size:20px;font-weight:700;">${cfg.emoji} ${t.speciesName}</div>
-              <div style="font-size:11px;opacity:.85;font-style:italic;margin-top:2px;">${t.scientificName}</div>
+          <div style="width:220px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
+            <div style="background:${cfg.bg}; color:#fff; padding:14px; text-align:center;">
+              <div style="font-size:17px; font-weight:800;">${cfg.emoji} ${t.speciesName}</div>
+              <div style="font-size:11px; opacity:0.8; margin-top:2px;">${t.scientificName}</div>
             </div>
-            <div style="padding:0 2px 4px;">
-              <p style="margin:4px 0;font-size:13px;"><b>🏷️ Família:</b> ${t.family || '—'}</p>
-              <p style="margin:4px 0;font-size:13px;"><b>📊 Status:</b> ${cfg.label}</p>
-              <p style="margin:4px 0;font-size:13px;"><b>⚡ Fiação:</b> ${t.nearPowerLine ? '<span style="color:#D32F2F;font-weight:700;">PRÓXIMO ⚠️</span>' : '<span style="color:#4CAF50">Seguro</span>'}</p>
-              <p style="margin:4px 0;font-size:11px;color:#888;">📍 ${t.latitude.toFixed(6)}, ${t.longitude.toFixed(6)}</p>
-              <p style="margin:4px 0;font-size:11px;color:#999;">🆔 ${t.id.slice(0, 12)}</p>
+            <div style="padding:16px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
+                <div style="text-align:left;">
+                  <p style="margin:0; font-size:10px; color:#999; font-weight:700;">STATUS</p>
+                  <p style="margin:0; font-size:12px; font-weight:600; color:#333;">${cfg.label}</p>
+                </div>
+                <div style="text-align:right;">
+                  <p style="margin:0; font-size:10px; color:#999; font-weight:700;">FIAÇÃO</p>
+                  <p style="margin:0; font-size:12px; font-weight:700; color:${t.nearPowerLine ? '#E53935' : '#43A047'}">${t.nearPowerLine ? '⚠ RISCO' : '✓ SEGURO'}</p>
+                </div>
+              </div>
+              <p style="margin:0; font-size:11px; color:#888; text-align:center;">Coordenadas: ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</p>
+              <button id="btn-route-${t.id}" style="
+                width:100%; background:#007bff; color:#fff; border:none; 
+                padding:12px; border-radius:8px; cursor:pointer; font-weight:700;
+                margin-top:16px; font-size:13px; text-transform:uppercase;
+                box-shadow: 0 4px 12px rgba(0,123,255,0.3); transition: transform 0.2s;
+              " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                🚀 INICIAR ROTA
+              </button>
             </div>
           </div>
-        `, { maxWidth: 280, className: 'tree-popup' })
+        `, { maxWidth: 260, className: 'tree-popup' })
+
+        marker.on('popupopen', () => {
+          const btn = document.getElementById(`btn-route-${t.id}`)
+          if (btn) {
+            btn.onclick = () => startRouting(t.latitude, t.longitude, t.speciesName)
+          }
+        })
 
         marker.on('click', () => { selectedTree.value = t })
         treeClusterGroup!.addLayer(marker)
@@ -294,11 +410,19 @@ export default defineComponent({
     const drawPowerLines = () => {
       if (!powerLinesLayer) return
       powerLinesLayer.clearLayers()
+      if (!showPowerLines.value) return
+
       SIMULATED_POWER_LINES.forEach((line) => {
         const polyline = L.polyline(line, { color: '#E53935', weight: 4, dashArray: '10, 8', opacity: 0.85 })
         polyline.bindPopup('<div style="text-align:center;font-weight:600;">⚡ Rede Elétrica<br><span style="font-size:11px;color:#888;">(simulada)</span></div>')
         powerLinesLayer!.addLayer(polyline)
       })
+    }
+
+    const togglePowerLines = () => {
+      showPowerLines.value = !showPowerLines.value
+      drawPowerLines()
+      notify(showPowerLines.value ? 'Rede elétrica visível' : 'Rede elétrica oculta', 'info')
     }
 
     /* ---------- Geolocalização ---------- */
@@ -349,10 +473,19 @@ export default defineComponent({
             3: 'Tempo esgotado ao buscar localização',
           }
           locationError.value = msgs[err.code] || 'Erro desconhecido'
-          notify(locationError.value, 'warning')
+          
+          // Fallback: Se falhar a localização, centraliza na primeira árvore
+          if (map?.getPane?.('mapPane') && trees.value.length > 0 && trees.value[0]) {
+            const first = trees.value[0]
+            map.flyTo([first.latitude, first.longitude], 15)
+            notify('Não foi possível obter sua posição. Centralizando nas árvores.', 'warning')
+          } else {
+            notify(locationError.value, 'warning')
+          }
+          
           locating.value = false
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        { enableHighAccuracy: false, timeout: 30000, maximumAge: 10000 },
       )
     }
 
@@ -365,6 +498,20 @@ export default defineComponent({
           userLng.value = longitude
           if (userMarker) userMarker.setLatLng([latitude, longitude])
           if (userAccuracyCircle) userAccuracyCircle.setLatLng([latitude, longitude]).setRadius(accuracy)
+
+          // Otimização: Só atualiza roteamento se moveu mais de 10 metros
+          const currentPos = L.latLng(latitude, longitude)
+          if (isRouting.value && routingControl && currentRouteDest.value) {
+            const dist = lastPosition ? currentPos.distanceTo(lastPosition) : 999
+            if (dist > 10) {
+              routingControl.setWaypoints([
+                currentPos,
+                // @ts-ignore
+                L.latLng(currentRouteDest.value.lat, currentRouteDest.value.lng)
+              ])
+              lastPosition = currentPos
+            }
+          }
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 5000 },
@@ -496,8 +643,27 @@ export default defineComponent({
       powerLinesLayer = L.layerGroup().addTo(map)
       drawPowerLines()
 
-      // Clique para marcação
+      // Clique para marcação / simulação
       map.on('click', (ev: L.LeafletMouseEvent) => {
+        if (isSimulationMode.value) {
+          userLat.value = ev.latlng.lat
+          userLng.value = ev.latlng.lng
+          
+          if (userMarker) {
+            userMarker.setLatLng(ev.latlng)
+          } else {
+            userMarker = L.marker(ev.latlng, { icon: createUserIcon(), zIndexOffset: 1000 }).addTo(map!)
+          }
+          
+          if (userAccuracyCircle) {
+            userAccuracyCircle.setLatLng(ev.latlng).setRadius(10)
+          }
+          
+          notify('📍 Posição definida manualmente!', 'success')
+          isSimulationMode.value = false
+          return
+        }
+
         if (!markMode.value) return
         const notes = prompt('📌 Digite uma nota para esta marcação:')
         if (notes === null) return
@@ -544,7 +710,8 @@ export default defineComponent({
       selectedTree, treeCount, dangerCount, markedCount, statusCounts, isMobile,
       goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
-      STATUS_CONFIG,
+      STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
+      loadingRoute, showPowerLines, togglePowerLines
     }
   },
 })
@@ -556,11 +723,13 @@ export default defineComponent({
     <!-- ============ MAPA ============ -->
     <div id="pruning-map-container" />
 
-    <!-- ============ OVERLAY LOADING LOCALIZAÇÃO ============ -->
+    <!-- ============ OVERLAY LOADING ============ -->
     <Transition name="fade">
-      <div v-if="locating" class="locating-overlay">
-        <v-progress-circular indeterminate color="white" size="56" width="5" />
-        <p class="text-white text-body-1 mt-4 font-weight-medium">Buscando sua localização…</p>
+      <div v-if="locating || loadingTrees || loadingRoute" class="locating-overlay glass-overlay">
+        <v-progress-circular indeterminate color="#C1E328" size="70" width="6" />
+        <p class="text-white mt-5 font-weight-bold" style="font-size: 18px; text-shadow: 0 2px 8px rgba(0,0,0,0.7);">
+          {{ locating ? 'Buscando sua localização…' : (loadingRoute ? 'Calculando melhor rota…' : 'Sincronizando dados das árvores…') }}
+        </p>
       </div>
     </Transition>
 
@@ -597,10 +766,26 @@ export default defineComponent({
         </template>
       </v-tooltip>
 
+      <v-tooltip text="Definir minha posição" location="left">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" icon :color="isSimulationMode ? 'amber-darken-3' : 'blue-grey-darken-1'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleSimulationMode" class="mb-2">
+            <v-icon>{{ isSimulationMode ? 'mdi-map-marker-question' : 'mdi-map-marker-account' }}</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+
       <v-tooltip :text="mapStyle === 'street' ? 'Satélite' : 'Mapa'" location="left">
         <template #activator="{ props }">
           <v-btn v-bind="props" icon color="blue-grey-darken-2" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleMapStyle" class="mb-2">
             <v-icon>{{ mapStyle === 'street' ? 'mdi-satellite-variant' : 'mdi-map-outline' }}</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+
+      <v-tooltip :text="showPowerLines ? 'Ocultar Rede Elétrica' : 'Mostrar Rede Elétrica'" location="left">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" icon :color="showPowerLines ? 'red-darken-1' : 'blue-grey-darken-1'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="togglePowerLines" class="mb-2">
+            <v-icon>{{ showPowerLines ? 'mdi-flash-off' : 'mdi-flash' }}</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
@@ -620,6 +805,22 @@ export default defineComponent({
           </v-btn>
         </template>
       </v-tooltip>
+
+      <!-- BOTÃO CANCELAR ROTA -->
+      <v-fade-transition>
+        <v-btn
+          v-if="isRouting"
+          icon
+          color="red"
+          :size="isMobile ? 'default' : 'large'"
+          elevation="4"
+          class="mt-2"
+          @click="stopRouting"
+        >
+          <v-icon>mdi-close-thick</v-icon>
+          <v-tooltip activator="parent" location="left">Cancelar Rota</v-tooltip>
+        </v-btn>
+      </v-fade-transition>
     </div>
 
     <!-- ============ BOTÃO TOGGLE SIDEBAR ============ -->
@@ -629,7 +830,7 @@ export default defineComponent({
       size="small"
       elevation="4"
       color="white"
-      :style="{ left: sidebarOpen ? '305px' : '12px' }"
+      :style="{ left: sidebarOpen ? '285px' : '12px' }"
       @click="sidebarOpen = !sidebarOpen"
     >
       <v-icon>{{ sidebarOpen ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
@@ -841,8 +1042,8 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
 }
 
 /* ============ BUSCA TOPO ============ */
@@ -880,16 +1081,28 @@ export default defineComponent({
 
 .map-sidebar {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 14px;
+  left: 14px;
   z-index: 1001;
-  width: 300px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(12px);
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+  width: 280px;
+  max-height: calc(100% - 28px);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
   overflow-x: hidden;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.map-sidebar:hover {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-backdrop {
+  display: none !important; /* Removemos o backdrop escuro para desktop */
 }
 
 .sidebar-section {
@@ -1051,6 +1264,12 @@ export default defineComponent({
   100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,59,59,0); }
 }
 
+@keyframes pulsePin {
+  0% { transform: rotate(-45deg) scale(1); box-shadow: -2px 2px 0 0 rgba(255,59,59,0.6); }
+  50% { transform: rotate(-45deg) scale(1.15); box-shadow: -4px 4px 10px 4px rgba(255,59,59,0.4); }
+  100% { transform: rotate(-45deg) scale(1); box-shadow: -2px 2px 0 0 rgba(255,59,59,0); }
+}
+
 @keyframes userPulse {
   0% { box-shadow: 0 0 0 0 rgba(25,118,210,0.5); }
   50% { box-shadow: 0 0 20px 10px rgba(25,118,210,0.12); }
@@ -1073,6 +1292,23 @@ export default defineComponent({
   border: none !important;
 }
 
+:deep(.leaflet-popup-content-wrapper) {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 12px !important;
+}
+
+:deep(.leaflet-popup-content) {
+  margin: 0 !important;
+  width: auto !important;
+}
+
+:deep(.leaflet-popup-close-button) {
+  color: #fff !important;
+  font-size: 16px !important;
+  padding: 10px 10px 0 0 !important;
+}
+
 :deep(.tree-popup .leaflet-popup-content-wrapper) {
   border-radius: 12px;
   padding: 0;
@@ -1084,6 +1320,7 @@ export default defineComponent({
 }
 
 :deep(.leaflet-control-zoom) { border: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; border-radius: 8px !important; }
+:deep(.leaflet-routing-container) { display: none !important; }
 :deep(.leaflet-control-zoom a) { border-radius: 0 !important; }
 :deep(.leaflet-control-zoom a:first-child) { border-radius: 8px 8px 0 0 !important; }
 :deep(.leaflet-control-zoom a:last-child) { border-radius: 0 0 8px 8px !important; }

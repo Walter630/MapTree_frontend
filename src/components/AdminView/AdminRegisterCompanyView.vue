@@ -108,7 +108,7 @@ export default defineComponent ({
 
       name: '',
       taxId: '',
-      isOutsourced: false,
+      isOutsourced: 'Não',
       managerId: '',
       isActive: true,
       valid: true,
@@ -138,7 +138,7 @@ export default defineComponent ({
 
       async loadManagers() {
         try {
-          const response = await this.$api.get('/users')
+          const response = await this.$api.get<User[]>('/users')
           this.managers = response.data
         } catch (err) {
           console.error("Erro ao carregar gestores:", err)

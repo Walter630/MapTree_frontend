@@ -170,7 +170,7 @@
             <tr>
               <td class="table-id">{{ item.name }}</td>
               <td class="table-text">{{ item.email }}</td>
-              <td class="table-text">{{ item.organization }}</td>
+              <td class="table-text">{{ item.organization?.name || '-' }}</td>
               <td>
                 <v-chip color="green" v-if="item.isActive">
                   {{ item.isActive }}
@@ -257,16 +257,18 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
-import type { User } from '@/plugins/apiConnect.ts'
+import type { User, UserRole } from '@/plugins/apiConnect.ts'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Gestor {
   id: string
   name: string
-  organizationId: string
-  organization: string
+  cpf: string
   email: string
-  role?: string
+  phone: string
+  role: UserRole
+  organizationId: string
+  organization: { id: string; name: string }
   isActive: boolean
 }
 
@@ -343,9 +345,12 @@ export default defineComponent({
         this.allGestores = response.data.map(user => ({
           id: user.id,
           name: user.name,
+          cpf: user.cpf,
           email: user.email,
-          organization: user.organization,
-          organizationId: user.organization?.name,
+          phone: user.phone,
+          role: user.role as UserRole,
+          organization: user.organization ?? { id: '', name: '' },
+          organizationId: user.organization?.id ?? '',
           isActive: user.isActive,
         }))
         // NOVO: Define o valor total
@@ -415,7 +420,7 @@ export default defineComponent({
     applyFilters() {
       this.gestores = this.allGestores.filter(g => {
         const matchName = this.search ? g.name?.toLowerCase().includes(this.search.toLowerCase()) : true
-        const matchConta = this.filterConta ? g.organization === this.filterConta : true
+        const matchConta = this.filterConta ? g.organization.name === this.filterConta : true
 
         return matchName && matchConta
       })

@@ -11,8 +11,8 @@ import LoginPage from '@/pages/LoginPage.vue'
 import RecoveryPage from '@/pages/RecoveryPage.vue'
 import MainComponent from '@/components/MainView/MainComponent.vue'
 import RegisterComponent from '@/components/MainView/RegisterComponent.vue'
-import EmailMessageComponent from '@/components/MainView/MensageEmailComponent.vue'
-import ResetPasswordComponent from '@/components/MainView/ResetSenhaComponent.vue'
+import EmailMessageComponent from '@/components/MainView/EmailMessageComponent.vue'
+import ResetPasswordComponent from '@/components/MainView/ResetPasswordComponent.vue'
 
 /* ===================================
    IMPORTS — Admin
@@ -44,8 +44,9 @@ import UserPage from '@/pages/UserPage.vue'
 import MapPage from '@/pages/map/MapPage.vue'
 import ReportsPage from '@/pages/ReportsPage.vue'
 import NotificationPage from '@/pages/NotificationPage.vue'
-import PodasLista from '@/pages/PodasLista.vue'
-import PodasCadastro from '@/pages/PodasCadastro.vue'
+import PruningList from '@/pages/PruningList.vue'
+import PruningRegistration from '@/pages/PruningRegistration.vue'
+import LogoutPage from '@/pages/LogoutPage.vue'
 
 /* ===================================
    DEFINIÇÃO DAS ROTAS
@@ -65,7 +66,8 @@ const router = createRouter({
         { path: 'recovery', name: 'Recovery', component: RecoveryPage },
         { path: 'recovery-code', name: 'RecoveryCode', component: EmailMessageComponent },
         { path: 'reset-password', name: 'ResetPassword', component: ResetPasswordComponent },
-        { path: 'logout', name: 'Logout', component: MainComponent },
+        { path: 'logout', name: 'Logout', component: LogoutPage },
+        { path: 'edit-account', name: 'EditAccount', component: () => import('@/components/MainView/EditProfileComponent.vue') },
 
         /* --- Admin --- */
         {
@@ -97,6 +99,7 @@ const router = createRouter({
               component: ManagerNotificationsView,
               meta: { notification: true, role: 'MANAGER' },
             },
+            { path: 'map', name: 'ManagerMap', component: MapPage },
           ],
         },
 
@@ -110,8 +113,8 @@ const router = createRouter({
             { path: '', name: 'UserHome', component: MainComponent },
             { path: 'reports', name: 'UserReports', component: ReportsPage },
             { path: 'mapUser', name: 'Map', component: MapPage },
-            { path: 'podas', name: 'PodasLista', component: PodasLista },
-            { path: 'podas/nova', name: 'PodasCadastro', component: PodasCadastro },
+            { path: 'podas', name: 'PruningList', component: PruningList },
+            { path: 'podas/nova', name: 'PruningRegistration', component: PruningRegistration },
             {
               path: 'notifications',
               name: 'UserNotifications',

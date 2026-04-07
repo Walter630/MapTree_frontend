@@ -39,7 +39,7 @@
             <v-icon class="corner-icon" small>mdi-domain</v-icon>
           </div>
 
-          <div class="summary-value">{{ totalEmpresas }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
+          <div class="summary-value">{{ totalCompanies }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
         </v-card>
       </v-col>
 
@@ -52,7 +52,7 @@
             <v-icon class="corner-icon" small>mdi-check-circle-outline</v-icon>
           </div>
 
-          <div class="summary-value">{{ totalEmpresas }}</div>
+          <div class="summary-value">{{ totalCompanies }}</div>
           <div class="summary-note text-danger">Requerem atenção</div>
         </v-card>
       </v-col>
@@ -100,8 +100,8 @@
           <v-col cols="12" sm="4" md="2" class="pr-4">
             <p class="mb-2">Empresa</p>
             <v-select
-              v-model="filterEmpresa"
-              :items="contas"
+              v-model="filterCompany"
+              :items="companyOptions"
               label="Empresa"
               placeholder="Nome da Empresa"
               variant="outlined"
@@ -128,8 +128,8 @@
           <v-col cols="12" sm="4" md="2" class="pr-4">
             <p class="mb-2">Cidade</p>
             <v-select
-              v-model="filterCidade"
-              :items="cidades"
+              v-model="filterCity"
+              :items="cities"
               label="Cidade"
               placeholder="Selecione a Cidade"
               variant="outlined"
@@ -152,7 +152,7 @@
         <p class="table-title-text mb-4 " style="font-size: 14px">Empresas Cadastradas</p>
         <v-data-table
           :headers="headers"
-          :items="empresas"
+          :items="companies"
           :search="search"
           class="elevation-0 data-table-custom"
           hide-default-footer
@@ -269,24 +269,24 @@ export default defineComponent({
 
   data() {
     return {
-      empresas: [] as Company[],
-      filterEmpresa: null,
-      filterCidade: null,
+      companies: [] as Company[],
+      filterCompany: null,
+      filterCity: null,
       search: '',
-      contas: ['EcoEnergia Sul', 'Verde Luz Nordeste', 'PowerTree Centro'],
-      cidades: ['Rio de Janeiro', 'São Paulo', 'Fortaleza'],
+      companyOptions: ['EcoEnergia Sul', 'Verde Luz Nordeste', 'PowerTree Centro'],
+      cities: ['Rio de Janeiro', 'São Paulo', 'Fortaleza'],
       page: 1,
       itemsPerPage: 10,
 
-      // Headers ajustados para a imagem
+      // Headers adjusted for the table
       headers: [
         { title: 'Nome', key: 'name', sortable: true },
         { title: 'CNPJ', key: 'taxId', sortable: true },
         { title: 'Gestor', key: 'managerId', sortable: true },
         { title: 'Status', key: 'isActive', sortable: true },
-        { title: 'Ações', key: 'acoes', sortable: false, align: 'end' },
+        { title: 'Ações', key: 'actions', sortable: false, align: 'end' as const },
       ],
-      // backup para filtros
+      // backup for filters
       allCompanies: [] as Company[],
       // Dados da Tabela simulando os estados da imagem
 
@@ -306,10 +306,10 @@ export default defineComponent({
   },
   computed: {
     pageCount() {
-      return Math.ceil(this.empresas.length / this.itemsPerPage)
+      return Math.ceil(this.companies.length / this.itemsPerPage)
     },
-    totalEmpresas() {
-      return this.empresas.length
+    totalCompanies() {
+      return this.companies.length
     }
   },
   mounted() {
@@ -329,11 +329,9 @@ export default defineComponent({
           isOutsourced: company.isOutsourced,
           manager: company.manager,
           managerId: company.managerId,
-          isActive: company.isActive, // Transforma Boolean em String visual
+          isActive: company.isActive,
         }))
-        this.totalEmpresas = this.allCompanies.length
-
-        this.empresas = [...this.allCompanies]
+        this.companies = [...this.allCompanies]
       } catch (error) {
         console.error('Failed to fetch companies:', error)
 
@@ -347,7 +345,7 @@ export default defineComponent({
       this.$router.push('/admin/register-company')
     },
     applyFilters() {
-      console.log('Filtros aplicados:', this.filterEmpresa, this.search, this.filterCidade)
+      console.log('Filtros aplicados:', this.filterCompany, this.search, this.filterCity)
     },
     async editItem() {
       try {

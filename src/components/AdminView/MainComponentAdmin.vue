@@ -1,10 +1,10 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
-import type { Manager } from '@/plugins/apiConnect.ts'
+import type { Manager, Company as ApiCompany } from '@/plugins/apiConnect.ts'
 
-interface Company {
+interface CompanyDisplay {
   name: string
-  manager: Manager
+  manager: string
   isActive: boolean
   createdAt?: Date
 }
@@ -13,10 +13,10 @@ export default defineComponent({
   data() {
     return {
       search: '' as string,
-      empresas: [] as Company[], // Lista vazia inicialmente
+      empresas: [] as CompanyDisplay[],
       managers: [] as Manager[],
-      empresasFiltradas: [] as Company[],
-      empresasRecentes: [] as Company[],
+      empresasFiltradas: [] as CompanyDisplay[],
+      empresasRecentes: [] as CompanyDisplay[],
       loading: false as boolean,
       error: null as string | null,
     };
@@ -34,19 +34,19 @@ export default defineComponent({
       this.loading = true;
       this.error = null;
       try {
-        const response = await this.$api.get<Company[]>('/organizations');
+        const response = await this.$api.get<ApiCompany[]>('/organizations');
         this.empresas = response.data.map(item => {
           return {
             name: item.name,
             createdAt: item.createdAt,
-            manager: item.manager.name || 'Sem gestor',
+            manager: item.manager?.name || 'Sem gestor',
             isActive: item.isActive,
           };
         });
         this.filterRecentCompanies();
         this.totalCompanies = this.empresas.length;
-      } catch (e: Error) {
-        console.error('Erro ao buscar empresas:', e.message);
+      } catch (e: unknown) {
+        console.error('Erro ao buscar empresas:', e);
         this.error = 'Falha ao carregar dados das empresas.';
       } finally {
         this.loading = false;
@@ -59,8 +59,8 @@ export default defineComponent({
         const response = await this.$api.get<Manager[]>('/users');
         this.managers = response.data;
         this.totalManagers = this.managers.length;
-      } catch (e: Error) {
-        console.error('Erro ao buscar gestores:', e.message);
+      } catch (e: unknown) {
+        console.error('Erro ao buscar gestores:', e);
         this.error = 'Falha ao carregar dados dos gestores.';
       } finally {
         this.loading = false;
