@@ -69,7 +69,11 @@
             <v-icon class="mr-2">mdi-map-marker-alert-outline</v-icon>
             Região em risco
           </p>
-          <MiniMap filter-status="TO_PRUNE" style="height: 270px; border-radius: 8px; overflow: hidden" />
+          <MiniMap
+            ref="miniMapRef"
+            filter-status="TO_PRUNE"
+            style="height: 270px; border-radius: 8px; overflow: hidden"
+          />
           <v-btn icon @click="goToMap"><v-icon>mdi-map</v-icon></v-btn>
         </v-card>
       </v-col>
@@ -78,10 +82,10 @@
       <v-col cols="12" md="3">
         <v-card class="pa-4 section-card-white" flat>
           <p class="section-title">
-            <v-icon class="mr-2">mdi-chart-bar</v-icon>
+            <v-icon class="mr-2" color="success">mdi-chart-line</v-icon>
             Podas por mês
           </p>
-          <v-skeleton-loader height="270" type="image" class="rounded-lg" />
+          <PruningChart />
         </v-card>
       </v-col>
 
@@ -93,17 +97,42 @@
             Árvores em risco
           </p>
 
-          <v-card
-            v-for="tree in filteredTrees"
-            :key="tree.id"
-            class="pa-3 mb-2 rounded-lg alert-card"
-            flat
-          >
-            <p class="text-subtitle-2 font-weight-medium mb-1">{{ tree.status }}</p>
-            <p class="text-caption text-grey-darken-1 mb-1">Lat: {{ tree.lat }}</p>
-            <p class="text-caption text-grey-darken-1 mb-1">Lng: {{ tree.lng }}</p>
-            <p class="text-caption font-weight-medium" style="color: #c80c34">Poda urgente</p>
-          </v-card>
+          <div class="alerts-container">
+            <v-card
+              v-for="tree in filteredTrees"
+              :key="tree.id"
+              class="pa-4 mb-3 rounded-xl alert-card-premium pointer-cursor"
+              flat
+              @click="focusOnTree(tree)"
+            >
+              <div class="d-flex justify-space-between align-center mb-2">
+                <v-chip color="error" size="x-small" variant="flat" class="font-weight-bold">
+                  PODA URGENTE
+                </v-chip>
+                <v-icon color="error" size="20">mdi-alert-decagram</v-icon>
+              </div>
+              
+              <p class="text-subtitle-1 font-weight-bold mb-1">{{ tree.status === 'TO_PRUNE' ? 'Necessita Poda' : tree.status }}</p>
+              
+              <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
+                <v-icon size="14" class="mr-1">mdi-map-marker</v-icon>
+                <span>
+                  Lat: {{ (tree.lat || tree.latitude || 0).toFixed(4) }} / 
+                  Lng: {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
+                </span>
+              </div>
+              
+              <div class="mt-2 d-flex align-center">
+                <v-icon size="16" color="warning" class="mr-1">mdi-lightning-bolt</v-icon>
+                <span class="text-caption font-weight-medium text-warning">Risco de fiação detectado</span>
+              </div>
+            </v-card>
+
+            <div v-if="filteredTrees.length === 0" class="text-center py-8">
+              <v-icon size="48" color="grey-lighten-2">mdi-check-circle-outline</v-icon>
+              <p class="text-body-2 text-grey mt-2">Nenhum alerta crítico pendente</p>
+            </div>
+          </div>
         </v-card>
       </v-col>
     </v-row>
@@ -156,6 +185,7 @@
 <script lang="ts">
 import { defineComponent } from 'vue'
 import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
+import PruningChart from '@/components/functions/GraficosView/PruningChart.vue'
 import { useAuth } from '@/hooks/useAuth'
 
 /* ===================================
@@ -165,8 +195,10 @@ import { useAuth } from '@/hooks/useAuth'
 interface Tree {
   id: string
   age: Date
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
+  latitude?: number
+  longitude?: number
   status: 'TO_PRUNE' | 'UNDER_OBSERVATION' | 'NORMAL' | 'PRUNED'
 }
 
@@ -208,7 +240,7 @@ interface ReportHeader {
 export default defineComponent({
   name: 'ManagerHomeView',
 
-  components: { MiniMap },
+  components: { MiniMap, PruningChart },
 
   data() {
     return {
@@ -218,6 +250,7 @@ export default defineComponent({
       species: null as Species[] | null,
       filteredTrees: [] as Tree[],
       prunings: [] as Pruning[],
+      miniMapRef: null as any,
 
       // Contadores
       countTrees: 0,
@@ -248,6 +281,12 @@ export default defineComponent({
       this.$router.push('/manager/map')
     },
 
+    focusOnTree(tree: Tree) {
+      if (this.miniMapRef && (tree.lat || tree.latitude)) {
+        this.miniMapRef.focusOn(tree.lat || tree.latitude, tree.lng || tree.longitude)
+      }
+    },
+
     /* ---------- Chamadas API ---------- */
 
     getSpecies() {
@@ -274,7 +313,11 @@ export default defineComponent({
       this.$api
         .get<Tree[]>('/trees')
         .then((response) => {
-          this.trees = response.data
+          this.trees = (response.data || []).map(t => ({
+            ...t,
+            lat: t.lat ?? t.latitude ?? 0,
+            lng: t.lng ?? t.longitude ?? 0
+          }))
           this.countTrees = this.trees.length
           this.filteredTrees = this.trees.filter((t) => t.status === 'TO_PRUNE')
         })
@@ -345,10 +388,35 @@ export default defineComponent({
 }
 
 /* ===== Alertas ===== */
-.alert-card {
-  border: 1px solid #cdcdcd;
-  background-color: #fbe0e3;
-  box-shadow: none;
+.alert-card-premium {
+  border: 1px solid rgba(200, 12, 52, 0.1);
+  background: linear-gradient(135deg, #ffffff 0%, #fff5f5 100%);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+.alert-card-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(200, 12, 52, 0.1) !important;
+}
+
+.pointer-cursor {
+  cursor: pointer;
+}
+
+.alerts-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.alerts-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.alerts-container::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 4px;
 }
 
 /* ===== Tabela de Relatórios ===== */

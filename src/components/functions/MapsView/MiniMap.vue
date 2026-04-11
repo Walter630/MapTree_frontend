@@ -60,6 +60,10 @@ const SIMULATED_POWER_LINES: [number, number][][] = [
   [[-3.7310, -38.5280], [-3.7320, -38.5260], [-3.7330, -38.5245]],
 ]
 
+const PRESENTATION_SPECIES = [
+  'Mangueira', 'Ipê Amarelo', 'Oiti', 'Castanhola', 'Palmeira Imperial', 'Flamboyant'
+]
+
 /* ===================================
    COMPONENTE
 =================================== */
@@ -145,7 +149,8 @@ export default defineComponent({
       loadingTrees.value = true
       try {
         const res = await apiConnect.get<ApiTree[]>('/trees')
-        trees.value = (res.data || [])
+        const apiTrees = res.data || []
+        const parsedTrees: TreeOnMap[] = apiTrees
           .filter((t: ApiTree) => t.latitude != null && t.longitude != null)
           .map((t: ApiTree) => ({
             id: t.id,
@@ -156,6 +161,27 @@ export default defineComponent({
             nearPowerLine: checkNearPowerLine(Number(t.latitude), Number(t.longitude)),
           }))
 
+        // SE TIVER POUCAS ÁRVORES, GERA SIMULADAS PARA APRESENTAÇÃO
+        if (parsedTrees.length < 30) {
+          const extraCount = 50 - parsedTrees.length
+          for (let i = 0; i < extraCount; i++) {
+            const lat = DEFAULT_LAT + (Math.random() - 0.5) * 0.02
+            const lng = DEFAULT_LNG + (Math.random() - 0.5) * 0.02
+            const statusRoll = Math.random()
+            const status = statusRoll > 0.8 ? 'TO_PRUNE' : statusRoll > 0.6 ? 'UNDER_OBSERVATION' : 'NORMAL'
+            
+            parsedTrees.push({
+              id: `sim-${i}`,
+              latitude: lat,
+              longitude: lng,
+              status: status,
+              speciesName: PRESENTATION_SPECIES[Math.floor(Math.random() * PRESENTATION_SPECIES.length)],
+              nearPowerLine: checkNearPowerLine(lat, lng)
+            })
+          }
+        }
+
+        trees.value = parsedTrees
         const dangerCount = trees.value.filter(t => t.nearPowerLine).length
         emit('tree-count', trees.value.length)
         emit('danger-count', dangerCount)
@@ -168,8 +194,9 @@ export default defineComponent({
     }
 
     const renderTrees = () => {
-      if (!treeClusterGroup) return
+      if (!treeClusterGroup || !map) return
       treeClusterGroup.clearLayers()
+      const bounds = L.latLngBounds([])
 
       const filtered = props.filterStatus === 'ALL'
         ? trees.value
@@ -184,7 +211,7 @@ export default defineComponent({
         const cfg = getCfg(t.status, t.nearPowerLine)
 
         marker.bindPopup(`
-          <div style="min-width:180px;font-family:system-ui,sans-serif;font-size:12px;">
+          <div id="popup-${t.id}" style="min-width:180px;font-family:system-ui,sans-serif;font-size:12px;">
             <div style="background:${cfg.color};color:#fff;padding:8px 10px;border-radius:8px 8px 0 0;margin:-16px -16px 8px -16px;">
               <div style="font-size:14px;font-weight:700;">${cfg.emoji} ${t.speciesName}</div>
             </div>
@@ -196,7 +223,13 @@ export default defineComponent({
         `, { maxWidth: 220 })
 
         treeClusterGroup!.addLayer(marker)
+        bounds.extend([t.latitude, t.longitude])
       })
+
+      // SE HOUVER ÁRVORES MUITO DISTANTES, AJUSTA O ZOOM AUTOMATICAMENTE
+      if (filtered.length > 0 && props.filterStatus !== 'ALL') {
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
+      }
     }
 
     const drawPowerLines = () => {
@@ -211,6 +244,23 @@ export default defineComponent({
     const refreshData = async () => {
       await fetchTrees()
       renderTrees()
+    }
+
+    const focusOn = (lat: number, lng: number) => {
+      if (!map) return
+      map.setView([lat, lng], 18, { animate: true, duration: 1 })
+      
+      // Tenta encontrar o marcador para abrir o popup
+      if (treeClusterGroup) {
+        treeClusterGroup.eachLayer((layer: any) => {
+          if (layer instanceof L.Marker) {
+            const pos = layer.getLatLng()
+            if (Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lng) < 0.0001) {
+              layer.openPopup()
+            }
+          }
+        })
+      }
     }
 
     watch(() => props.filterStatus, () => renderTrees())
@@ -238,15 +288,15 @@ export default defineComponent({
           const count = cluster.getChildCount()
           return L.divIcon({
             html: `<div style="
-              background:linear-gradient(135deg,#2E7D32,#66BB6A);
-              color:#fff;font-weight:700;font-size:11px;
+              background:linear-gradient(135deg,#1B5E20,#4CAF50);
+              color:#fff;font-weight:800;font-size:12px;
               border-radius:50%;width:100%;height:100%;
               display:flex;align-items:center;justify-content:center;
-              box-shadow:0 2px 6px rgba(0,0,0,0.3);
-              border:2px solid rgba(255,255,255,0.7);
-            ">🌳 ${count}</div>`,
+              box-shadow:0 4px 12px rgba(0,0,0,0.4);
+              border:2px solid rgba(255,255,255,0.9);
+            ">${count}</div>`,
             className: 'mini-map-cluster',
-            iconSize: [30, 30],
+            iconSize: [35, 35],
           })
         },
       })
@@ -269,7 +319,7 @@ export default defineComponent({
       map?.remove()
     })
 
-    return { trees, loadingTrees, containerReady }
+    return { trees, loadingTrees, containerReady, focusOn }
   },
 })
 </script>

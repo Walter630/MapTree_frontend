@@ -44,6 +44,14 @@ export enum TreeStatus {
   TO_PRUNE = 'TO_PRUNE',
   UNDER_OBSERVATION = 'UNDER_OBSERVATION',
   NORMAL = 'NORMAL',
+  CRITICAL = 'CRITICAL',
+}
+
+export enum Vigor {
+  EXCELLENT = 'EXCELLENT',
+  GOOD = 'GOOD',
+  POOR = 'POOR',
+  DEAD = 'DEAD',
 }
 
 /* ===================================
@@ -100,6 +108,25 @@ export interface Tree {
   lng: number
   status: TreeStatus
   speciesId: string
+  vigor: Vigor
+  lastPruneDate?: string
+}
+
+export interface Measurement {
+  id: string
+  treeId: string
+  height: number
+  canopyWidth: number
+  date: string
+}
+
+export interface MaintenanceSchedule {
+  id: string
+  treeId: string
+  type: string
+  plannedDate: string
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED'
+  notes?: string
 }
 
 export interface Pruning {
@@ -110,6 +137,59 @@ export interface Pruning {
   date: Date
   observations: string
   type: 'LIGHT' | 'MODERATE' | 'HEAVY'
+}
+
+/* ===================================
+   TIPOS — IA / Predição
+=================================== */
+
+export type RiskStatus = 'NORMAL' | 'MODERATE' | 'CRITICAL'
+export type CanopyShape = 'WIDE' | 'NARROW' | 'ROUND' | 'COLUMNAR'
+export type SoilQuality = 'GOOD' | 'REGULAR' | 'BAD'
+
+export interface CanopyInfo {
+  shape: CanopyShape
+  ratio_width_height: number
+}
+
+export interface FibonacciInfo {
+  growth_modifier: number
+}
+
+export interface AiPrediction {
+  estimated_height_m: number
+  wire_height_m: number
+  will_reach_wire: boolean
+  days_to_wire: number
+  months_to_wire: number
+  risk_status: RiskStatus
+  alert: string | null
+  canopy: CanopyInfo
+  fibonacci_info: FibonacciInfo
+}
+
+export interface Soil {
+  id: string
+  idTree: string
+  depth: number
+  inclination: number
+  quality: SoilQuality
+  coverage: number
+  clay?: number | null
+  sand?: number | null
+  ph?: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TreeWithAi {
+  id: string
+  commonName: string
+  aiPrediction: AiPrediction
+  soil?: Soil
+  vigor: Vigor
+  measurements?: Measurement[]
+  maintenanceSchedule?: MaintenanceSchedule[]
 }
 
 /* ===================================
@@ -268,6 +348,10 @@ class ApiConnect {
 
   public get<T = unknown>(url: string, config = {}) {
     return this.axiosInstance.get<T>(url, config)
+  }
+
+  public getTreesMap() {
+    return this.axiosInstance.get<Array<{ id: string, latitude: number, longitude: number, status: string }>>('/trees/map/risk')
   }
 
   public post<T = unknown>(url: string, data?: unknown, config = {}) {

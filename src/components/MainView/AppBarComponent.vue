@@ -118,6 +118,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
     { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
     { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
+    { title: 'Mapa', icon: 'mdi-map', to: '/admin/map' },
   ],
   MANAGER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },

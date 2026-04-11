@@ -80,6 +80,7 @@ const router = createRouter({
             { path: 'companies', name: 'AdminCompanies', component: AdminCompaniesView },
             { path: 'register-company', name: 'AdminRegisterCompany', component: AdminRegisterCompanyView },
             { path: 'register-managers', name: 'AdminRegisterManagers', component: AdminRegisterManagersView },
+            { path: 'map', name: 'AdminMap', component: MapPage },
           ],
         },
 

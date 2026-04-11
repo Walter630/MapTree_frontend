@@ -5,7 +5,8 @@ import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { apiConnect } from '@/plugins/apiConnect'
+import { apiConnect, type TreeWithAi } from '@/plugins/apiConnect'
+import TreeAiStats from '@/components/functions/TreeAiStats.vue'
 import 'leaflet-routing-machine'
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
@@ -26,6 +27,10 @@ interface ApiTree {
     family: string
     description: string
   }
+  solo?: Array<{
+    quality: string
+  }>
+  vigor: string
 }
 
 interface TreeOnMap {
@@ -37,6 +42,8 @@ interface TreeOnMap {
   scientificName: string
   family: string
   nearPowerLine: boolean
+  soilQuality?: string
+  vigor: string
 }
 
 interface MarkedLocation {
@@ -47,6 +54,28 @@ interface MarkedLocation {
   timestamp: Date
   marker?: L.Marker
 }
+
+// Tipos — adiciona junto com os outros interfaces no topo
+interface SoilMapPoint {
+  treeId: string
+  lat: number
+  lng: number
+  status: string
+  species: string
+  soilQuality: string
+  soilDepth: number | null
+  clay: number | null
+  sand: number | null
+  ph: number | null
+  hasSoilData: boolean
+  markerColor: string
+}
+
+// Estado reativo — adiciona junto com os outros refs
+const soilPoints = ref<SoilMapPoint[]>([])
+const showSoilLayer = ref(false)
+const loadingSoil = ref(false)
+let soilLayer: L.LayerGroup | null = null
 
 /* ===================================
    CORREÇÃO ÍCONE PADRÃO LEAFLET
@@ -102,6 +131,7 @@ const SIMULATED_POWER_LINES: [number, number][][] = [
 
 export default defineComponent({
   name: 'PruningMap',
+  components: { TreeAiStats },
 
   setup() {
     /* ---------- Map refs ---------- */
@@ -143,6 +173,11 @@ export default defineComponent({
     const currentRouteDest = ref<{ lat: number; lng: number } | null>(null)
     const showPowerLines = ref(true)
     let lastPosition: L.LatLng | null = null
+
+    /* ---------- IA Drawer ---------- */
+    const aiDrawerOpen = ref(false)
+    const aiTreeData = ref<TreeWithAi | null>(null)
+    const loadingAiData = ref(false)
 
     /* ---------- Computed ---------- */
     const filteredTrees = computed(() => {
@@ -247,10 +282,10 @@ export default defineComponent({
     const fetchTrees = async () => {
       loadingTrees.value = true
       try {
-        const res = await apiConnect.get<ApiTree[]>('/trees')
+        const res = await apiConnect.getTreesMap()
         trees.value = (res.data || [])
-          .filter((t: ApiTree) => t.latitude != null && t.longitude != null)
-          .map((t: ApiTree) => {
+          .filter((t: any) => t.latitude != null && t.longitude != null)
+          .map((t: any) => {
             const lat = Number(t.latitude)
             const lng = Number(t.longitude)
             return {
@@ -258,10 +293,12 @@ export default defineComponent({
               latitude: lat,
               longitude: lng,
               status: t.status || 'NORMAL',
-              speciesName: t.species?.commonName || 'Espécie desconhecida',
-              scientificName: t.species?.scientificName || '',
-              family: t.species?.family || '',
+              speciesName: 'Clique para detalhes',
+              scientificName: '',
+              family: '',
               nearPowerLine: checkNearPowerLine(lat, lng),
+              soilQuality: 'UNKNOWN',
+              vigor: 'GOOD',
             }
           })
         notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
@@ -273,6 +310,132 @@ export default defineComponent({
         loadingTrees.value = false
       }
     }
+
+    const fetchSoilData = async () => {
+  loadingSoil.value = true
+  try {
+    const res = await apiConnect.get<SoilMapPoint[]>('/soil/map')
+    soilPoints.value = res.data || []
+  } catch (err) {
+    notify('Erro ao carregar dados de solo', 'error')
+  } finally {
+    loadingSoil.value = false
+  }
+}
+
+  const renderSoilLayer = () => {
+    if (!soilLayer || !map) return
+    soilLayer.clearLayers()
+    if (!showSoilLayer.value) return
+
+    soilPoints.value.forEach((point) => {
+      // Marcador Visual Premium (Hexágono com pulso)
+      const icon = L.divIcon({
+        className: 'soil-marker-container',
+        html: `
+          <div class="soil-hex-marker" style="--marker-color: ${point.markerColor}">
+            <div class="soil-hex-inner"></div>
+            <div class="soil-hex-pulse"></div>
+          </div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+      })
+
+      const marker = L.marker([point.lat, point.lng], { icon })
+      
+      // Lógica de Definição e Crescimento
+      const qualityInfo: Record<string, { label: string, growth: string, desc: string, icon: string }> = {
+        GOOD: { 
+          label: 'Solo A+ (Fértil)', 
+          growth: 'Acelerado (+20%)', 
+          desc: 'Alta capacidade de retenção de nutrientes e profundidade ideal.',
+          icon: 'mdi-auto-fix'
+        },
+        REGULAR: { 
+          label: 'Solo B (Médio)', 
+          growth: 'Estável (Normal)', 
+          desc: 'Composição balanceada, adequada para a maioria das espécies.',
+          icon: 'mdi-check-circle-outline'
+        },
+        BAD: { 
+          label: 'Solo C (Pobre)', 
+          growth: 'Retardado (-30%)', 
+          desc: 'Solo compactado ou muito arenoso. Requer correção nutricional.',
+          icon: 'mdi-alert-circle-outline'
+        },
+        UNKNOWN: { 
+          label: 'Sem Dados', 
+          growth: 'N/A', 
+          desc: 'Dados ainda não processados para esta coordenada.',
+          icon: 'mdi-help-circle-outline'
+        }
+      }
+
+      const info = qualityInfo[point.soilQuality] || qualityInfo.UNKNOWN
+
+      marker.bindPopup(`
+        <div class="soil-intelligence-card">
+          <div class="soil-card-header" style="border-bottom: 2px solid ${point.markerColor}22">
+            <div class="species-tag">${point.species}</div>
+            <div class="quality-badge" style="background: ${point.markerColor}22; color: ${point.markerColor}">
+              ${info.label}
+            </div>
+          </div>
+          
+          <div class="soil-card-body">
+            <div class="growth-prediction">
+              <span class="prediction-label">Impacto no Crescimento:</span>
+              <span class="prediction-value" style="color: ${point.markerColor}">${info.growth}</span>
+            </div>
+            
+            <p class="soil-definition">${info.desc}</p>
+            
+            <div class="metrics-grid">
+              <div class="metric-item">
+                <div class="metric-header">
+                  <span>Argila</span>
+                  <span>${point.clay ? point.clay.toFixed(1) + '%' : '---'}</span>
+                </div>
+                <div class="metric-bar"><div class="bar-fill" style="width: ${point.clay || 0}%; background: ${point.markerColor}"></div></div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-header">
+                  <span>pH</span>
+                  <span>${point.ph ? point.ph.toFixed(1) : '---'}</span>
+                </div>
+                <div class="metric-bar"><div class="bar-fill" style="width: ${(point.ph || 0) * 7}%; background: ${point.markerColor}"></div></div>
+              </div>
+            </div>
+
+            <div class="footer-metrics">
+              <div class="footer-item">
+                <v-icon size="14">mdi-arrow-down-bold</v-icon>
+                <span>${point.soilDepth ? point.soilDepth.toFixed(1) + 'm' : '---'}</span>
+              </div>
+              <div class="footer-item">
+                <v-icon size="14">mdi-texture-box</v-icon>
+                <span>Textura ideal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `, { maxWidth: 300, className: 'soil-glass-popup' })
+
+      soilLayer!.addLayer(marker)
+    })
+  }
+
+  const toggleSoilLayer = async () => {
+    showSoilLayer.value = !showSoilLayer.value
+
+    if (showSoilLayer.value && soilPoints.value.length === 0) {
+      await fetchSoilData()
+    }
+
+    renderSoilLayer()
+    notify(showSoilLayer.value ? 'Camada de solo ativada' : 'Camada de solo oculta', 'info')
+  }
 
     /* ---------- Roteirização ---------- */
     const stopRouting = () => {
@@ -366,39 +529,77 @@ export default defineComponent({
         const cfg = getStatusCfg(t.status, t.nearPowerLine)
 
         marker.bindPopup(`
-          <div style="width:220px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
+          <div style="width:240px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
             <div style="background:${cfg.bg}; color:#fff; padding:14px; text-align:center;">
               <div style="font-size:17px; font-weight:800;">${cfg.emoji} ${t.speciesName}</div>
               <div style="font-size:11px; opacity:0.8; margin-top:2px;">${t.scientificName}</div>
             </div>
             <div style="padding:16px;">
               <div style="display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <div style="text-align:left;">
-                  <p style="margin:0; font-size:10px; color:#999; font-weight:700;">STATUS</p>
-                  <p style="margin:0; font-size:12px; font-weight:600; color:#333;">${cfg.label}</p>
+                <div style="flex:1;">
+                  <h3 style="margin:0; font-size:18px; color:#333;">${t.speciesName}</h3>
+                  <p style="margin:0; font-size:12px; color:#666; font-style:italic;">${t.scientificName}</p>
+                  <p style="margin:4px 0 0; font-size:10px; color:${t.vigor === 'EXCELLENT' ? '#22c55e' : t.vigor === 'GOOD' ? '#84cc16' : t.vigor === 'POOR' ? '#f59e0b' : '#ef4444'}; font-weight:800; border:1px solid currentColor; display:inline-block; padding:0 6px; border-radius:4px;">
+                    HEALTH: ${t.vigor}
+                  </p>
                 </div>
                 <div style="text-align:right;">
                   <p style="margin:0; font-size:10px; color:#999; font-weight:700;">FIAÇÃO</p>
                   <p style="margin:0; font-size:12px; font-weight:700; color:${t.nearPowerLine ? '#E53935' : '#43A047'}">${t.nearPowerLine ? '⚠ RISCO' : '✓ SEGURO'}</p>
                 </div>
               </div>
+
+              <!-- Novo Bloco de Solo Unificado -->
+              <div style="
+                background: ${t.soilQuality === 'GOOD' ? '#f0fdf4' : t.soilQuality === 'REGULAR' ? '#fffbeb' : '#fef2f2'};
+                border: 1px solid ${t.soilQuality === 'GOOD' ? '#dcfce7' : t.soilQuality === 'REGULAR' ? '#fef3c7' : '#fee2e2'};
+                border-radius: 8px;
+                padding: 10px;
+                margin-bottom: 16px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+              ">
+                <div style="font-size: 20px;">${t.soilQuality === 'GOOD' ? '🌱' : t.soilQuality === 'REGULAR' ? '🌿' : '🍂'}</div>
+                <div>
+                  <p style="margin: 0; font-size: 10px; color: #666; font-weight: 700; text-transform: uppercase;">Inteligência de Solo</p>
+                  <p style="margin: 0; font-size: 12px; font-weight: 700; color: ${t.soilQuality === 'GOOD' ? '#166534' : t.soilQuality === 'REGULAR' ? '#92400e' : '#991b1b'};">
+                    ${t.soilQuality === 'GOOD' ? 'Qualidade A+ (Fértil)' : t.soilQuality === 'REGULAR' ? 'Qualidade B (Estável)' : t.soilQuality === 'BAD' ? 'Qualidade C (Pobre)' : 'Sem Dados'}
+                  </p>
+                </div>
+              </div>
+
               <p style="margin:0; font-size:11px; color:#888; text-align:center;">Coordenadas: ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</p>
-              <button id="btn-route-${t.id}" style="
-                width:100%; background:#007bff; color:#fff; border:none; 
-                padding:12px; border-radius:8px; cursor:pointer; font-weight:700;
-                margin-top:16px; font-size:13px; text-transform:uppercase;
-                box-shadow: 0 4px 12px rgba(0,123,255,0.3); transition: transform 0.2s;
-              " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                🚀 INICIAR ROTA
-              </button>
+              <div style="display:flex; gap:8px; margin-top:16px;">
+                <button id="btn-route-${t.id}" style="
+                  flex:1; background:#007bff; color:#fff; border:none; 
+                  padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
+                  font-size:12px; text-transform:uppercase;
+                  box-shadow: 0 4px 12px rgba(0,123,255,0.3); transition: transform 0.2s;
+                " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                  🚀 ROTA
+                </button>
+                <button id="btn-ai-${t.id}" style="
+                  flex:1; background:linear-gradient(135deg,#7B1FA2,#AB47BC); color:#fff; border:none;
+                  padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
+                  font-size:12px; text-transform:uppercase;
+                  box-shadow: 0 4px 12px rgba(123,31,162,0.3); transition: transform 0.2s;
+                " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                  🧠 VER IA
+                </button>
+              </div>
             </div>
           </div>
-        `, { maxWidth: 260, className: 'tree-popup' })
+        `, { maxWidth: 280, className: 'tree-popup' })
 
         marker.on('popupopen', () => {
-          const btn = document.getElementById(`btn-route-${t.id}`)
-          if (btn) {
-            btn.onclick = () => startRouting(t.latitude, t.longitude, t.speciesName)
+          const btnRoute = document.getElementById(`btn-route-${t.id}`)
+          if (btnRoute) {
+            btnRoute.onclick = () => startRouting(t.latitude, t.longitude, t.speciesName)
+          }
+          const btnAi = document.getElementById(`btn-ai-${t.id}`)
+          if (btnAi) {
+            btnAi.onclick = () => openAiDrawer(t)
           }
         })
 
@@ -583,6 +784,41 @@ export default defineComponent({
       renderTrees()
     }
 
+    /* ---------- IA Drawer ---------- */
+    const openAiDrawer = async (t: TreeOnMap) => {
+      selectedTree.value = t
+      aiDrawerOpen.value = true
+      loadingAiData.value = true
+      aiTreeData.value = null
+
+      try {
+        // LAZY LOAD: Busca detalhes completos apenas ao abrir a gaveta
+        const res = await apiConnect.get<any>(`/trees/${t.id}`)
+        const data = res.data
+
+        // Montamos o objeto TreeWithAi combinando os dados
+        aiTreeData.value = {
+          id: t.id,
+          commonName: data.species?.commonName || t.speciesName,
+          aiPrediction: data.aiPrediction || data,
+          soil: data.soil || (data.solo ? data.solo[0] : null),
+          vigor: data.vigor || 'GOOD',
+          measurements: data.measurements || [],
+          maintenanceSchedule: data.maintenanceSchedule || []
+        }
+      } catch (err) {
+        console.error('Erro ao buscar dados completos da árvore:', err)
+        notify('Não foi possível carregar os detalhes desta árvore.', 'error')
+      } finally {
+        loadingAiData.value = false
+      }
+    }
+
+    const closeAiDrawer = () => {
+      aiDrawerOpen.value = false
+      aiTreeData.value = null
+    }
+
     /* ---------- Watch filtro ---------- */
     watch(activeFilter, () => renderTrees())
 
@@ -641,6 +877,7 @@ export default defineComponent({
 
       markedMarkersLayer = L.layerGroup().addTo(map)
       powerLinesLayer = L.layerGroup().addTo(map)
+      soilLayer = L.layerGroup().addTo(map)
       drawPowerLines()
 
       // Clique para marcação / simulação
@@ -711,7 +948,9 @@ export default defineComponent({
       goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
-      loadingRoute, showPowerLines, togglePowerLines
+      loadingRoute, showPowerLines, togglePowerLines,
+      aiDrawerOpen, aiTreeData, loadingAiData, openAiDrawer, closeAiDrawer,
+      showSoilLayer, loadingSoil, toggleSoilLayer
     }
   },
 })
@@ -786,6 +1025,23 @@ export default defineComponent({
         <template #activator="{ props }">
           <v-btn v-bind="props" icon :color="showPowerLines ? 'red-darken-1' : 'blue-grey-darken-1'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="togglePowerLines" class="mb-2">
             <v-icon>{{ showPowerLines ? 'mdi-flash-off' : 'mdi-flash' }}</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+
+      <v-tooltip text="Camada de Solo" location="left">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            icon
+            :color="showSoilLayer ? 'brown-darken-2' : 'blue-grey-darken-1'"
+            :size="isMobile ? 'default' : 'large'"
+            elevation="4"
+            :loading="loadingSoil"
+            @click="toggleSoilLayer"
+            class="mb-2"
+          >
+            <v-icon>{{ showSoilLayer ? 'mdi-layers' : 'mdi-layers-outline' }}</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
@@ -927,7 +1183,7 @@ export default defineComponent({
               :key="tree.id"
               class="tree-list-item"
               :class="{ 'tree-list-item--danger': tree.nearPowerLine, 'tree-list-item--active': selectedTree?.id === tree.id }"
-              @click="flyToTree(tree)"
+              @click="flyToTree(tree); openAiDrawer(tree)"
             >
               <div class="tree-list-icon" :style="{ background: tree.nearPowerLine ? '#FF3B3B' : (STATUS_CONFIG[tree.status]?.bg || '#4CAF50') }">
                 {{ tree.nearPowerLine ? '⚠️' : (STATUS_CONFIG[tree.status]?.emoji || '🌳') }}
@@ -978,6 +1234,21 @@ export default defineComponent({
             <span class="legend-dot" style="background:linear-gradient(135deg,#1565C0,#42A5F5)" />
             <span class="text-caption">📍 Sua posição</span>
           </div>
+
+          <v-divider class="my-2" />
+          <p class="text-caption font-weight-bold mb-1">Qualidade do Solo (Grids)</p>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#22c55e" />
+            <span class="text-caption">🌱 Solo bom</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#f59e0b" />
+            <span class="text-caption">🌱 Solo regular</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot" style="background:#ef4444" />
+            <span class="text-caption">🌱 Solo ruim</span>
+          </div>
         </div>
       </div>
     </Transition>
@@ -1007,6 +1278,57 @@ export default defineComponent({
     <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000" location="bottom right">
       {{ snackbarText }}
     </v-snackbar>
+
+    <!-- ============ IA DRAWER (Lateral Direita) ============ -->
+    <v-navigation-drawer
+      v-model="aiDrawerOpen"
+      location="right"
+      temporary
+      :width="isMobile ? 320 : 420"
+      class="ai-drawer"
+      :scrim="false"
+    >
+      <!-- Header do Drawer -->
+      <div class="ai-drawer-header">
+        <div class="d-flex align-center">
+          <div class="ai-drawer-icon">
+            <v-icon size="22" color="white">mdi-brain</v-icon>
+          </div>
+          <div class="ml-3">
+            <p class="ai-drawer-title">Análise de IA</p>
+            <p class="ai-drawer-subtitle">{{ selectedTree?.speciesName || 'Árvore' }}</p>
+          </div>
+        </div>
+        <v-btn icon variant="text" size="small" @click="closeAiDrawer">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
+      </div>
+
+      <v-divider />
+
+      <!-- Conteúdo do Drawer -->
+      <div class="ai-drawer-body">
+        <!-- Loading -->
+        <div v-if="loadingAiData" class="ai-drawer-loading">
+          <v-progress-circular indeterminate color="deep-purple" size="48" width="4" />
+          <p class="mt-4 text-body-2 text-grey-darken-1">Carregando análise de IA...</p>
+        </div>
+
+        <!-- Dados da IA -->
+        <TreeAiStats v-else-if="aiTreeData" :data="aiTreeData" />
+
+        <!-- Sem dados -->
+        <div v-else class="ai-drawer-empty">
+          <v-icon size="64" color="grey-lighten-1">mdi-brain</v-icon>
+          <p class="mt-4 text-body-2 text-grey-darken-1 text-center">
+            Nenhuma análise de IA disponível para esta árvore.
+          </p>
+          <p class="text-caption text-grey text-center">
+            Execute a importação de dados no painel do Administrador.
+          </p>
+        </div>
+      </div>
+    </v-navigation-drawer>
   </div>
 </template>
 
@@ -1395,5 +1717,229 @@ export default defineComponent({
   inset: 0;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.35);
+}
+
+/* ============ AI DRAWER ============ */
+.ai-drawer {
+  z-index: 2001 !important;
+}
+
+.ai-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fafafa;
+}
+
+.ai-drawer-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7B1FA2, #AB47BC);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ai-drawer-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.2;
+}
+
+.ai-drawer-subtitle {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.ai-drawer-body {
+  padding: 16px;
+  overflow-y: auto;
+  height: calc(100% - 74px);
+}
+
+.ai-drawer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+}
+
+.ai-drawer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+}
+/* ===================================
+   ESTILOS PREMIUM - SOLO
+=================================== */
+
+:deep(.soil-hex-marker) {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  background: var(--marker-color);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  z-index: 2;
+}
+
+:deep(.soil-hex-inner) {
+  width: 12px;
+  height: 12px;
+  background: white;
+  opacity: 0.3;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+:deep(.soil-hex-pulse) {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--marker-color);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  opacity: 0.4;
+  z-index: -1;
+  animation: soilPulse 2s infinite;
+}
+
+@keyframes soilPulse {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+:deep(.soil-glass-popup) .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+:deep(.soil-glass-popup) .leaflet-popup-content {
+  margin: 0;
+}
+
+:deep(.soil-intelligence-card) {
+  padding: 0;
+  font-family: 'Outfit', sans-serif;
+}
+
+:deep(.soil-card-header) {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+:deep(.species-tag) {
+  font-weight: 800;
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+:deep(.quality-badge) {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+:deep(.soil-card-body) {
+  padding: 16px;
+}
+
+:deep(.growth-prediction) {
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.prediction-label) {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+:deep(.prediction-value) {
+  font-size: 14px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+:deep(.soil-definition) {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+:deep(.metrics-grid) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+:deep(.metric-item) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+:deep(.metric-header) {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+}
+
+:deep(.metric-bar) {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+:deep(.bar-fill) {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease-out;
+}
+
+:deep(.footer-metrics) {
+  display: flex;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 12px;
+  gap: 16px;
+}
+
+:deep(.footer-item) {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+:deep(.leaflet-popup-tip) {
+  background: rgba(255, 255, 255, 0.95);
 }
 </style>
