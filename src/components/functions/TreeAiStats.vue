@@ -81,11 +81,11 @@
         <v-row class="mt-4" dense>
           <v-col cols="6" sm="3">
             <div class="metric-card">
-              <v-icon size="24" :color="data.aiPrediction.will_reach_wire ? 'red' : 'green'">
-                {{ data.aiPrediction.will_reach_wire ? 'mdi-alert-octagon' : 'mdi-check-circle' }}
+              <v-icon size="24" :color="(data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'red' : 'green'">
+                {{ (data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'mdi-alert-octagon' : 'mdi-check-circle' }}
               </v-icon>
-              <p class="metric-value" :class="data.aiPrediction.will_reach_wire ? 'text-red' : 'text-green'">
-                {{ data.aiPrediction.will_reach_wire ? 'SIM' : 'NÃO' }}
+              <p class="metric-value" :class="(data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'text-red' : 'text-green'">
+                {{ (data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'SIM' : 'NÃO' }}
               </p>
               <p class="metric-label">Alcançará fiação</p>
             </div>
@@ -94,7 +94,7 @@
           <v-col cols="6" sm="3">
             <div class="metric-card">
               <v-icon size="24" color="indigo">mdi-calendar-clock</v-icon>
-              <p class="metric-value">{{ data.aiPrediction.days_to_wire.toLocaleString() }}</p>
+              <p class="metric-value">{{ heightPercent >= 100 ? 'ALCANÇADO' : (data.aiPrediction.days_to_wire ? data.aiPrediction.days_to_wire.toLocaleString() : 'N/A') }}</p>
               <p class="metric-label">Dias até a fiação</p>
             </div>
           </v-col>
@@ -102,7 +102,7 @@
           <v-col cols="6" sm="3">
             <div class="metric-card">
               <v-icon size="24" color="deep-purple">mdi-calendar-month</v-icon>
-              <p class="metric-value">{{ data.aiPrediction.months_to_wire.toFixed(1) }}</p>
+              <p class="metric-value">{{ heightPercent >= 100 ? '0.0' : data.aiPrediction.months_to_wire.toFixed(1) }}</p>
               <p class="metric-label">Meses estimados</p>
             </div>
           </v-col>
@@ -119,58 +119,51 @@
 
       <v-divider class="mb-6" />
 
-      <!-- ===== Insights de Crescimento ===== -->
       <div class="section-block mb-6">
-        <div class="section-header">
-          <v-icon size="20" class="mr-2" color="green-darken-1">mdi-sprout</v-icon>
-          <span class="section-title">Insights de Crescimento</span>
+        <div class="section-header mb-4">
+          <v-icon size="22" class="mr-2" color="green-darken-1">mdi-brain</v-icon>
+          <span class="section-title">Análise de Redes Neurais</span>
         </div>
 
-        <v-row class="mt-3" dense>
+        <v-row dense>
           <!-- Copa -->
           <v-col cols="12" sm="6">
-            <div class="insight-card">
-              <div class="insight-icon-wrapper canopy-icon">
-                <v-icon size="28" color="white">{{ canopyIcon }}</v-icon>
+            <div class="insight-card-v2">
+              <div class="insight-header">
+                <div class="insight-badge canopy-badge">
+                  <v-icon size="20" color="white">{{ canopyIcon }}</v-icon>
+                </div>
+                <span class="insight-label">Geometria da Copa</span>
               </div>
-              <div class="insight-info">
-                <p class="insight-title">Formato da Copa</p>
-                <v-chip
-                  size="small"
-                  variant="flat"
-                  :color="canopyColor"
-                  class="font-weight-bold"
-                >
-                  {{ canopyLabel }}
-                </v-chip>
-                <p class="text-caption text-grey-darken-1 mt-1">
-                  Proporção L/A:
-                  <strong>{{ data.aiPrediction.canopy.ratio_width_height.toFixed(2) }}</strong>
-                </p>
+              <div class="insight-main mt-3">
+                <div class="d-flex align-center justify-space-between mb-1">
+                  <h3 class="insight-value">{{ canopyLabel }}</h3>
+                  <span class="text-caption text-grey-darken-1">L/A: {{ data.aiPrediction.canopy.ratio_width_height.toFixed(2) }}</span>
+                </div>
+                <p class="text-caption text-grey mb-0">Formato estimado via processamento de imagem e espécie.</p>
               </div>
             </div>
           </v-col>
 
-          <!-- Fibonacci -->
+          <!-- Fibonacci / R -->
           <v-col cols="12" sm="6">
-            <div class="insight-card">
-              <div class="insight-icon-wrapper fibonacci-icon">
-                <v-icon size="28" color="white">mdi-math-integral-box</v-icon>
-              </div>
-              <div class="insight-info">
-                <p class="insight-title">Padrão Fibonacci</p>
-                <div class="fibonacci-bar-container">
-                  <div class="fibonacci-bar">
-                    <div
-                      class="fibonacci-bar-fill"
-                      :style="{ width: fibonacciPercent + '%' }"
-                    />
-                  </div>
-                  <span class="fibonacci-value">{{ fibonacciPercent.toFixed(0) }}%</span>
+            <div class="insight-card-v2">
+              <div class="insight-header">
+                <div class="insight-badge r-badge">
+                  <v-icon size="20" color="white">mdi-chart-bell-curve-cumulative</v-icon>
                 </div>
-                <p class="text-caption text-grey-darken-1 mt-1">
-                  Modificador:
-                  <strong>{{ data.aiPrediction.fibonacci_info.growth_modifier.toFixed(4) }}</strong>
+                <span class="insight-label">R (Confiabilidade)</span>
+              </div>
+              <div class="insight-main mt-3">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <h3 class="insight-value">{{ (data.aiPrediction.fibonacci_info.growth_modifier * 100).toFixed(0) }}%</h3>
+                  <v-chip size="x-small" color="blue-lighten-4" variant="flat" class="text-blue-darken-4 font-weight-bold">Ajuste IA</v-chip>
+                </div>
+                <div class="modern-progress mb-2">
+                  <div class="modern-progress-fill" :style="{ width: (data.aiPrediction.fibonacci_info.growth_modifier * 100) + '%' }" />
+                </div>
+                <p class="text-caption r-desc">
+                  Este índice indica a precisão do modelo matemático para esta predição específica.
                 </p>
               </div>
             </div>
@@ -306,30 +299,45 @@ export default defineComponent({
   computed: {
     /* ---------- Risco ---------- */
     riskClass(): string {
+      // OVERRIDE: Se estiver a 90% ou mais da fiação, é CRÍTICO independente do status da IA
+      if (this.heightPercent >= 90) return 'critical'
+
+      const s = String(this.data.aiPrediction.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'normal',
         MODERATE: 'moderate',
         CRITICAL: 'critical',
+        TO_PRUNE: 'critical',
+        UNDER_OBSERVATION: 'observation'
       }
-      return map[this.data.aiPrediction.risk_status] || 'normal'
+      return map[s] || 'normal'
     },
 
     riskLabel(): string {
+      if (this.heightPercent >= 100) return 'CONTATO COM FIAÇÃO'
+      if (this.heightPercent >= 90) return 'RISCO IMINENTE'
+
+      const s = String(this.data.aiPrediction.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
-        NORMAL: 'Normal',
-        MODERATE: 'Moderado',
-        CRITICAL: 'Crítico',
+        NORMAL: 'Risco Normal',
+        MODERATE: 'Risco Moderado',
+        CRITICAL: 'RISCO CRÍTICO',
+        TO_PRUNE: 'Poda Necessária',
+        UNDER_OBSERVATION: 'Em Observação'
       }
-      return map[this.data.aiPrediction.risk_status] || 'Normal'
+      return map[s] || 'Análise de IA'
     },
 
     riskIcon(): string {
+      const s = String(this.data.aiPrediction.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'mdi-shield-check',
         MODERATE: 'mdi-shield-alert',
         CRITICAL: 'mdi-shield-remove',
+        TO_PRUNE: 'mdi-content-cut',
+        UNDER_OBSERVATION: 'mdi-eye-outline',
       }
-      return map[this.data.aiPrediction.risk_status] || 'mdi-shield-check'
+      return map[s] || 'mdi-shield-check'
     },
 
     /* ---------- Altura ---------- */
@@ -705,82 +713,86 @@ export default defineComponent({
   line-height: 1.3;
 }
 
-/* ============ INSIGHT CARDS ============ */
-.insight-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
+/* ============ NEW INSIGHT CARDS V2 ============ */
+.insight-card-v2 {
+  background: white;
+  border: 1px solid #edf2f7;
+  border-radius: 16px;
   padding: 16px;
-  border-radius: 12px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
   height: 100%;
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
 }
 
-.insight-card:hover {
-  background: #f5f5f5;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+.insight-card-v2:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e0;
 }
 
-.insight-icon-wrapper {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+.insight-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.insight-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
-.canopy-icon {
-  background: linear-gradient(135deg, #26A69A, #00897B);
+.canopy-badge {
+  background: linear-gradient(135deg, #10b981, #059669);
 }
 
-.fibonacci-icon {
-  background: linear-gradient(135deg, #AB47BC, #7B1FA2);
+.r-badge {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
 }
 
-.insight-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.insight-title {
+.insight-label {
   font-size: 13px;
   font-weight: 700;
-  color: #333;
-  margin-bottom: 6px;
+  color: #4a5568;
 }
 
-/* ============ FIBONACCI BAR ============ */
-.fibonacci-bar-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.insight-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a202c;
+  margin: 0;
 }
 
-.fibonacci-bar {
-  flex: 1;
-  height: 8px;
-  background: #E1BEE7;
-  border-radius: 4px;
+.modern-progress {
+  width: 100%;
+  height: 6px;
+  background: #edf2f7;
+  border-radius: 10px;
   overflow: hidden;
 }
 
-.fibonacci-bar-fill {
+.modern-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #CE93D8, #7B1FA2);
-  border-radius: 4px;
-  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+  border-radius: 10px;
+  transition: width 1s ease;
 }
 
-.fibonacci-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: #7B1FA2;
-  white-space: nowrap;
+.r-desc {
+  font-size: 11px !important;
+  color: #718096 !important;
+  line-height: 1.4 !important;
+}
+
+@media (max-width: 600px) {
+  .insight-card-v2 {
+    margin-bottom: 8px;
+  }
 }
 
 /* ============ SOIL QUALITY BAR ============ */

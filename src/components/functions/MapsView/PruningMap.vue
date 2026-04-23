@@ -44,6 +44,8 @@ interface TreeOnMap {
   nearPowerLine: boolean
   soilQuality?: string
   vigor: string
+  currentHeight?: number
+  wireHeight?: number
 }
 
 interface MarkedLocation {
@@ -106,18 +108,23 @@ interface StatusInfo {
 }
 
 const STATUS_CONFIG: { [key: string]: StatusInfo } = {
-  NORMAL:              { label: 'Normal',         emoji: '🌳', color: '#4CAF50', bg: '#4CAF50', border: '#2E7D32' },
-  TO_PRUNE:            { label: 'Para Podar',     emoji: '✂️', color: '#FF9800', bg: '#FF9800', border: '#E65100' },
-  UNDER_OBSERVATION:   { label: 'Observação',     emoji: '👁️', color: '#FFC107', bg: '#FFC107', border: '#F57F17' },
-  PRUNED:              { label: 'Podada',          emoji: '🌿', color: '#66BB6A', bg: '#66BB6A', border: '#388E3C' },
-  DANGER:              { label: 'Risco Fiação',   emoji: '⚠️', color: '#FF3B3B', bg: '#FF3B3B', border: '#B00000' },
+  NORMAL:            { label: 'Normal',         emoji: '🌳', color: '#2E7D32', bg: '#2E7D32', border: '#1B5E20' },
+  TO_PRUNE:          { label: 'Para Podar',     emoji: '✂️', color: '#EF6C00', bg: '#EF6C00', border: '#E65100' },
+  UNDER_OBSERVATION: { label: 'Observação',     emoji: '👁️', color: '#F9A825', bg: '#F9A825', border: '#F57F17' },
+  PRUNED:            { label: 'Podada',         emoji: '🌿', color: '#4CAF50', bg: '#4CAF50', border: '#388E3C' },
+  DANGER:            { label: 'Risco Fiação',   emoji: '⚠️', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
+  CRITICAL:          { label: 'CRÍTICO',        emoji: '🚨', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
 }
 
 const DEFAULT_STATUS: StatusInfo = { label: 'Normal', emoji: '🌳', color: '#4CAF50', bg: '#4CAF50', border: '#2E7D32' }
 
 function getStatusCfg(status: string, danger: boolean): StatusInfo {
-  if (danger) return STATUS_CONFIG['DANGER'] || DEFAULT_STATUS
-  return STATUS_CONFIG[status] || DEFAULT_STATUS
+  const s = String(status).toUpperCase()
+  // SE ESTIVER EM PERIGO (por altura ou simulação) OU SE O STATUS FOR CRÍTICO/PODA
+  if (danger || s === 'CRITICAL' || s === 'DANGER' || s === 'TO_PRUNE') {
+    return STATUS_CONFIG['CRITICAL'] || STATUS_CONFIG['DANGER'] || DEFAULT_STATUS
+  }
+  return STATUS_CONFIG[s] || DEFAULT_STATUS
 }
 
 const SIMULATED_POWER_LINES: [number, number][][] = [
@@ -153,6 +160,7 @@ export default defineComponent({
     const markMode = ref(false)
     const isExpanded = ref(false)
     const loadingTrees = ref(false)
+    const isInitialLoad = ref(true)
     const locating = ref(false)
     const locationError = ref('')
     const userLat = ref<number | null>(null)
@@ -182,15 +190,18 @@ export default defineComponent({
     /* ---------- Computed ---------- */
     const filteredTrees = computed(() => {
       if (activeFilter.value === 'ALL') return trees.value
-      if (activeFilter.value === 'DANGER') return trees.value.filter(t => t.nearPowerLine)
+      if (activeFilter.value === 'CRITICAL') {
+        return trees.value.filter(t => t.nearPowerLine || t.status === 'CRITICAL' || t.status === 'TO_PRUNE')
+      }
       return trees.value.filter(t => t.status === activeFilter.value)
     })
 
     const treeCount = computed(() => trees.value.length)
     const dangerCount = computed(() => trees.value.filter(t => t.nearPowerLine).length)
+    const criticalCount = computed(() => trees.value.filter(t => t.nearPowerLine || t.status === 'CRITICAL' || t.status === 'TO_PRUNE').length)
     const markedCount = computed(() => markedLocations.value.length)
     const statusCounts = computed(() => {
-      const counts: Record<string, number> = { NORMAL: 0, TO_PRUNE: 0, UNDER_OBSERVATION: 0, PRUNED: 0 }
+      const counts: Record<string, number> = { NORMAL: 0, TO_PRUNE: 0, UNDER_OBSERVATION: 0, PRUNED: 0, CRITICAL: 0 }
       trees.value.forEach(t => { counts[t.status] = (counts[t.status] || 0) + 1 })
       return counts
     })
@@ -272,7 +283,7 @@ export default defineComponent({
         for (let i = 0; i < line.length - 1; i++) {
           const segA = line[i]!
           const segB = line[i + 1]!
-          if (distancePointToSegment(lat, lng, segA[0], segA[1], segB[0], segB[1]) < POWER_LINE_DISTANCE_METERS) return true
+          if (distancePointToSegment(lat, lng, segA[0], segA[1], segB[0], segB[1]) < 25) return true
         }
       }
       return false
@@ -288,20 +299,36 @@ export default defineComponent({
           .map((t: any) => {
             const lat = Number(t.latitude)
             const lng = Number(t.longitude)
+            const curH = t.currentHeight || 0
+            const wireH = t.wireHeight || 6.5
+            
+            // É PERIGO se: estiver perto da fiação simulada OU se a altura for >= 90% do fio
+            const isDanger = checkNearPowerLine(lat, lng) || (curH / wireH >= 0.9)
+            
             return {
               id: t.id,
               latitude: lat,
               longitude: lng,
               status: t.status || 'NORMAL',
-              speciesName: 'Clique para detalhes',
+              speciesName: 'Árvore #' + t.id.slice(-4),
               scientificName: '',
               family: '',
-              nearPowerLine: checkNearPowerLine(lat, lng),
+              nearPowerLine: isDanger,
               soilQuality: 'UNKNOWN',
               vigor: 'GOOD',
+              currentHeight: curH,
+              wireHeight: wireH
             }
           })
+        console.log('Total de árvores carregadas:', trees.value.length)
         notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
+        
+        // AUTO-CENTER: Centraliza o mapa para mostrar todas as árvores apenas na primeira carga
+        if (map && trees.value.length > 0 && isInitialLoad.value) {
+          const bounds = L.latLngBounds(trees.value.map(t => [t.latitude, t.longitude]))
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
+          isInitialLoad.value = false
+        }
       } catch (err) {
         console.error('Erro ao buscar árvores:', err)
         trees.value = []
@@ -995,6 +1022,30 @@ export default defineComponent({
       </v-text-field>
     </div>
 
+    <!-- ============ FILTROS RÁPIDOS PRINCIPAIS ============ -->
+    <div class="main-filter-bar">
+      <v-btn-toggle
+        v-model="activeFilter"
+        mandatory
+        color="green-darken-2"
+        rounded="pill"
+        class="filter-toggle"
+      >
+        <v-btn value="ALL" class="toggle-btn">
+          <v-icon start>mdi-tree</v-icon>
+          Todas ({{ treeCount }})
+        </v-btn>
+        <v-btn value="CRITICAL" class="toggle-btn">
+          <v-icon start color="red">mdi-alert-decagram</v-icon>
+          Críticos ({{ criticalCount }})
+        </v-btn>
+        <v-btn value="UNDER_OBSERVATION" class="toggle-btn">
+          <v-icon start color="amber">mdi-eye</v-icon>
+          Obs. ({{ statusCounts['UNDER_OBSERVATION'] || 0 }})
+        </v-btn>
+      </v-btn-toggle>
+    </div>
+
     <!-- ============ BOTÕES FLUTUANTES DIREITA ============ -->
     <div class="floating-actions-right">
       <v-tooltip text="Minha localização" location="left">
@@ -1379,8 +1430,53 @@ export default defineComponent({
   max-width: calc(100% - 340px);
 }
 
-.search-input {
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
+/* ============ BARRA DE FILTRO PRINCIPAL ============ */
+.main-filter-bar {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  pointer-events: auto;
+}
+
+.filter-toggle {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2) !important;
+  padding: 4px;
+  height: auto !important;
+}
+
+.toggle-btn {
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  height: 40px !important;
+  padding: 0 20px !important;
+  border-radius: 20px !important;
+}
+
+.toggle-btn:not(.v-btn--active) {
+  color: #555 !important;
+}
+
+@media (max-width: 768px) {
+  .main-filter-bar {
+    bottom: 20px;
+    width: calc(100% - 40px);
+  }
+  .filter-toggle {
+    width: 100%;
+    display: flex;
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+  }
 }
 
 /* ============ BOTÕES FLUTUANTES DIREITA ============ */
