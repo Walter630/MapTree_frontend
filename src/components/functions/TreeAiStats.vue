@@ -54,11 +54,11 @@
         <div class="height-progress-container mt-3">
           <div class="height-labels d-flex justify-space-between mb-1">
             <span class="text-caption font-weight-bold">
-              {{ data.aiPrediction.estimated_height_m.toFixed(1) }}m
+              {{ (data.aiPrediction?.estimated_height_m || 0).toFixed(1) }}m
               <span class="text-grey-darken-1 font-weight-regular">(Atual)</span>
             </span>
             <span class="text-caption font-weight-bold">
-              {{ data.aiPrediction.wire_height_m.toFixed(1) }}m
+              {{ (data.aiPrediction?.wire_height_m || 6.5).toFixed(1) }}m
               <span class="text-grey-darken-1 font-weight-regular">(Fiação)</span>
             </span>
           </div>
@@ -81,11 +81,11 @@
         <v-row class="mt-4" dense>
           <v-col cols="6" sm="3">
             <div class="metric-card">
-              <v-icon size="24" :color="(data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'red' : 'green'">
-                {{ (data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'mdi-alert-octagon' : 'mdi-check-circle' }}
+              <v-icon size="24" :color="(data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'red' : 'green'">
+                {{ (data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'mdi-alert-octagon' : 'mdi-check-circle' }}
               </v-icon>
-              <p class="metric-value" :class="(data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'text-red' : 'text-green'">
-                {{ (data.aiPrediction.will_reach_wire || heightPercent >= 90) ? 'SIM' : 'NÃO' }}
+              <p class="metric-value" :class="(data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'text-red' : 'text-green'">
+                {{ (data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'SIM' : 'NÃO' }}
               </p>
               <p class="metric-label">Alcançará fiação</p>
             </div>
@@ -94,7 +94,7 @@
           <v-col cols="6" sm="3">
             <div class="metric-card">
               <v-icon size="24" color="indigo">mdi-calendar-clock</v-icon>
-              <p class="metric-value">{{ heightPercent >= 100 ? 'ALCANÇADO' : (data.aiPrediction.days_to_wire ? data.aiPrediction.days_to_wire.toLocaleString() : 'N/A') }}</p>
+              <p class="metric-value">{{ heightPercent >= 100 ? 'ALCANÇADO' : (data.aiPrediction?.days_to_wire ? data.aiPrediction.days_to_wire.toLocaleString() : 'N/A') }}</p>
               <p class="metric-label">Dias até a fiação</p>
             </div>
           </v-col>
@@ -102,7 +102,7 @@
           <v-col cols="6" sm="3">
             <div class="metric-card">
               <v-icon size="24" color="deep-purple">mdi-calendar-month</v-icon>
-              <p class="metric-value">{{ heightPercent >= 100 ? '0.0' : data.aiPrediction.months_to_wire.toFixed(1) }}</p>
+              <p class="metric-value">{{ heightPercent >= 100 ? '0.0' : (data.aiPrediction?.months_to_wire?.toFixed(1) || '0.0') }}</p>
               <p class="metric-label">Meses estimados</p>
             </div>
           </v-col>
@@ -138,7 +138,7 @@
               <div class="insight-main mt-3">
                 <div class="d-flex align-center justify-space-between mb-1">
                   <h3 class="insight-value">{{ canopyLabel }}</h3>
-                  <span class="text-caption text-grey-darken-1">L/A: {{ data.aiPrediction.canopy.ratio_width_height.toFixed(2) }}</span>
+                  <span class="text-caption text-grey-darken-1">L/A: {{ (data.aiPrediction?.canopy?.ratio_width_height || 0).toFixed(2) }}</span>
                 </div>
                 <p class="text-caption text-grey mb-0">Formato estimado via processamento de imagem e espécie.</p>
               </div>
@@ -191,24 +191,27 @@
       </div>
 
       <!-- ===== Solo (Inteligência Integrada) ===== -->
-      <template v-if="data.soil">
+      <template v-if="soilInfo">
         <v-divider class="mb-6" />
 
         <div class="section-block">
           <div class="section-header mb-4">
             <v-icon size="20" class="mr-2" color="brown-darken-1">mdi-terraform</v-icon>
             <span class="section-title">Inteligência de Solo & Terreno</span>
+            <v-chip v-if="!data.soil" size="x-small" variant="tonal" color="brown" class="ml-auto font-weight-bold">
+              ESTIMATIVA REGIONAL (EMBRAPA)
+            </v-chip>
           </div>
 
           <!-- Growth & Definition Card -->
-          <div class="soil-analysis-banner mb-5" :style="{ borderLeft: `4px solid ${soilMarkerColor}` }">
+          <div class="soil-analysis-banner mb-5" :style="{ borderLeft: `6px solid ${soilMarkerColor}`, background: `${soilMarkerColor}08` }">
             <div class="d-flex justify-space-between align-center mb-1">
-              <span class="text-overline font-weight-bold">Expectativa de Crescimento</span>
+              <span class="text-overline font-weight-bold" style="color: #444">Expectativa de Crescimento</span>
               <v-chip size="x-small" :color="soilMarkerColor" class="font-weight-bold" variant="flat">
                 {{ soilGrowthLabel }}
               </v-chip>
             </div>
-            <p class="text-body-2 mb-0">{{ soilDefinition }}</p>
+            <p class="text-body-2 mb-0" style="color: #333; font-weight: 500;">{{ soilDefinition }}</p>
           </div>
 
           <v-row dense>
@@ -217,10 +220,10 @@
               <div class="soil-metric-item">
                 <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
                   <span>Argila</span>
-                  <span>{{ data.soil.clay ? data.soil.clay.toFixed(1) + '%' : 'N/A' }}</span>
+                  <span>{{ data.soil?.clay ? data.soil.clay.toFixed(1) + '%' : (soilInfo?.typicalClay || 60) + '% (Típica)' }}</span>
                 </div>
                 <v-progress-linear
-                  :model-value="data.soil.clay || 0"
+                  :model-value="data.soil?.clay || soilInfo?.typicalClay || 60"
                   height="6"
                   rounded
                   :color="soilMarkerColor"
@@ -232,11 +235,11 @@
             <v-col cols="12" sm="6">
               <div class="soil-metric-item">
                 <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
-                  <span>Acidez (pH)</span>
-                  <span>{{ data.soil.ph ? data.soil.ph.toFixed(1) : 'N/A' }}</span>
+                  <span>pH</span>
+                  <span>{{ data.soil?.ph ? data.soil.ph.toFixed(1) : (soilInfo?.typicalPh || 6.5) + ' (Típico)' }}</span>
                 </div>
                 <v-progress-linear
-                  :model-value="(data.soil.ph || 0) * 7"
+                  :model-value="(data.soil?.ph || soilInfo?.typicalPh || 6.5) * 11"
                   height="6"
                   rounded
                   :color="soilMarkerColor"
@@ -250,14 +253,14 @@
             <v-col cols="6" sm="3">
               <div class="metric-card">
                 <v-icon size="20" color="brown-darken-2">mdi-arrow-collapse-down</v-icon>
-                <p class="metric-value">{{ data.soil.depth.toFixed(1) }}m</p>
+                <p class="metric-value">{{ data.soil?.depth ? data.soil.depth.toFixed(1) + 'm' : '1.5m (Est.)' }}</p>
                 <p class="metric-label">Profundidade</p>
               </div>
             </v-col>
             <v-col cols="6" sm="3">
               <div class="metric-card">
                 <v-icon size="20" color="orange-darken-3">mdi-slope-downhill</v-icon>
-                <p class="metric-value">{{ data.soil.inclination.toFixed(0) }}°</p>
+                <p class="metric-value">{{ data.soil?.inclination ? data.soil.inclination.toFixed(0) + '°' : '8° (Suave)' }}</p>
                 <p class="metric-label">Inclinação</p>
               </div>
             </v-col>
@@ -271,7 +274,7 @@
             <v-col cols="6" sm="3">
               <div class="metric-card">
                 <v-icon size="20" color="green-darken-2">mdi-leaf-circle</v-icon>
-                <p class="metric-value">{{ (data.soil.coverage * 100).toFixed(0) }}%</p>
+                <p class="metric-value">{{ ((data.soil?.coverage || 0.6) * 100).toFixed(0) }}%</p>
                 <p class="metric-label">Cobertura</p>
               </div>
             </v-col>
@@ -285,6 +288,7 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
 import type { TreeWithAi } from '@/plugins/apiConnect'
+import { getSoilInfo } from '@/utils/soilData'
 
 export default defineComponent({
   name: 'TreeAiStats',
@@ -342,36 +346,40 @@ export default defineComponent({
 
     /* ---------- Altura ---------- */
     heightPercent(): number {
-      const pct =
-        (this.data.aiPrediction.estimated_height_m / this.data.aiPrediction.wire_height_m) * 100
+      const est = this.data.aiPrediction?.estimated_height_m || 0
+      const wire = this.data.aiPrediction?.wire_height_m || 6.5
+      const pct = (est / wire) * 100
       return Math.min(pct, 100)
     },
 
     remainingMeters(): string {
-      const diff =
-        this.data.aiPrediction.wire_height_m - this.data.aiPrediction.estimated_height_m
+      const wire = this.data.aiPrediction?.wire_height_m || 6.5
+      const est = this.data.aiPrediction?.estimated_height_m || 0
+      const diff = wire - est
       return Math.max(diff, 0).toFixed(2)
     },
 
     /* ---------- Copa ---------- */
     canopyIcon(): string {
+      const shape = this.data.aiPrediction?.canopy?.shape || 'WIDE'
       const map: Record<string, string> = {
         WIDE: 'mdi-tree',
         NARROW: 'mdi-pine-tree',
         ROUND: 'mdi-circle-outline',
         COLUMNAR: 'mdi-pillar',
       }
-      return map[this.data.aiPrediction.canopy.shape] || 'mdi-tree'
+      return map[shape] || 'mdi-tree'
     },
 
     canopyLabel(): string {
+      const shape = this.data.aiPrediction?.canopy?.shape || 'Desconhecida'
       const map: Record<string, string> = {
         WIDE: 'Ampla',
         NARROW: 'Estreita',
         ROUND: 'Arredondada',
         COLUMNAR: 'Colunar',
       }
-      return map[this.data.aiPrediction.canopy.shape] || this.data.aiPrediction.canopy.shape
+      return map[shape] || shape
     },
 
     canopyColor(): string {
@@ -381,73 +389,55 @@ export default defineComponent({
         ROUND: 'green',
         COLUMNAR: 'deep-purple',
       }
-      return map[this.data.aiPrediction.canopy.shape] || 'grey'
+      return map[this.data.aiPrediction?.canopy?.shape] || 'grey'
     },
 
     /* ---------- Fibonacci ---------- */
     fibonacciPercent(): number {
-      return Math.min(this.data.aiPrediction.fibonacci_info.growth_modifier * 100, 100)
+      return Math.min((this.data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100, 100)
     },
 
     /* ---------- Solo ---------- */
     soilQualityLabel(): string {
-      if (!this.data.soil) return ''
-      const map: Record<string, string> = {
-        GOOD: 'Bom',
-        REGULAR: 'Regular',
-        BAD: 'Ruim',
-      }
-      return map[this.data.soil.quality] || this.data.soil.quality
+      return this.soilInfo?.name || this.data.soil?.quality || 'Solo Regional'
     },
 
     soilQualityColor(): string {
-      if (!this.data.soil) return 'grey'
+      const q = this.data.soil?.quality || 'REGULAR'
       const map: Record<string, string> = {
         GOOD: 'green-darken-2',
         REGULAR: 'orange-darken-2',
         BAD: 'red-darken-1',
       }
-      return map[this.data.soil.quality] || 'grey'
+      return map[q] || 'grey'
     },
 
     soilQualityIcon(): string {
-      if (!this.data.soil) return 'mdi-help-circle'
+      const q = this.data.soil?.quality || 'REGULAR'
       const map: Record<string, string> = {
         GOOD: 'mdi-star-face',
         REGULAR: 'mdi-emoticon-neutral-outline',
         BAD: 'mdi-emoticon-dead-outline',
       }
-      return map[this.data.soil.quality] || 'mdi-help-circle'
+      return map[q] || 'mdi-help-circle'
     },
 
     soilGrowthLabel(): string {
-      if (!this.data.soil) return ''
-      const map: Record<string, string> = {
-        GOOD: 'Acelerado (+20%)',
-        REGULAR: 'Estável (Normal)',
-        BAD: 'Retardado (-30%)',
-      }
-      return map[this.data.soil.quality] || 'N/A'
+      return this.soilInfo?.growthImpact || 'N/A'
     },
 
     soilDefinition(): string {
-      if (!this.data.soil) return ''
-      const map: Record<string, string> = {
-        GOOD: 'Solo Fértil com alta retenção de nutrientes e profundidade ideal para raízes.',
-        REGULAR: 'Solo com composição estável, adequado para o desenvolvimento urbano padrão.',
-        BAD: 'Solo compactado ou muito arenoso. Pode limitar o vigor da árvore.',
-      }
-      return map[this.data.soil.quality] || 'Análise de solo pendente.'
+      return this.soilInfo?.description || 'Análise de solo pendente.'
     },
 
     soilMarkerColor(): string {
-      if (!this.data.soil) return '#94a3b8'
-      const map: Record<string, string> = {
-        GOOD: '#22c55e',
-        REGULAR: '#f59e0b',
-        BAD: '#ef4444',
-      }
-      return map[this.data.soil.quality] || '#94a3b8'
+      const typeKey = this.data.soil?.soilType || this.data.soil?.quality || 'LATOSSOLO_VERMELHO'
+      return getSoilInfo(typeKey).color
+    },
+
+    soilInfo(): any {
+      const typeKey = this.data.soil?.soilType || this.data.soil?.quality || 'LATOSSOLO_VERMELHO'
+      return getSoilInfo(typeKey)
     },
 
     /* ---------- Vigor (Saúde) ---------- */
@@ -456,7 +446,7 @@ export default defineComponent({
         EXCELLENT: 'Vigor Excelente',
         GOOD: 'Saúde Estável',
         POOR: 'Saúde Debilitada',
-        DEAD: 'Espécime Morto',
+        DEAD: 'Espécime Morto'
       }
       return map[this.data.vigor] || 'Vigor Desconhecido'
     },

@@ -135,28 +135,42 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
-  const requiredRole = to.meta.role
   const store = useAppStore()
 
-  // Rotas que NÃO requerem autenticação — libera imediatamente
+  // 1. Rotas públicas: Lança direto
   if (!requiresAuth) return next()
 
+  // 2. Verifica token
   try {
-    const { data } = await apiConnect.get<{ valid: boolean }>('/auth/verify-token')
+    const { data: verifyData } = await apiConnect.get<{ valid: boolean }>('/auth/verify-token')
+    if (!verifyData.valid) {
+      store.logout()
+      return next({ name: 'Login' })
+    }
 
-    if (!data.valid) return next({ name: 'Login' })
+    // 3. Garante que temos o usuário no Store
+    if (!store.user) {
+      const { data: userData } = await apiConnect.get<User>('users/me/profile')
+      store.getUser(userData)
+    }
 
-    // Verifica role do usuário, se necessário
-    if (requiredRole) {
-      const { data: user } = await apiConnect.get<User>('users/me/profile')
-      store.getUser(user)
+    const user = store.user
+    if (!user) return next({ name: 'Login' })
 
-      if (user.role !== requiredRole) return next({ name: 'Main' })
+    // 4. Verificação de Role REFORÇADA
+    // Percorre todos os níveis da rota (ex: /admin/managers) procurando restrições de role
+    const requiredRole = to.matched.find(record => record.meta.role)?.meta.role
+
+    if (requiredRole && user.role !== requiredRole) {
+      console.warn(`Acesso negado: Usuário ${user.role} tentou acessar rota de ${requiredRole}`)
+      store.logout() // Opcional: Desloga por segurança ou apenas redireciona
+      return next({ name: 'Login' }) 
     }
 
     next()
   } catch (error) {
-    console.error('Erro na autenticação:', error)
+    console.error('Erro de segurança no Router:', error)
+    store.logout()
     next({ name: 'Login' })
   }
 })

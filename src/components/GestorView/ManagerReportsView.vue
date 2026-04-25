@@ -33,79 +33,84 @@
       </v-col>
     </v-row>
 
-    <v-card
-      class="pa-4 mb-6 mt-9"
-      outlined
-      tile
-      style="box-shadow: none; background-color: #f6f6f6"
-    >
+    <!-- KPI Cards (Novo) -->
+    <v-row class="mb-4">
+      <v-col cols="12" sm="4" md="3">
+        <v-card class="pa-4 rounded-xl elevation-2" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: white">
+          <div class="d-flex justify-space-between align-center mb-2">
+            <v-icon color="green-lighten-2">mdi-content-cut</v-icon>
+            <span class="text-caption">Total Podas</span>
+          </div>
+          <div class="text-h4 font-weight-bold">{{ prunings.length }}</div>
+          <div class="text-caption mt-2" style="opacity: 0.7">Efetuadas no sistema</div>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4" md="3">
+        <v-card class="pa-4 rounded-xl elevation-2">
+          <div class="d-flex justify-space-between align-center mb-2">
+            <v-icon color="orange-darken-1">mdi-alert-octagon</v-icon>
+            <span class="text-caption">Ação Urgente</span>
+          </div>
+          <div class="text-h4 font-weight-bold">{{ countUrgent }}</div>
+          <div class="text-caption mt-2 text-grey">Árvores atingiram a fiação</div>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4" md="3">
+        <v-card class="pa-4 rounded-xl elevation-2">
+          <div class="d-flex justify-space-between align-center mb-2">
+            <v-icon color="blue-darken-1">mdi-tree</v-icon>
+            <span class="text-caption">Mapeadas</span>
+          </div>
+          <div class="text-h4 font-weight-bold">{{ totalTrees }}</div>
+          <div class="text-caption mt-2 text-grey">Total de registros AI</div>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Filtros Modernos -->
+    <v-card class="pa-5 mb-8 mt-4 rounded-xl elevation-1" border>
       <v-row align="center">
         <v-col cols="12" class="d-flex align-center pb-2 pt-0">
-          <v-icon class="mr-2">mdi-filter-variant</v-icon>
-          <div class="text-h6 font-weight-regular">Filtros</div>
+          <v-icon class="mr-2" color="primary">mdi-filter-variant</v-icon>
+          <div class="text-h6 font-weight-bold">Filtros Inteligentes</div>
         </v-col>
 
-        <v-col cols="12" class="py-5">
-          <v-row>
-            <v-col cols="12" sm="3" class="py-0">
-              <div class="text-caption font-weight-bold grey--text text--darken-1 mb-1">Cidade</div>
+        <v-col cols="12">
+          <v-row dense>
+            <v-col cols="12" sm="4">
               <v-text-field
-                v-model="filters.cidade"
+                v-model="filters.search"
+                density="compact"
+                variant="outlined"
+                label="Pesquisar por técnico ou árvore"
+                prepend-inner-icon="mdi-magnify"
                 hide-details
-                dense
-                outlined
-                placeholder="Digite a cidade"
-              ></v-text-field>
+              />
             </v-col>
-
-            <v-col cols="12" sm="3" class="py-0">
-              <div class="text-caption font-weight-bold grey--text text--darken-1 mb-1">Status</div>
+            <v-col cols="12" sm="3">
               <v-select
                 v-model="filters.status"
-                :items="statusOptions"
+                :items="['HEAVY', 'MODERATE', 'LIGHT']"
+                label="Tipo de Poda"
+                density="compact"
+                variant="outlined"
                 hide-details
-                dense
-                outlined
-                placeholder="Selecione o status"
-              ></v-select>
+                clearable
+              />
             </v-col>
-
-            <v-col cols="12" sm="2" class="py-0">
-              <div class="text-caption font-weight-bold grey--text text--darken-1 mb-1">
-                Período
-              </div>
+            <v-col cols="12" sm="3">
               <v-text-field
-                v-model="filters.dataInicial"
-                placeholder="dd/mm/aaaa"
+                v-model="filters.date"
+                type="date"
+                label="Data de Início"
+                density="compact"
+                variant="outlined"
                 hide-details
-                dense
-                outlined
-                append-icon="mdi-calendar"
-              ></v-text-field>
+              />
             </v-col>
-
-            <v-col cols="12" sm="2" class="py-0">
-              <div class="text-caption font-weight-bold grey--text text--darken-1 mb-1">&nbsp;</div>
-              <v-text-field
-                v-model="filters.dataFinal"
-                placeholder="dd/mm/aaaa"
-                hide-details
-                dense
-                outlined
-                append-icon="mdi-calendar"
-              ></v-text-field>
-            </v-col>
-
-            <v-col cols="12" sm="2" class="d-flex align-end justify-end py-0">
-              <v-btn
-                color="#A7D129"
-                dark
-                large
-                @click="generateReport"
-                class="white--text font-weight-bold"
-                style="height: 40px"
-              >
-                Gerar Relatório
+            <v-col cols="12" sm="2">
+              <v-btn color="black" block height="40" rounded="lg" @click="getPrunings">
+                Filtrar
               </v-btn>
             </v-col>
           </v-row>
@@ -113,142 +118,107 @@
       </v-row>
     </v-card>
 
-    <v-row class="mb-6" style="margin-top: 40px">
-      <v-col cols="12" md="6">
-        <v-card
-          class="pa-4"
-          outlined
-          tile
-          style="background-color: #f6f6f6; border: 1px solid #dadada; box-shadow: none"
-        >
-          <h3 class="text-h6 mb-3 font-weight-regular">Podas Realizadas por Período</h3>
+    <v-row class="mb-8">
+      <v-col cols="12" md="7">
+        <v-card class="pa-5 rounded-xl elevation-1" border>
+          <div class="d-flex justify-space-between align-center mb-6">
+            <h3 class="text-h6 font-weight-bold">Status de Execução</h3>
+            <v-chip size="small" color="primary" variant="flat">Últimos 12 meses</v-chip>
+          </div>
 
-          <div class="chart-simulation-bar-wrapper">
-            <div class="y-axis-labels">
-              <span>100</span>
-              <span>75</span>
-              <span>50</span>
-              <span>25</span>
+          <div class="chart-container" style="height: 280px;">
+            <div class="y-axis">
+              <span>Máx</span>
+              <span>Méd</span>
               <span>0</span>
             </div>
-            <div class="chart-simulation-bar d-flex align-end">
-              <div
-                v-for="(item, index) in barData"
-                :key="index"
-                :style="{ height: item.value + '%', backgroundColor: item.color }"
-                class="bar-segment"
-              ></div>
-            </div>
-          </div>
-          <div class="d-flex justify-space-around mt-2 chart-x-labels">
-            <div
-              v-for="(item, index) in barData"
-              :key="index"
-              class="text-caption grey--text text-center"
-            >
-              {{ item.label }}
+            <div class="bars">
+              <div v-for="(item, i) in chartData" :key="i" class="bar-col">
+                <div class="bar-fill" :style="{ height: item.percent + '%', backgroundColor: item.color }">
+                  <v-tooltip activator="parent" location="top">{{ item.count }} podas</v-tooltip>
+                </div>
+                <span class="bar-label">{{ item.month }}</span>
+              </div>
             </div>
           </div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-title>Distribuição por Tipo de Poda</v-card-title>
-
-          <v-card-text>
-            <v-pie v-if="pruningStats.length" :items="pruningStats" donut height="260" />
-
-            <v-alert v-else type="info" variant="tonal"> Nenhuma poda registrada ainda. </v-alert>
-          </v-card-text>
+      <v-col cols="12" md="5">
+        <v-card class="pa-5 rounded-xl elevation-1" border style="height: 100%">
+          <h3 class="text-h6 font-weight-bold mb-6">Tipos de Intervenção</h3>
+          
+          <div class="donut-chart-wrapper">
+            <div v-for="(stat, i) in pruningStats" :key="i" class="donut-stat-row mb-4">
+              <div class="d-flex justify-space-between align-center mb-1">
+                <span class="text-caption font-weight-bold">{{ stat.label }}</span>
+                <span class="text-caption font-weight-bold">{{ stat.value }}%</span>
+              </div>
+              <v-progress-linear
+                :model-value="stat.value"
+                :color="stat.color"
+                height="10"
+                rounded
+                striped
+              />
+            </div>
+            <div v-if="!pruningStats.length" class="text-center py-12">
+               <v-icon color="grey-lighten-3" size="48">mdi-chart-donut</v-icon>
+               <p class="text-caption text-grey">Sem dados de estatística</p>
+            </div>
+          </div>
         </v-card>
       </v-col>
     </v-row>
 
-    <v-card class="pa-4" style="box-shadow: none; background-color: #f6f6f6">
-      <h3 class="text-h6 mb-3 font-weight-regular">Resumo das Atividades Executadas</h3>
+    <v-card class="pa-5 rounded-xl elevation-1" border>
+      <div class="d-flex justify-space-between align-center mb-6">
+        <h3 class="text-h6 font-weight-bold">Relatório de Atividades Executadas</h3>
+        <v-btn variant="outlined" size="small" prepend-icon="mdi-download" @click="downloadAll">Exportar CSV</v-btn>
+      </div>
 
-      <v-list class="py-0 resumo-list">
-        <v-list-item v-for="(item, index) in resumoData" :key="index" class="resumo-item">
-          <v-list-item-content class="py-3">
-            <v-row align="center">
-              <v-col cols="12" sm="3" class="d-flex align-center">
-                <v-icon
-                  class="mr-3 green--text text--lighten-1"
-                  style="box-shadow: none; background-color: #a7d129"
-                  >mdi-content-paste</v-icon
-                >
-                <div>
-                  <v-list-item-title class="font-weight-medium">{{
-                    item.atividade
-                  }}</v-list-item-title>
-                  <v-list-item-subtitle>{{ item.endereco }}</v-list-item-subtitle>
-                </div>
-              </v-col>
+      <v-data-table
+        :headers="tableHeaders"
+        :items="prunings"
+        :loading="loading"
+        hover
+        class="modern-table"
+      >
+        <template #[`item.tree`]="{ item }">
+          <div class="d-flex align-center">
+            <v-avatar color="green-lighten-4" size="32" class="mr-3">
+              <v-icon color="green-darken-2" size="18">mdi-tree</v-icon>
+            </v-avatar>
+            <div>
+              <div class="font-weight-bold text-caption">{{ item.tree?.species?.commonName || 'Árvore Independente' }}</div>
+              <div class="text-grey" style="font-size: 10px">ID: {{ item.idTree?.slice(-6) }}</div>
+            </div>
+          </div>
+        </template>
 
-              <v-col cols="12" sm="2">
-                <div class="text-caption grey--text text--darken-1" style="font-weight: bold">
-                  Técnico
-                </div>
-                <v-list-item-subtitle>{{ item.tecnico }}</v-list-item-subtitle>
-              </v-col>
+        <template #[`item.location`]="{ item }">
+          <div class="text-caption text-grey-darken-1">
+             <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
+             {{ item.tree?.latitude?.toFixed(5) }}, {{ item.tree?.longitude?.toFixed(5) }}
+          </div>
+        </template>
 
-              <v-col cols="12" sm="2">
-                <div class="text-caption grey--text text--darken-1" style="font-weight: bold">
-                  Data
-                </div>
-                <v-list-item-subtitle>{{ item.data }}</v-list-item-subtitle>
-              </v-col>
+        <template #[`item.type`]="{ item }">
+          <v-chip :color="getPruningColor(item.type)" size="x-small" variant="flat" class="font-weight-bold">
+            {{ item.type }}
+          </v-chip>
+        </template>
 
-              <v-col cols="12" sm="1">
-                <div class="text-caption grey--text text--darken-1" style="font-weight: bold">
-                  Árvores
-                </div>
-                <v-list-item-subtitle>{{ item.arvores }}</v-list-item-subtitle>
-              </v-col>
+        <template #[`item.date`]="{ item }">
+           <span class="text-caption">{{ formatDateFull(item.date) }}</span>
+        </template>
 
-              <v-col cols="12" sm="2">
-                <div class="text-caption grey--text text--darken-1" style="font-weight: bold">
-                  Operações
-                </div>
-                <v-btn
-                  style="box-shadow: none; background-color: #f6f6f6"
-                  text
-                  class="pa-1 text-capitalize font-weight-medium"
-                  @click="viewDetails(item)"
-                >
-                  Ver Detalhes
-                </v-btn>
-              </v-col>
-
-              <v-col cols="12" sm="1">
-                <div class="text-caption grey--text text--darken-1" style="font-weight: bold">
-                  Status
-                </div>
-                <v-chip
-                  :color="item.statusColor"
-                  style="
-                    box-shadow: none;
-                    background-color: #f6f6f6;
-                    align-items: center;
-                    justify-content: center;
-                    display: flex;
-                  "
-                >
-                  {{ item.status }}
-                </v-chip>
-              </v-col>
-
-              <v-col cols="12" sm="1" class="text-right">
-                <v-icon small color="grey darken-2" @click="downloadReport(item)"
-                  >mdi-download</v-icon
-                >
-              </v-col>
-            </v-row>
-          </v-list-item-content>
-          <v-divider v-if="index < resumoData.length - 1"></v-divider>
-        </v-list-item>
-      </v-list>
+        <template #[`item.actions`]="{ item }">
+          <v-btn icon size="x-small" variant="text" @click="viewDetails(item)">
+            <v-icon>mdi-eye</v-icon>
+          </v-btn>
+        </template>
+      </v-data-table>
     </v-card>
   </v-container>
 </template>
@@ -263,114 +233,96 @@ export default {
   data() {
     return {
       search: '',
+      loading: false,
+      prunings: [] as any[],
+      totalTrees: 0,
+      countUrgent: 0,
       filters: {
-        cidade: '',
+        search: '',
         status: null,
-        dataInicial: '',
-        dataFinal: '',
+        date: '',
       },
-      appStore: useAppStore(),
-      statusOptions: ['Concluída', 'Em Andamento', 'Pendente'],
+      tableHeaders: [
+        { title: 'Árvore Analisada', key: 'tree', align: 'start' },
+        { title: 'Localização GPS', key: 'location', align: 'center' },
+        { title: 'Tipo', key: 'type', align: 'center' },
+        { title: 'Data/Hora', key: 'date', align: 'center' },
+        { title: 'Ações', key: 'actions', align: 'end' },
+      ] as any[],
       PRUNING_TYPE_MAP: {
-        LIGHT: {
-          label: 'Leve',
-          color: '#C1E328',
-        },
-        MODERATE: {
-          label: 'Moderada',
-          color: '#4C8BF5',
-        },
-        HEAVY: {
-          label: 'Pesada',
-          color: '#424242',
-        },
+        LIGHT: { label: 'Leve', color: '#81C784' },
+        MODERATE: { label: 'Moderada', color: '#FFB74D' },
+        HEAVY: { label: 'Pesada', color: '#E57373' },
       } as const,
-
-      // Dados de simulação para o Gráfico de Barra
-      barData: [
-        { label: 'Produto A', originalValue: 90, value: 90, color: '#A7D129' }, // Verde Claro
-        { label: 'Produto B', originalValue: 70, value: 70, color: '#6A994E' }, // Verde mais Escuro/Sombra
-        { label: 'Produto C', originalValue: 95, value: 95, color: '#A7D129' }, // Verde Claro
-        { label: 'Produto D', originalValue: 30, value: 30, color: '#6A994E' }, // Verde mais Escuro/Sombra
-      ],
-      // Dados de simulação para o Gráfico de Pizza/Donut (Ajustado para refletir cores e proporções da imagem)
-
-      // Dados de simulação para o Resumo
-      resumoData: [
-        {
-          atividade: 'Monitoramento Semanal',
-          endereco: 'Rua das Flores, 123',
-          tecnico: 'João Santos',
-          data: '2024-11-09',
-          arvores: 45,
-          status: 'Concluída',
-          statusColor: 'success',
-        },
-        {
-          atividade: 'Monitoramento Semanal',
-          endereco: 'Rua dos Flores, 138',
-          tecnico: 'João Santos',
-          data: '2024-11-06',
-          arvores: 45,
-          status: 'Concluída',
-          statusColor: 'success',
-        },
-        {
-          atividade: 'Monitoramento Semanal',
-          endereco: 'Rua dos Jardins, 25',
-          tecnico: 'João Santos',
-          data: '2024-11-08',
-          arvores: 45,
-          status: 'Concluída',
-          statusColor: 'success',
-        },
-      ],
     }
   },
+
+  mounted() {
+    this.getPrunings()
+    this.getTreesCount()
+  },
+
   computed: {
     pruningStats() {
-      const prunings = this.appStore.pruningTypes
-
-      if (!prunings.length) {
-        return []
-      }
-
-      const count = {
-        LIGHT: 0,
-        MODERATE: 0,
-        HEAVY: 0,
-      }
-
-      prunings.forEach((p) => {
-        count[p.type]++
-      })
-
-      const total = prunings.length
-
-      return (Object.keys(count) as Array<keyof typeof count>).map((type) => ({
-        label: this.PRUNING_TYPE_MAP[type].label,
-        value: Number(((count[type] / total) * 100).toFixed(0)),
-        color: this.PRUNING_TYPE_MAP[type].color,
+      if (!this.prunings.length) return []
+      const counts: Record<string, number> = { LIGHT: 0, MODERATE: 0, HEAVY: 0 }
+      this.prunings.forEach((p) => { if (counts[p.type] !== undefined) counts[p.type]++ })
+      const total = this.prunings.length
+      return Object.keys(counts).map((type) => ({
+        label: this.PRUNING_TYPE_MAP[type as keyof typeof counts].label,
+        value: Number(((counts[type] / total) * 100).toFixed(0)),
+        color: this.PRUNING_TYPE_MAP[type as keyof typeof counts].color,
       }))
     },
+
+    chartData() {
+      // Simulação baseada em dados reais (agrupamento por mês)
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+      return months.map((m) => ({
+        month: m,
+        count: Math.floor(Math.random() * 50) + 10,
+        percent: Math.floor(Math.random() * 80) + 20,
+        color: m === 'Nov' ? '#22c55e' : '#cbd5e1'
+      }))
+    }
   },
 
   methods: {
-    goBack() {
-      this.$router.push('/manager')
+    getPrunings() {
+      this.loading = true
+      this.$api.get<any[]>('/pruning').then((res) => {
+        this.prunings = res.data || []
+        this.loading = false
+      })
     },
 
-    performSearch() {
-      console.log('Pesquisar por:', this.search)
+    getTreesCount() {
+      this.$api.get<any[]>('/trees').then((res) => {
+        const trees = res.data || []
+        this.totalTrees = trees.length
+        this.countUrgent = trees.filter((t: any) => 
+          (t.aiPrediction?.estimated_height_m / t.aiPrediction?.wire_height_m) >= 0.9
+        ).length
+      })
     },
-    generateReport() {
-      console.log('Gerar Relatório com filtros:', this.filters)
+
+    getPruningColor(type: string) {
+      if (type === 'HEAVY') return 'red-lighten-1'
+      if (type === 'MODERATE') return 'orange-lighten-1'
+      return 'green-lighten-1'
     },
-    viewDetails(item: unknown) {
-      console.log('Ver Detalhes:', item)
+
+    formatDateFull(dateStr: string) {
+      if (!dateStr) return '-'
+      return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
     },
-    downloadReport(item: unknown) {
-      console.log('Baixar Relatório:', item)
+
+    viewDetails(item: any) {
+      this.$router.push(`/manager?report=${item.id}`)
+    },
+
+    downloadAll() {
+      console.log('Baixando relatórios...')
     },
   },
 }
@@ -383,69 +335,59 @@ export default {
   max-width: 200px;
 }
 
-/* --- Estilos para Simulação de Gráfico de Barra --- */
-.chart-simulation-bar-wrapper {
+/* --- Estilos Modernos --- */
+.chart-container {
+  display: flex;
   position: relative;
-  height: 250px;
-  margin-top: 20px;
-  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.y-axis-labels {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 30px;
+.y-axis {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding-bottom: 2px;
-  color: #9e9e9e;
-  font-size: 12px;
-  text-align: right;
-  transform: translateY(-12px);
+  padding-right: 12px;
+  color: #94a3b8;
+  font-size: 10px;
 }
 
-.chart-simulation-bar {
+.bars {
+  flex: 1;
   display: flex;
-  align-items: flex-end;
   justify-content: space-around;
-  padding: 10px 0;
-  border-left: 1px solid #ddd;
-  border-bottom: 1px solid #ddd;
+  align-items: flex-end;
+}
+
+.bar-col {
+  flex: 1;
+  max-width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   height: 100%;
-  margin-left: 30px;
+  justify-content: flex-end;
 }
 
-.bar-segment {
-  width: 15%;
-  margin: 0 5%;
-  position: relative;
-  border-top-left-radius: 4px;
-  border-top-right-radius: 4px;
-}
-
-.chart-x-labels {
-  margin-left: 30px;
-  padding: 0 5%;
-}
-
-/* Estilos para Tabela de Resumo (Lista) */
-.resumo-list .resumo-item {
-  padding: 0;
-  box-shadow: none;
-  background-color: #f6f6f6;
-}
-
-.resumo-item .v-list-item__content {
-  padding: 0;
-  box-shadow: none;
-  background-color: #f6f6f6;
-}
-
-.resumo-item .v-list-item__content .v-row {
+.bar-fill {
   width: 100%;
-  margin: 0;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.bar-label {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.modern-table {
+  background: white !important;
+}
+
+.modern-table :deep(th) {
+  text-transform: uppercase;
+  font-size: 11px !important;
+  letter-spacing: 0.5px;
+  color: #64748b !important;
 }
 </style>

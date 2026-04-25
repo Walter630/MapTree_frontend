@@ -174,6 +174,7 @@ export interface Soil {
   depth: number
   inclination: number
   quality: SoilQuality
+  soilType?: string // Adicionado para suportar novos tipos científicos
   coverage: number
   clay?: number | null
   sand?: number | null
@@ -185,6 +186,7 @@ export interface Soil {
 export interface TreeWithAi {
   id: string
   commonName: string
+  status: TreeStatus
   aiPrediction: AiPrediction
   soil?: Soil
   vigor: Vigor
@@ -368,6 +370,19 @@ class ApiConnect {
 
   public delete<T = unknown>(url: string, config = {}) {
     return this.axiosInstance.delete<T>(url, config)
+  }
+
+  public getAiPrediction(treeId: string) {
+    return this.axiosInstance.get(`/trees/${treeId}/ai-prediction`)
+  }
+
+  /* ---------- Novas Importações IA ---------- */
+  public importExternalData() {
+    return this.axiosInstance.post('/trees/import-external')
+  }
+
+  public importMapTreeCsv(filePath: string) {
+    return this.axiosInstance.post('/trees/import-maptree-csv', { filePath })
   }
 }
 

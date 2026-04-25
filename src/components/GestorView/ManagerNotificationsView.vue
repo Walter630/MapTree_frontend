@@ -23,46 +23,70 @@
     <!-- Lista de Notificações -->
     <v-window v-model="tab">
       <v-window-item value="todas">
-        <v-row class="mt-3">
-          <v-col v-for="(notificacao, i) in notificacoes" :key="i" cols="12">
-            <v-card flat class="notification-card pa-6 mb-4">
+        <div v-if="loading" class="text-center py-12">
+          <v-progress-circular indeterminate color="primary" />
+          <p class="text-caption text-grey mt-2">Sincronizando alertas...</p>
+        </div>
+        
+        <v-row v-else class="mt-3">
+          <v-col v-for="(notificacao, i) in filteredNotifications" :key="i" cols="12">
+            <v-card flat class="notification-card pa-5 mb-4 rounded-xl elevation-2" border>
               <div class="d-flex justify-space-between align-start mb-2">
-                <!-- Informações -->
                 <div class="d-flex align-center">
-                  <v-icon :color="notificacao.iconColor" size="28" class="mr-3">
-                    {{ notificacao.icon }}
-                  </v-icon>
+                  <v-avatar :color="notificacao.iconColor + '22'" size="48" class="mr-4">
+                    <v-icon :color="notificacao.iconColor" size="24">
+                      {{ notificacao.icon }}
+                    </v-icon>
+                  </v-avatar>
                   <div>
-                    <p class="text-subtitle-1 font-weight-medium mb-0">{{ notificacao.titulo }}</p>
+                    <div class="d-flex align-center gap-2 mb-1">
+                      <p class="text-subtitle-1 font-weight-bold mb-0">{{ notificacao.titulo }}</p>
+                      <v-chip v-if="notificacao.isNew" color="primary" size="x-small" variant="flat">NOVO</v-chip>
+                    </div>
                     <p class="text-body-2 text-grey-darken-1 mb-1">{{ notificacao.descricao }}</p>
-                    <p class="text-caption text-grey-darken-2">{{ notificacao.tempo }}</p>
+                    <div class="d-flex align-center text-caption text-grey">
+                      <v-icon size="12" class="mr-1">mdi-clock-outline</v-icon>
+                      {{ notificacao.tempo }}
+                    </div>
                   </div>
                 </div>
 
-                <!-- Ações -->
                 <div class="d-flex flex-column align-end">
-                  <v-chip :color="notificacao.prioridadeCor" text-color="white" label size="small" class="mb-2">
+                  <v-chip :color="notificacao.prioridadeCor" size="x-small" class="mb-2 font-weight-bold">
                     {{ notificacao.prioridade }}
                   </v-chip>
-                  <v-btn variant="text" size="small" class="text-caption">Marcar como lida</v-btn>
                 </div>
               </div>
 
-              <v-divider class="mb-4" />
+              <v-divider class="my-4" opacity="0.1" />
 
-              <v-btn
-                v-if="notificacao.acao"
-                :color="notificacao.botaoCor"
-                variant="flat"
-                class="action-btn"
-              >
-                {{ notificacao.acao }}
-              </v-btn>
-
-              <v-btn v-else variant="outlined" color="grey-darken-2" class="action-btn">
-                {{ notificacao.acaoSecundaria }}
-              </v-btn>
+              <div class="d-flex justify-end gap-2">
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  rounded="lg"
+                  color="grey"
+                  @click="markAsRead(i)"
+                >
+                  Ocultar
+                </v-btn>
+                <v-btn
+                  v-if="notificacao.link"
+                  :color="notificacao.botaoCor || 'primary'"
+                  variant="flat"
+                  size="small"
+                  rounded="lg"
+                  :to="notificacao.link"
+                >
+                  Ver Mais
+                </v-btn>
+              </div>
             </v-card>
+          </v-col>
+
+          <v-col v-if="filteredNotifications.length === 0" cols="12" class="text-center py-12">
+             <v-icon size="64" color="grey-lighten-2">mdi-bell-off-outline</v-icon>
+             <p class="text-grey mt-2">Nenhuma notificação nesta categoria.</p>
           </v-col>
         </v-row>
       </v-window-item>
@@ -93,44 +117,97 @@ export default defineComponent({
 
   data: () => ({
     tab: 'todas',
-
-    notificacoes: [
-      {
-        titulo: 'Poda Urgente Necessária',
-        descricao: 'Uma árvore na Avenida Central apresenta sinais de doença grave.',
-        tempo: 'Há 10 minutos',
-        prioridade: 'Alta',
-        prioridadeCor: '#FF3C3C',
-        icon: 'mdi-alert-circle',
-        iconColor: '#FF3C3C',
-        acao: 'Ver Detalhes',
-        botaoCor: '#FF3C3C',
-      },
-      {
-        titulo: 'Agendamento de Poda Confirmado',
-        descricao: 'A poda para a Rua das Flores foi agendada para 15/09/2024.',
-        tempo: 'Há 1 hora',
-        prioridade: 'Média',
-        prioridadeCor: '#FBC02D',
-        icon: 'mdi-calendar-check',
-        iconColor: '#FBC02D',
-        acao: 'Ver Agendamento',
-        botaoCor: '#FBC02D',
-      },
-      {
-        titulo: 'Relatório de Poda Disponível',
-        descricao: 'O relatório da poda realizada no Parque Central está disponível.',
-        tempo: 'Ontem',
-        prioridade: 'Baixa',
-        prioridadeCor: '#388E3C',
-        icon: 'mdi-file-document',
-        iconColor: '#388E3C',
-        acaoSecundaria: 'Ver Relatório',
-      },
-    ] as Notificacao[],
+    loading: false,
+    notificacoes: [] as any[],
   }),
 
+  computed: {
+    filteredNotifications() {
+      if (this.tab === 'todas') return this.notificacoes
+      if (this.tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
+      if (this.tab === 'agendamentos') return this.notificacoes.filter(n => n.type === 'SCHEDULE')
+      if (this.tab === 'relatorios') return this.notificacoes.filter(n => n.type === 'PRUNING')
+      return this.notificacoes
+    }
+  },
+
+  mounted() {
+    this.fetchAllData()
+  },
+
   methods: {
+    async fetchAllData() {
+      this.loading = true
+      try {
+        const [treesRes, schedulesRes, pruningsRes] = await Promise.all([
+          this.$api.get<any[]>('/trees'),
+          this.$api.get<any[]>('/scheduling'),
+          this.$api.get<any[]>('/pruning')
+        ])
+
+        const alerts = [] as any
+
+        // 1. Riscos de IA
+        treesRes.data?.filter(t => (t.aiPrediction?.estimated_height_m / t.aiPrediction?.wire_height_m) >= 0.8).forEach(t => {
+          alerts.push({
+            type: 'RISK',
+            titulo: 'Alerta de Risco IA',
+            descricao: `Árvore ${t.species?.commonName || ''} atingiu nível crítico de altura na rede elétrica.`,
+            tempo: 'Detectado agora',
+            prioridade: 'ALTA',
+            prioridadeCor: 'red-darken-1',
+            icon: 'mdi-alert-decagram',
+            iconColor: 'red',
+            botaoCor: 'red',
+            link: '/manager/map',
+            isNew: true
+          })
+        })
+
+        // 2. Agendamentos
+        schedulesRes.data?.filter(s => s.status === 'PENDING').forEach(s => {
+          alerts.push({
+            type: 'SCHEDULE',
+            titulo: 'Tarefa Pendente',
+            descricao: `Poda agendada para árvore ${s.tree?.species?.commonName || ''} em ${new Date(s.plannedDate).toLocaleDateString()}.`,
+            tempo: 'Agendamento ativo',
+            prioridade: 'MEDIA',
+            prioridadeCor: 'orange-darken-1',
+            icon: 'mdi-calendar-clock',
+            iconColor: 'orange',
+            botaoCor: 'orange',
+            link: '/manager'
+          })
+        })
+
+        // 3. Relatórios recentes
+        pruningsRes.data?.slice(0, 5).forEach(p => {
+          alerts.push({
+            type: 'PRUNING',
+            titulo: 'Novo Relatório de Poda',
+            descricao: `Finalizada intervenção do tipo ${p.type} por ${p.user?.name || 'Técnico'}.`,
+            tempo: new Date(p.date).toLocaleDateString(),
+            prioridade: 'BAIXA',
+            prioridadeCor: 'green-darken-1',
+            icon: 'mdi-file-check',
+            iconColor: 'green',
+            botaoCor: 'green',
+            link: '/manager/reports'
+          })
+        })
+
+        this.notificacoes = alerts
+      } catch (e) {
+        console.error('Erro ao buscar notificações:', e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    markAsRead(index: number) {
+      this.notificacoes.splice(index, 1)
+    },
+
     goBack() {
       this.$router.push('/manager')
     },

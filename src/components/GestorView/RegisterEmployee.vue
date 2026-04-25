@@ -138,15 +138,20 @@ export default {
 
     async registrar() {
       try {
-        const response = await this.$api.post<User>('/users', this.formData)
+        // Garantir que estamos registrando um 'USER' associado à organização do gestor
+        const payload = {
+          ...this.formData,
+          role: 'USER',
+          isActive: true
+        }
+
+        const response = await this.$api.post<User>('/users', payload)
         if (response.status === 201) {
           this.$router.push('/manager/employees')
-        } else {
-          console.log('Erro no registro: ', response)
         }
       } catch (error) {
         console.error('Erro no registro: ', error)
-        alert('Erro no registro: ' + error)
+        alert('Falha ao cadastrar funcionário. Verifique os dados.')
       }
     },
 

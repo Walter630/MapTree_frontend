@@ -28,60 +28,70 @@
     <!-- Lista de notificações -->
     <v-window v-model="tab">
       <v-window-item value="todas">
-        <v-row style="margin-top: 10px">
-          <v-col cols="12" v-for="(notificacao, i) in notificacoes" :key="i">
+        <div v-if="loading" class="text-center py-10">
+           <v-progress-circular indeterminate color="green" />
+           <p class="text-caption mt-2">Buscando alertas de campo...</p>
+        </div>
+
+        <v-row v-else style="margin-top: 10px">
+          <v-col cols="12" v-for="(notificacao, i) in filteredNotifications" :key="i">
             <v-card
               flat
-              class="pa-6 mb-4"
-              style="border: 1px solid #e0e0e0; background-color: #fafafa; border-radius: 12px"
+              class="pa-5 mb-4 rounded-xl elevation-1"
+              border
             >
               <div class="d-flex justify-space-between align-start mb-2">
                 <div class="d-flex align-center">
-                  <v-icon :color="notificacao.iconColor" size="28" class="mr-3">
-                    {{ notificacao.icon }}
-                  </v-icon>
+                  <v-avatar :color="notificacao.iconColor + '22'" size="40" class="mr-3">
+                    <v-icon :color="notificacao.iconColor" size="20">
+                      {{ notificacao.icon }}
+                    </v-icon>
+                  </v-avatar>
                   <div>
-                    <p class="text-subtitle-1 font-weight-medium mb-0">
+                    <p class="text-subtitle-2 font-weight-bold mb-0">
                       {{ notificacao.titulo }}
                     </p>
-                    <p class="text-body-2 text-grey-darken-1 mb-1">
+                    <p class="text-caption text-grey-darken-1 mb-1">
                       {{ notificacao.descricao }}
                     </p>
-                    <p class="text-caption text-grey-darken-2">
+                    <div class="text-caption text-grey-darken-2 d-flex align-center">
+                      <v-icon size="10" class="mr-1">mdi-clock</v-icon>
                       {{ notificacao.tempo }}
-                    </p>
+                    </div>
                   </div>
                 </div>
 
                 <div class="d-flex flex-column align-end">
                   <v-chip
                     :color="notificacao.prioridadeCor"
-                    text-color="white"
-                    label
-                    size="small"
-                    class="mb-2"
+                    size="x-small"
+                    class="mb-2 font-weight-bold"
                   >
                     {{ notificacao.prioridade }}
                   </v-chip>
-                  <v-btn variant="text" size="small" class="text-caption" @click="markAsRead(notificacao)"> Marcar como lida </v-btn>
                 </div>
               </div>
 
-              <v-divider class="mb-4"></v-divider>
+              <v-divider class="my-3" opacity="0.1"></v-divider>
 
-              <v-btn
-                v-if="notificacao.acao"
-                :color="notificacao.botaoCor"
-                variant="flat"
-                style="color: white; border-radius: 8px"
-              >
-                {{ notificacao.acao }}
-              </v-btn>
-
-              <v-btn v-else variant="outlined" color="grey-darken-2" style="border-radius: 8px">
-                {{ notificacao.acaoSecundaria }}
-              </v-btn>
+              <div class="d-flex justify-end">
+                <v-btn
+                   v-if="notificacao.link"
+                  :color="notificacao.iconColor"
+                  variant="flat"
+                  size="small"
+                  rounded="lg"
+                  :to="notificacao.link"
+                  class="font-weight-bold"
+                >
+                  ACESSAR
+                </v-btn>
+              </div>
             </v-card>
+          </v-col>
+
+          <v-col v-if="filteredNotifications.length === 0" cols="12" class="text-center py-10">
+             <p class="text-grey">Nenhum alerta pendente.</p>
           </v-col>
         </v-row>
       </v-window-item>
@@ -98,53 +108,74 @@ export default defineComponent({
   components: { PageHeader },
   data: () => ({
     tab: 'todas',
-
-    notificacoes: [
-      {
-        id: 1,
-        titulo: 'Poda Urgente Necessária',
-        descricao: 'Uma árvore na Avenida Central apresenta sinais de doença grave.',
-        tempo: 'Há 10 minutos',
-        prioridade: 'Alta',
-        prioridadeCor: '#FF3C3C',
-        icon: 'mdi-alert-circle',
-        iconColor: '#FF3C3C',
-        acao: 'Ver Detalhes',
-        botaoCor: '#FF3C3C',
-      },
-      {
-        id: 2,
-        titulo: 'Agendamento de Poda Confirmado',
-        descricao: 'A poda para a Rua das Flores foi agendada para 15/09/2024.',
-        tempo: 'Há 1 hora',
-        prioridade: 'Média',
-        prioridadeCor: '#FBC02D',
-        icon: 'mdi-calendar-check',
-        iconColor: '#FBC02D',
-        acao: 'Ver Agendamento',
-        botaoCor: '#FBC02D',
-      },
-      {
-        id: 3,
-        titulo: 'Relatório de Poda Disponível',
-        descricao: 'O relatório da poda realizada no Parque Central está disponível.',
-        tempo: 'Ontem',
-        prioridade: 'Baixa',
-        prioridadeCor: '#388E3C',
-        icon: 'mdi-file-document',
-        iconColor: '#388E3C',
-        acaoSecundaria: 'Ver Relatório',
-      },
-    ],
+    loading: false,
+    notificacoes: [] as any[],
   }),
 
+  computed: {
+    filteredNotifications() {
+      if (this.tab === 'todas') return this.notificacoes
+      if (this.tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
+      if (this.tab === 'agendamentos') return this.notificacoes.filter(n => n.type === 'SCHEDULE')
+      return this.notificacoes
+    }
+  },
+
+  mounted() {
+    this.fetchUserAlerts()
+  },
+
   methods: {
+    async fetchUserAlerts() {
+      this.loading = true
+      try {
+        const [treesRes, schedulesRes] = await Promise.all([
+          this.$api.get<any[]>('/trees'),
+          this.$api.get<any[]>('/scheduling')
+        ])
+
+        const alerts = [] as any
+
+        // 1. Árvores em risco (Alerta para o funcionário agir)
+        treesRes.data?.filter(t => (t.aiPrediction?.estimated_height_m / t.aiPrediction?.wire_height_m) >= 0.9).forEach(t => {
+          alerts.push({
+            type: 'RISK',
+            titulo: 'Poda de Emergência',
+            descricao: `Risco iminente em ${t.species?.commonName || 'Árvore'}. Localize no mapa.`,
+            tempo: 'Agora',
+            prioridade: 'ALTA',
+            prioridadeCor: 'red',
+            icon: 'mdi-lightning-bolt',
+            iconColor: 'red',
+            link: '/user/mapUser'
+          })
+        })
+
+        // 2. Agendamentos Pendentes para o Funcionário
+        schedulesRes.data?.filter(s => s.status === 'PENDING').forEach(s => {
+          alerts.push({
+            type: 'SCHEDULE',
+            titulo: 'Poda Programada',
+            descricao: `Executar poda na árvore ID: ${s.idTree?.slice(-6)}.`,
+            tempo: 'Agendado',
+            prioridade: 'MEDIA',
+            prioridadeCor: 'orange',
+            icon: 'mdi-clipboard-list',
+            iconColor: 'orange',
+            link: '/user/podas'
+          })
+        })
+
+        this.notificacoes = alerts
+      } catch (e) {
+        console.error(e)
+      } finally {
+        this.loading = false
+      }
+    },
+
     goBack() {
       this.$router.push('/user')
-    },
-    markAsRead(notificacao: any) {
-      notificacao.lida = true
-      this.notificacoes = this.notificacoes.map((n) => (n.id === notificacao.id ? { ...n, lida: true } : n))
     },
   },
 })

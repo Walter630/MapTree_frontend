@@ -42,6 +42,11 @@ export const useAppStore = defineStore('app', {
     setLoadingPage(value: boolean) {
       this.loadingPage = value
     },
+
+    logout() {
+      this.user = null
+      // Limpa dados sensíveis se houver
+    }
   },
 
   /* ---------- Getters ---------- */

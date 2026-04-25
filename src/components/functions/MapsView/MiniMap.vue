@@ -123,9 +123,11 @@ export default defineComponent({
       TO_PRUNE: { emoji: '✂️', color: '#FF9800', label: 'Para Podar' },
       UNDER_OBSERVATION: { emoji: '👁️', color: '#FFC107', label: 'Observação' },
       PRUNED: { emoji: '🌿', color: '#66BB6A', label: 'Podada' },
+      CRITICAL: { emoji: '💣', color: '#D32F2F', label: 'RISCO CRÍTICO' },
     }
 
     const getCfg = (status: string, danger: boolean): { emoji: string; color: string; label: string } => {
+      if (status === 'CRITICAL') return STATUS_CONFIG.CRITICAL!
       if (danger) return { emoji: '⚠️', color: '#FF3B3B', label: 'Risco Fiação' }
       return (STATUS_CONFIG[status] ?? STATUS_CONFIG.NORMAL)!
     }
@@ -136,8 +138,8 @@ export default defineComponent({
         html: `<div style="
           background:${cfg.color};border:2px solid #fff;border-radius:50%;
           width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-          font-size:${danger ? '14' : '12'}px;box-shadow:0 2px 6px rgba(0,0,0,0.3);
-          ${danger ? 'animation:pulse 1.2s infinite;' : ''}
+          font-size:${(danger || status === 'CRITICAL') ? '14' : '12'}px;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+          ${(danger || status === 'CRITICAL') ? 'animation:pulse 1.2s infinite;' : ''}
         ">${cfg.emoji}</div>`,
         iconSize: [30, 30],
         iconAnchor: [15, 15],
@@ -175,7 +177,7 @@ export default defineComponent({
               latitude: lat,
               longitude: lng,
               status: status,
-              speciesName: PRESENTATION_SPECIES[Math.floor(Math.random() * PRESENTATION_SPECIES.length)],
+              speciesName: PRESENTATION_SPECIES[Math.floor(Math.random() * PRESENTATION_SPECIES.length)] as string,
               nearPowerLine: checkNearPowerLine(lat, lng)
             })
           }

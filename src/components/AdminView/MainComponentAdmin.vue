@@ -20,11 +20,12 @@ export default defineComponent({
       loading: false as boolean,
       error: null as string | null,
 
-      // Importação IA
+      // Manutenção
       importLoading: false,
       importSuccess: false,
       importError: '',
-      importResult: '',
+      cleanupLoading: false,
+      totalTrees: 0,
 
       // Snackbar
       snackbar: false,
@@ -95,27 +96,39 @@ export default defineComponent({
 
     async importExternalData() {
       this.importLoading = true;
-      this.importError = '';
-      this.importResult = '';
-      this.importSuccess = false;
-
       try {
-        const response = await this.$api.post<{ message?: string }>('/trees/import-external');
+        const response = await this.$api.post<any>('/trees/import-external');
         this.importSuccess = true;
-        this.importResult = `Importação concluída com sucesso! ${JSON.stringify(response.data?.message || response.data || '')}`;
-        this.notify('Dados da IA importados com sucesso!', 'success');
-
-        // Reset do estado de sucesso após 5 segundos
-        setTimeout(() => {
-          this.importSuccess = false;
-        }, 5000);
+        this.notify(`Importação concluída! +${response.data?.imported || 0} novas árvores.`, 'success');
+        this.getTreesCount(); 
       } catch (e: unknown) {
-        console.error('Erro ao importar dados externos:', e);
-        const err = e as { response?: { data?: { message?: string } } };
-        this.importError = err.response?.data?.message || 'Falha ao importar dados. Verifique se o arquivo JSON existe no servidor.';
-        this.notify(this.importError, 'error');
+        this.notify('Falha ao importar dados.', 'error');
       } finally {
         this.importLoading = false;
+      }
+    },
+
+    async cleanupDuplicates() {
+      if (!confirm('Deseja realmente remover TODAS as árvores duplicadas? Esta ação não pode ser desfeita.')) return;
+      
+      this.cleanupLoading = true;
+      try {
+        const response = await this.$api.post<any>('/trees/cleanup');
+        this.notify(`Faxina concluída! Removidas ${response.data?.duplicatesRemoved || 0} duplicatas.`, 'success');
+        this.getTreesCount();
+      } catch (e: unknown) {
+        this.notify('Falha ao executar limpeza.', 'error');
+      } finally {
+        this.cleanupLoading = false;
+      }
+    },
+
+    async getTreesCount() {
+      try {
+        const res = await this.$api.get<any[]>('/trees');
+        this.totalTrees = (res.data || []).length;
+      } catch (e) {
+        console.error(e);
       }
     },
 
@@ -127,10 +140,9 @@ export default defineComponent({
 
   },
   mounted() {
-    // Chamar a API automaticamente ao carregar o componente
     this.getCompanies();
     this.getManagers();
-
+    this.getTreesCount();
   },
 });
 </script>
@@ -349,29 +361,29 @@ export default defineComponent({
       </v-col>
 
       <v-col cols="12" md="4">
-        <v-card class="import-card import-card--info" elevation="0">
+        <v-card class="import-card" elevation="0" style="border-color: #F44336; background-color: #FFF5F5;">
           <div class="import-card-header">
-            <div class="import-icon-wrapper" style="background: linear-gradient(135deg, #FF8F00, #FFB300);">
-              <v-icon size="28" color="white">mdi-information-outline</v-icon>
+            <div class="import-icon-wrapper" style="background: linear-gradient(135deg, #F44336, #D32F2F);">
+              <v-icon size="28" color="white">mdi-database-remove</v-icon>
             </div>
             <div>
-              <p class="import-title">Como funciona?</p>
-              <p class="import-subtitle">Fluxo de importação dos dados</p>
+              <p class="import-title">Limpeza de Duplicatas</p>
+              <p class="import-subtitle">Remova árvores duplicadas e otimize o banco de dados</p>
             </div>
           </div>
-
           <v-divider class="my-3" />
-
-          <div class="info-steps">
-            <div class="info-step">
-              <div class="step-number">1</div>
-              <span>Admin importa o JSON externo</span>
-            </div>
-            <div class="info-step">
-              <div class="step-number">2</div>
-              <span>Admin e Gestores analisam riscos no mapa</span>
-            </div>
-          </div>
+          <v-btn 
+            block 
+            size="large"
+            color="error" 
+            variant="flat"
+            :loading="cleanupLoading"
+            prepend-icon="mdi-broom"
+            class="import-btn"
+            @click="cleanupDuplicates"
+          >
+            Limpar Base ({{ totalTrees }} total)
+          </v-btn>
         </v-card>
       </v-col>
     </v-row>

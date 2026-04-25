@@ -32,99 +32,76 @@
           :headers="headers"
           :items="users"
           :search="search"
-          :sort-by="[{ key: 'nome', order: 'asc' }]"
-          class="elevation-0 data-table-custom"
-          style="background-color: #f6f6f6"
-          hide-default-footer
+          :loading="loading"
+          class="elevation-0 modern-table"
         >
-          <template #item="{ item }">
-            <tr>
-              <td class="table-id">{{ item.name }}</td>
-              <td class="table-text">{{ item.cpf }}</td>
+          <template #[`item.name`]="{ item }">
+            <span class="font-weight-bold">{{ item.name }}</span>
+          </template>
 
-              <td>
-                <v-chip color="green" v-if="item.isActive">
-                  {{ item.isActive }}
-                </v-chip>
-              </td>
-              <td>
-                <v-icon size="small" class="mr-2 action-icon" @click="openDialogEdit(item)">
-                  mdi-square-edit-outline
-                </v-icon>
-                <v-icon size="small" class="action-icon" @click="openDialogDelete(item)">
-                  mdi-trash-can-outline
-                </v-icon>
-              </td>
-            </tr>
+          <template #[`item.isActive`]="{ item }">
+            <v-chip :color="item.isActive ? 'green-darken-1' : 'red-darken-1'" size="x-small" variant="flat" class="font-weight-bold">
+              {{ item.isActive ? 'ATIVO' : 'INATIVO' }}
+            </v-chip>
+          </template>
+
+          <template #[`item.acoes`]="{ item }">
+             <v-btn icon size="x-small" variant="text" color="blue-grey-darken-2" @click="openDialogEdit(item)">
+                <v-icon>mdi-pencil-outline</v-icon>
+             </v-btn>
+             <v-btn icon size="x-small" variant="text" color="red-darken-2" @click="openDialogDelete(item)">
+                <v-icon>mdi-trash-can-outline</v-icon>
+             </v-btn>
           </template>
         </v-data-table>
-        <v-card-actions class="justify-center py-6">
-          <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
+      </v-col>
+    </v-row>
+    
+    <v-dialog v-model="dialogEdit.active" max-width="500px">
+      <v-card v-if="dialogEdit.item" class="rounded-xl pa-4">
+        <v-card-title class="text-h6 font-weight-bold">Editar Funcionário</v-card-title>
+        <v-card-text>
+          <v-row dense>
+            <v-col cols="12">
+              <v-text-field v-model="dialogEdit.item.name" label="Nome Completo" variant="outlined" density="comfortable" />
+            </v-col>
+            <v-col cols="12">
+              <v-text-field v-model="dialogEdit.item.email" label="Email" variant="outlined" density="comfortable" />
+            </v-col>
+            <v-col cols="12">
+              <v-select
+                v-model="dialogEdit.item.isActive"
+                :items="[{ title: 'Ativo', value: true }, { title: 'Inativo', value: false }]"
+                label="Status da Conta"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="closeDialogEdit">Cancelar</v-btn>
+          <v-btn color="black" variant="flat" :loading="dialogEdit.loading" @click="editItem">Salvar Alterações</v-btn>
         </v-card-actions>
-      </v-col>
-    </v-row>
+      </v-card>
+    </v-dialog>
 
-    <v-row justify="space-between" align="center" class="mt-4">
-      <v-col cols="auto">
-        <div class="d-flex align-center text-caption text-grey-darken-1">
-          Linhas por página
-          <v-select
-            v-model="itemsPerPage"
-            :items="[4, 10, 25, 50]"
-            density="compact"
-            variant="solo"
-            hide-details
-            class="ml-2"
-            style="width: 70px; font-size: 12px"
-          />
-        </div>
-      </v-col>
-
-      <v-col cols="auto">
-        <div class="d-flex align-center text-caption text-grey-darken-1">
-          <v-btn icon size="small" variant="text" @click="page > 1 && page--">
-            <v-icon>mdi-chevron-left</v-icon>
-          </v-btn>
-
-          <span class="mx-1">
-            <v-btn
-              v-for="p in 1"
-              :key="p"
-              size="small"
-              variant="text"
-              :color="p === page ? 'black' : 'grey'"
-              @click="page = p"
-              class="font-weight-bold"
-            >
-              {{ p }}
-            </v-btn>
-          </span>
-
-          <span class="mx-2 text-subtitle-2">...</span>
-          <v-btn
-            size="small"
-            variant="text"
-            :color="page === 11 ? 'black' : 'grey'"
-            @click="page = 11"
-            class="font-weight-bold"
-            >11</v-btn
-          >
-          <v-btn
-            size="small"
-            variant="text"
-            :color="page === 12 ? 'black' : 'grey'"
-            @click="page = 12"
-            class="font-weight-bold"
-            >12</v-btn
-          >
-
-          <span class="text-subtitle-2 mx-1">Próxima</span>
-          <v-btn icon size="small" variant="text" @click="page < pageCount && page++">
-            <v-icon>mdi-chevron-right</v-icon>
-          </v-btn>
-        </div>
-      </v-col>
-    </v-row>
+    <!-- ===== Diálogo de Exclusão ===== -->
+    <v-dialog v-model="dialogDelete.active" max-width="450px">
+      <v-card v-if="dialogDelete.item" class="rounded-xl pa-4">
+        <v-card-title class="text-h6 font-weight-bold text-error">Excluir Funcionário?</v-card-title>
+        <v-card-text>
+          Tem certeza que deseja remover <strong>{{ dialogDelete.item.name }}</strong>? 
+          Esta ação removerá o acesso do usuário permanentemente.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="closeDialogDelete">Pensa melhor</v-btn>
+          <v-btn color="error" variant="flat" :loading="dialogDelete.loading" @click="deleteItem">Sim, Excluir</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -159,22 +136,16 @@ export default defineComponent({
   components: { PageHeader },
   data() {
     return {
-      users: [] as User[],
-      cpfMask: '###.###.###-##',
-      comparacaoPercentual: '',
-      comparacaoCor: 'text-success',
-      // filtros
+      users: [] as any[],
+      loading: false,
       search: '',
-      totalUsers: 0,
-
-      // tabela
-      itemsPerPage: 6,
+      itemsPerPage: 10,
       page: 1,
       headers: [
-        { title: 'Nome', key: 'name', sortable: true },
-        { title: 'Cpf', key: 'cpf', sortable: true },
-        { title: 'Status', key: 'isActive', sortable: true },
-        { title: 'Ações', key: 'acoes', sortable: false },
+        { title: 'Nome Completo', key: 'name', align: 'start' },
+        { title: 'CPF / Registro', key: 'cpf', align: 'center' },
+        { title: 'Status', key: 'isActive', align: 'center' },
+        { title: 'Ações', key: 'acoes', align: 'end', sortable: false },
       ],
       dialogDelete: {
         active: false,
@@ -189,6 +160,8 @@ export default defineComponent({
 
       // backup para filtros
       allUsers: [] as User[],
+      totalUsers: 0,
+      cpfMask: '###.###.###-##',
     }
   },
 
@@ -225,32 +198,35 @@ export default defineComponent({
     },
 
     async editItem() {
+      if (!this.dialogEdit.item) return
       try {
         this.dialogEdit.loading = true
-        await this.$api.patch(`/users/${this.dialogEdit?.item?.id}`, {
-          name: this.dialogEdit?.item?.name,
-          email: this.dialogEdit?.item?.email,
-          organizationId: this.dialogEdit?.item?.organization,
-          isActive: this.dialogEdit?.item?.isActive,
+        await this.$api.patch(`/users/${this.dialogEdit.item.id}`, {
+          name: this.dialogEdit.item.name,
+          email: this.dialogEdit.item.email,
+          isActive: this.dialogEdit.item.isActive,
         })
+        this.notify('Funcionário atualizado!', 'success')
       } catch (error) {
-        console.error('Erro ao buscar usuário:', error)
+        console.error('Erro ao editar:', error)
       } finally {
         await this.getAllUsers()
-        this.dialogEdit.loading = false
-        this.dialogEdit.active = false
-        this.dialogEdit.item = null
+        this.closeDialogEdit()
       }
     },
 
-    openDialogEdit(item: User) {
+    openDialogEdit(item: any) {
+      this.dialogEdit.item = { ...item } // Clone necessário para evitar erro de null na transição
       this.dialogEdit.active = true
-      this.dialogEdit.item = item
     },
     closeDialogEdit() {
       this.dialogEdit.active = false
       this.dialogEdit.item = null
       this.dialogEdit.loading = false
+    },
+    notify(text: string, color = 'success') {
+       // Notifica se houver snackbar ou similar no parent
+       console.log(text, color)
     },
 
     /** 🔹 Usuário logado */
@@ -264,16 +240,16 @@ export default defineComponent({
 
     /** 🔹 Excluir item */
     async deleteItem() {
+      if (!this.dialogDelete.item) return
       try {
         this.dialogDelete.loading = true
-        await this.$api.delete(`/users/${this.dialogDelete?.item?.id}`)
+        await this.$api.delete(`/users/${this.dialogDelete.item.id}`)
+        this.notify('Usuário removido.', 'success')
       } catch (error) {
-        console.error('Erro ao buscar usuário:', error)
+        console.error('Erro ao excluir:', error)
       } finally {
         await this.getAllUsers()
-        this.dialogDelete.loading = false
-        this.dialogDelete.active = false
-        this.dialogDelete.item = null
+        this.closeDialogDelete()
       }
     },
 

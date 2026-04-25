@@ -7,6 +7,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { apiConnect, type TreeWithAi } from '@/plugins/apiConnect'
 import TreeAiStats from '@/components/functions/TreeAiStats.vue'
+import { SOIL_TYPES, getSoilInfo } from '@/utils/soilData'
 import 'leaflet-routing-machine'
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
@@ -64,13 +65,14 @@ interface SoilMapPoint {
   lng: number
   status: string
   species: string
-  soilQuality: string
+  soilType: string // Mudado de soilQuality
+  soilQuality?: string // Legado para compatibilidade
   soilDepth: number | null
   clay: number | null
   sand: number | null
   ph: number | null
   hasSoilData: boolean
-  markerColor: string
+  markerColor?: string
 }
 
 // Estado reativo — adiciona junto com os outros refs
@@ -120,10 +122,18 @@ const DEFAULT_STATUS: StatusInfo = { label: 'Normal', emoji: '🌳', color: '#4C
 
 function getStatusCfg(status: string, danger: boolean): StatusInfo {
   const s = String(status).toUpperCase()
-  // SE ESTIVER EM PERIGO (por altura ou simulação) OU SE O STATUS FOR CRÍTICO/PODA
-  if (danger || s === 'CRITICAL' || s === 'DANGER' || s === 'TO_PRUNE') {
+  
+  // SE ESTIVER EM PERIGO (por altura ou fiação), forçamos CRÍTICO (Vermelho)
+  if (danger || s === 'CRITICAL' || s === 'DANGER') {
     return STATUS_CONFIG['CRITICAL'] || STATUS_CONFIG['DANGER'] || DEFAULT_STATUS
   }
+  
+  // SE FOR PARA PODAR, retorna o status laranja/amarelo correto (TO_PRUNE)
+  if (s === 'TO_PRUNE') {
+    return STATUS_CONFIG['TO_PRUNE'] || DEFAULT_STATUS
+  }
+  
+  // Caso contrário, respeita o status (incluindo TO_PRUNE em amarelo/laranja)
   return STATUS_CONFIG[s] || DEFAULT_STATUS
 }
 
@@ -293,23 +303,25 @@ export default defineComponent({
     const fetchTrees = async () => {
       loadingTrees.value = true
       try {
-        const res = await apiConnect.getTreesMap()
+        // Usar o endpoint principal para garantir que temos todos os dados (height, wire, etc.)
+        const res = await apiConnect.get<any[]>('/trees')
         trees.value = (res.data || [])
-          .filter((t: any) => t.latitude != null && t.longitude != null)
+          .filter((t: any) => (t.latitude != null || t.lat != null) && (t.longitude != null || t.lng != null))
           .map((t: any) => {
-            const lat = Number(t.latitude)
-            const lng = Number(t.longitude)
-            const curH = t.currentHeight || 0
-            const wireH = t.wireHeight || 6.5
+            const lat = Number(t.lat ?? t.latitude ?? 0)
+            const lng = Number(t.lng ?? t.longitude ?? 0)
+            const curH = Number(t.currentHeight || t.estimatedHeight || t.estimated_height_m || t.aiPrediction?.estimated_height_m || 0)
+            const wireH = Number(t.wireHeight || t.wire_height_m || t.aiPrediction?.wire_height_m || 6.5)
             
-            // É PERIGO se: estiver perto da fiação simulada OU se a altura for >= 90% do fio
+            // Usa o status calculado diretamente do backend
+            const treeStatus = t.status || 'NORMAL'
             const isDanger = checkNearPowerLine(lat, lng) || (curH / wireH >= 0.9)
             
             return {
               id: t.id,
               latitude: lat,
               longitude: lng,
-              status: t.status || 'NORMAL',
+              status: treeStatus,
               speciesName: 'Árvore #' + t.id.slice(-4),
               scientificName: '',
               family: '',
@@ -355,101 +367,48 @@ export default defineComponent({
     soilLayer.clearLayers()
     if (!showSoilLayer.value) return
 
+    // Otimização: Uso de Canvas para processar centenas de áreas sem travar
+    const soilCanvas = L.canvas({ padding: 0.5 })
+
     soilPoints.value.forEach((point) => {
-      // Marcador Visual Premium (Hexágono com pulso)
-      const icon = L.divIcon({
-        className: 'soil-marker-container',
-        html: `
-          <div class="soil-hex-marker" style="--marker-color: ${point.markerColor}">
-            <div class="soil-hex-inner"></div>
-            <div class="soil-hex-pulse"></div>
-          </div>
-        `,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
+      const typeKey = point.soilType || point.soilQuality || 'UNKNOWN'
+      const info = getSoilInfo(typeKey)
+      const color = info.color
+
+      // Área de Solo (Zona Regional) via CANVAS
+      const area = L.circle([point.lat, point.lng], {
+        radius: 650,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.12,
+        weight: 1,
+        dashArray: '5, 5',
+        interactive: false,
+        renderer: soilCanvas // CRÍTICO: Usa canvas em vez de SVG para performance
+      })
+      soilLayer!.addLayer(area)
+
+      // Marcador Central simplificado (CircleMarker é mais leve que DivIcon animado)
+      const centerMarker = L.circleMarker([point.lat, point.lng], {
+        radius: 6,
+        color: '#fff',
+        fillColor: color,
+        fillOpacity: 1,
+        weight: 2,
+        renderer: soilCanvas
       })
 
-      const marker = L.marker([point.lat, point.lng], { icon })
-      
-      // Lógica de Definição e Crescimento
-      const qualityInfo: Record<string, { label: string, growth: string, desc: string, icon: string }> = {
-        GOOD: { 
-          label: 'Solo A+ (Fértil)', 
-          growth: 'Acelerado (+20%)', 
-          desc: 'Alta capacidade de retenção de nutrientes e profundidade ideal.',
-          icon: 'mdi-auto-fix'
-        },
-        REGULAR: { 
-          label: 'Solo B (Médio)', 
-          growth: 'Estável (Normal)', 
-          desc: 'Composição balanceada, adequada para a maioria das espécies.',
-          icon: 'mdi-check-circle-outline'
-        },
-        BAD: { 
-          label: 'Solo C (Pobre)', 
-          growth: 'Retardado (-30%)', 
-          desc: 'Solo compactado ou muito arenoso. Requer correção nutricional.',
-          icon: 'mdi-alert-circle-outline'
-        },
-        UNKNOWN: { 
-          label: 'Sem Dados', 
-          growth: 'N/A', 
-          desc: 'Dados ainda não processados para esta coordenada.',
-          icon: 'mdi-help-circle-outline'
-        }
-      }
-
-      const info = qualityInfo[point.soilQuality] || qualityInfo.UNKNOWN
-
-      marker.bindPopup(`
-        <div class="soil-intelligence-card">
-          <div class="soil-card-header" style="border-bottom: 2px solid ${point.markerColor}22">
-            <div class="species-tag">${point.species}</div>
-            <div class="quality-badge" style="background: ${point.markerColor}22; color: ${point.markerColor}">
-              ${info.label}
-            </div>
-          </div>
-          
-          <div class="soil-card-body">
-            <div class="growth-prediction">
-              <span class="prediction-label">Impacto no Crescimento:</span>
-              <span class="prediction-value" style="color: ${point.markerColor}">${info.growth}</span>
-            </div>
-            
-            <p class="soil-definition">${info.desc}</p>
-            
-            <div class="metrics-grid">
-              <div class="metric-item">
-                <div class="metric-header">
-                  <span>Argila</span>
-                  <span>${point.clay ? point.clay.toFixed(1) + '%' : '---'}</span>
-                </div>
-                <div class="metric-bar"><div class="bar-fill" style="width: ${point.clay || 0}%; background: ${point.markerColor}"></div></div>
-              </div>
-              <div class="metric-item">
-                <div class="metric-header">
-                  <span>pH</span>
-                  <span>${point.ph ? point.ph.toFixed(1) : '---'}</span>
-                </div>
-                <div class="metric-bar"><div class="bar-fill" style="width: ${(point.ph || 0) * 7}%; background: ${point.markerColor}"></div></div>
-              </div>
-            </div>
-
-            <div class="footer-metrics">
-              <div class="footer-item">
-                <v-icon size="14">mdi-arrow-down-bold</v-icon>
-                <span>${point.soilDepth ? point.soilDepth.toFixed(1) + 'm' : '---'}</span>
-              </div>
-              <div class="footer-item">
-                <v-icon size="14">mdi-texture-box</v-icon>
-                <span>Textura ideal</span>
-              </div>
-            </div>
+      centerMarker.bindPopup(`
+        <div class="soil-intelligence-card text-center">
+          <div class="pa-3">
+            <div class="text-overline font-weight-bold" style="color: ${color}">${info.name}</div>
+            <div class="text-body-2 mb-2">${info.description}</div>
+            <v-chip size="x-small" color="brown-darken-1" variant="flat">${info.growthImpact}</v-chip>
           </div>
         </div>
-      `, { maxWidth: 300, className: 'soil-glass-popup' })
+      `, { maxWidth: 240, className: 'soil-glass-popup' })
 
-      soilLayer!.addLayer(marker)
+      soilLayer!.addLayer(centerMarker)
     })
   }
 
@@ -578,8 +537,8 @@ export default defineComponent({
 
               <!-- Novo Bloco de Solo Unificado -->
               <div style="
-                background: ${t.soilQuality === 'GOOD' ? '#f0fdf4' : t.soilQuality === 'REGULAR' ? '#fffbeb' : '#fef2f2'};
-                border: 1px solid ${t.soilQuality === 'GOOD' ? '#dcfce7' : t.soilQuality === 'REGULAR' ? '#fef3c7' : '#fee2e2'};
+                background: ${getSoilInfo(t.soilQuality || 'UNKNOWN').color}15;
+                border: 1px solid ${getSoilInfo(t.soilQuality || 'UNKNOWN').color}33;
                 border-radius: 8px;
                 padding: 10px;
                 margin-bottom: 16px;
@@ -587,11 +546,14 @@ export default defineComponent({
                 align-items: center;
                 gap: 10px;
               ">
-                <div style="font-size: 20px;">${t.soilQuality === 'GOOD' ? '🌱' : t.soilQuality === 'REGULAR' ? '🌿' : '🍂'}</div>
+                <div style="font-size: 20px;">🌱</div>
                 <div>
                   <p style="margin: 0; font-size: 10px; color: #666; font-weight: 700; text-transform: uppercase;">Inteligência de Solo</p>
-                  <p style="margin: 0; font-size: 12px; font-weight: 700; color: ${t.soilQuality === 'GOOD' ? '#166534' : t.soilQuality === 'REGULAR' ? '#92400e' : '#991b1b'};">
-                    ${t.soilQuality === 'GOOD' ? 'Qualidade A+ (Fértil)' : t.soilQuality === 'REGULAR' ? 'Qualidade B (Estável)' : t.soilQuality === 'BAD' ? 'Qualidade C (Pobre)' : 'Sem Dados'}
+                  <p style="margin: 0; font-size: 12px; font-weight: 700; color: ${getSoilInfo(t.soilQuality || 'UNKNOWN').color};">
+                    ${getSoilInfo(t.soilQuality || 'UNKNOWN').name}
+                  </p>
+                  <p style="margin: 2px 0 0; font-size: 10px; color: #7f8c8d; line-height: 1.2;">
+                    ${getSoilInfo(t.soilQuality || 'UNKNOWN').description}
                   </p>
                 </div>
               </div>
@@ -811,6 +773,39 @@ export default defineComponent({
       renderTrees()
     }
 
+    /* ---------- IA Import ---------- */
+    const importingIA = ref(false)
+    const syncIA = async () => {
+      importingIA.value = true
+      try {
+        const res = await apiConnect.importExternalData()
+        notify('Sincronização de IA concluída!', 'success')
+        await refreshData()
+      } catch (err) {
+        console.error(err)
+        notify('Erro ao sincronizar dados da IA', 'error')
+      } finally {
+        importingIA.value = false
+      }
+    }
+
+    const importCsvMode = ref(false)
+    const csvPath = ref('/home/walter/maptree.csv')
+    const syncCsvIA = async () => {
+      importingIA.value = true
+      try {
+        await apiConnect.importMapTreeCsv(csvPath.value)
+        notify('Importação CSV concluída!', 'success')
+        importCsvMode.value = false
+        await refreshData()
+      } catch (err) {
+        console.error(err)
+        notify('Erro ao importar CSV', 'error')
+      } finally {
+        importingIA.value = false
+      }
+    }
+
     /* ---------- IA Drawer ---------- */
     const openAiDrawer = async (t: TreeOnMap) => {
       selectedTree.value = t
@@ -821,21 +816,34 @@ export default defineComponent({
       try {
         // LAZY LOAD: Busca detalhes completos apenas ao abrir a gaveta
         const res = await apiConnect.get<any>(`/trees/${t.id}`)
-        const data = res.data
+        const data = res.data || {}
+
+        // Se não tiver predição nos dados básicos, tenta buscar no novo endpoint
+        let aiPrediction = data.aiPrediction
+        if (!aiPrediction) {
+          try {
+            const predRes = await apiConnect.getAiPrediction(t.id)
+            aiPrediction = predRes.data
+          } catch (pErr) {
+            console.warn('Predição IA não encontrada para esta árvore', pErr)
+          }
+        }
 
         // Montamos o objeto TreeWithAi combinando os dados
         aiTreeData.value = {
           id: t.id,
-          commonName: data.species?.commonName || t.speciesName,
-          aiPrediction: data.aiPrediction || data,
-          soil: data.soil || (data.solo ? data.solo[0] : null),
+          commonName: data.species?.commonName || t.speciesName || 'Árvore Independente',
+          status: t.status as any,
+          aiPrediction: aiPrediction || data, 
+          soil: data.soil || (data.solo ? data.solo[0] : null) || null,
           vigor: data.vigor || 'GOOD',
           measurements: data.measurements || [],
           maintenanceSchedule: data.maintenanceSchedule || []
         }
       } catch (err) {
         console.error('Erro ao buscar dados completos da árvore:', err)
-        notify('Não foi possível carregar os detalhes desta árvore.', 'error')
+        notify('Erro ao carregar detalhes. Tente novamente.', 'error')
+        aiDrawerOpen.value = false // Fecha se falhar feio
       } finally {
         loadingAiData.value = false
       }
@@ -843,7 +851,8 @@ export default defineComponent({
 
     const closeAiDrawer = () => {
       aiDrawerOpen.value = false
-      aiTreeData.value = null
+      // Omitimos o clearing de aiTreeData aqui para evitar erros de "patch node"
+      // durante a animação de fechamento do drawer.
     }
 
     /* ---------- Watch filtro ---------- */
@@ -971,13 +980,14 @@ export default defineComponent({
       trees, filteredTrees, markedLocations, markMode, isExpanded,
       loadingTrees, locating, locationError, searchQuery, searching,
       sidebarOpen, activeFilter, mapStyle, snackbar, snackbarText, snackbarColor,
-      selectedTree, treeCount, dangerCount, markedCount, statusCounts, isMobile,
+      selectedTree, treeCount, dangerCount, criticalCount, markedCount, statusCounts, isMobile,
       goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
       loadingRoute, showPowerLines, togglePowerLines,
       aiDrawerOpen, aiTreeData, loadingAiData, openAiDrawer, closeAiDrawer,
-      showSoilLayer, loadingSoil, toggleSoilLayer
+      showSoilLayer, loadingSoil, toggleSoilLayer, getSoilInfo, SOIL_TYPES,
+      importingIA, syncIA, importCsvMode, csvPath, syncCsvIA
     }
   },
 })
@@ -985,6 +995,29 @@ export default defineComponent({
 
 <template>
   <div :class="['map-root', { 'map-expanded': isExpanded }]">
+    <!-- LEGENDA FLUTUANTE DE SOLOS (MODERNA) -->
+    <v-fade-transition>
+      <div v-if="showSoilLayer && !isMobile" class="floating-soil-legend">
+        <div class="legend-header">
+          <v-icon color="brown-darken-1" size="18" class="mr-2">mdi-layers-triple</v-icon>
+          <span>Inteligência Técnica de Solos</span>
+          <v-spacer />
+          <v-btn icon="mdi-close" variant="text" size="x-small" @click="showSoilLayer = false" />
+        </div>
+        <div class="legend-content">
+          <div v-for="(info, key) in SOIL_TYPES" :key="key" class="legend-item">
+            <span class="color-box" :style="{ backgroundColor: info.color }" />
+            <div class="item-text">
+              <span class="item-name">{{ info.name }}</span>
+              <span class="item-impact">{{ info.growthImpact }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="legend-footer">
+          Fonte: Embrapa Brasil / Mapeamento IA
+        </div>
+      </div>
+    </v-fade-transition>
 
     <!-- ============ MAPA ============ -->
     <div id="pruning-map-container" />
@@ -1216,6 +1249,39 @@ export default defineComponent({
           <v-progress-linear v-if="loadingTrees" indeterminate color="green" class="mt-2" />
         </div>
 
+        <!-- Sincronização IA -->
+        <div class="sidebar-section">
+          <p class="sidebar-subtitle">IA & Big Data</p>
+          <v-btn 
+            block 
+            size="small" 
+            variant="flat" 
+            color="deep-purple-darken-2" 
+            prepend-icon="mdi-brain" 
+            :loading="importingIA" 
+            @click="syncIA"
+            class="mb-2"
+          >
+            Sincronizar IA (396+)
+          </v-btn>
+
+          <v-btn 
+            block 
+            size="x-small" 
+            variant="outlined" 
+            color="deep-purple-lighten-2" 
+            prepend-icon="mdi-file-delimited" 
+            @click="importCsvMode = true"
+            class="mb-2"
+          >
+            Importar CSV MapTree
+          </v-btn>
+
+          <p class="text-caption text-grey text-center">
+            Importa predições do script de mapeamento IA.
+          </p>
+        </div>
+
         <v-divider />
 
         <!-- Lista de árvores -->
@@ -1287,18 +1353,20 @@ export default defineComponent({
           </div>
 
           <v-divider class="my-2" />
-          <p class="text-caption font-weight-bold mb-1">Qualidade do Solo (Grids)</p>
-          <div class="legend-row">
-            <span class="legend-dot" style="background:#22c55e" />
-            <span class="text-caption">🌱 Solo bom</span>
+          <p class="text-caption font-weight-bold mb-1" style="color: #5D4037">
+            <v-icon size="14" color="brown" class="mr-1">mdi-layers</v-icon>
+            Legenda de Solos
+          </p>
+          
+          <div v-if="!showSoilLayer" class="text-caption text-grey italic mb-2">
+            Ative a camada de solo para ver detalhes.
           </div>
-          <div class="legend-row">
-            <span class="legend-dot" style="background:#f59e0b" />
-            <span class="text-caption">🌱 Solo regular</span>
-          </div>
-          <div class="legend-row">
-            <span class="legend-dot" style="background:#ef4444" />
-            <span class="text-caption">🌱 Solo ruim</span>
+          
+          <div v-else class="soil-legend-scroll mt-2">
+            <div v-for="(info, key) in SOIL_TYPES" :key="key" class="legend-row mb-1">
+              <span class="legend-dot" :style="{ background: info.color, width: '10px', height: '10px' }" />
+              <span class="text-caption" style="font-size: 10px !important; color: #444;">{{ info.name }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1358,7 +1426,7 @@ export default defineComponent({
       <v-divider />
 
       <!-- Conteúdo do Drawer -->
-      <div class="ai-drawer-body">
+      <div class="ai-drawer-body" v-if="aiDrawerOpen || aiTreeData">
         <!-- Loading -->
         <div v-if="loadingAiData" class="ai-drawer-loading">
           <v-progress-circular indeterminate color="deep-purple" size="48" width="4" />
@@ -1366,7 +1434,7 @@ export default defineComponent({
         </div>
 
         <!-- Dados da IA -->
-        <TreeAiStats v-else-if="aiTreeData" :data="aiTreeData" />
+        <TreeAiStats v-else-if="aiTreeData" :key="aiTreeData.id" :data="aiTreeData" />
 
         <!-- Sem dados -->
         <div v-else class="ai-drawer-empty">
@@ -1380,6 +1448,38 @@ export default defineComponent({
         </div>
       </div>
     </v-navigation-drawer>
+    <!-- Dialog Importação CSV -->
+    <v-dialog v-model="importCsvMode" max-width="400">
+      <v-card class="rounded-xl pa-4">
+        <v-card-title class="headline d-flex align-center">
+          <v-icon color="deep-purple" class="mr-2">mdi-file-import</v-icon>
+          Importar CSV
+        </v-card-title>
+        <v-card-text>
+          <p class="text-body-2 mb-4">Informe o caminho completo do arquivo CSV no servidor para processamento.</p>
+          <v-text-field
+            v-model="csvPath"
+            label="Caminho do Arquivo"
+            variant="outlined"
+            density="compact"
+            prepend-inner-icon="mdi-folder-outline"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="importCsvMode = false">Cancelar</v-btn>
+          <v-btn 
+            color="deep-purple-darken-1" 
+            variant="flat" 
+            @click="syncCsvIA" 
+            :loading="importingIA"
+          >
+            Iniciar Importação
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -1625,6 +1725,91 @@ export default defineComponent({
 .tree-list-info { flex: 1; min-width: 0; }
 .tree-list-name { font-size: 13px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tree-list-meta { font-size: 11px; color: #888; }
+.soil-legend-scroll {
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.soil-legend-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+.soil-legend-scroll::-webkit-scrollbar-thumb {
+  background: #D7CCC8;
+  border-radius: 10px;
+}
+
+/* ============ FLOATING SOIL LEGEND ============ */
+.floating-soil-legend {
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  z-index: 1000;
+  width: 240px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(121, 85, 72, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.legend-header {
+  background: #EFEBE9;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #5D4037;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+}
+
+.legend-content {
+  padding: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+.color-box {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #333;
+}
+
+.item-impact {
+  font-size: 9px;
+  color: #795548;
+  font-weight: 600;
+}
+
+.legend-footer {
+  padding: 8px;
+  font-size: 9px;
+  color: #999;
+  text-align: center;
+  background: #fafafa;
+}
 
 /* ============ LEGENDA ============ */
 .legend-row {
