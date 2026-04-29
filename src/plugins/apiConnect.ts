@@ -356,6 +356,85 @@ class ApiConnect {
     return this.axiosInstance.get<Array<{ id: string, latitude: number, longitude: number, status: string }>>('/trees/map/risk')
   }
 
+  /**
+   * Busca árvores dentro de uma área geográfica (bounding box)
+   * Útil para carregar apenas árvores visíveis no mapa
+   */
+  public getTreesInBounds(north: number, south: number, east: number, west: number, limit = 500) {
+    return this.axiosInstance.get<any[]>('/trees/bounds', {
+      params: { north, south, east, west, limit }
+    })
+  }
+
+  /**
+   * Busca árvores próximas a uma coordenada (raio em km)
+   * Útil para carregar árvores da localização do usuário
+   */
+  public getTreesNearby(lat: number, lng: number, radiusKm = 5, limit = 300) {
+    return this.axiosInstance.get<any[]>('/trees/nearby', {
+      params: { lat, lng, radius: radiusKm, limit }
+    })
+  }
+
+  /**
+   * Busca árvores por cidade/região pré-definida
+   * Mais eficiente que bounds para regiões conhecidas
+   */
+  public getTreesByCity(cityId: string, limit = 1000) {
+    return this.axiosInstance.get<{ cityId: string; bounds: any; count: number; trees: any[] }>(`/trees/city/${cityId}`, {
+      params: { limit }
+    })
+  }
+
+  /**
+   * Busca estatísticas de uma cidade (contadores rápidos)
+   * Útil para mostrar preview antes de carregar árvores
+   */
+  public getCityStats(cityId: string) {
+    return this.axiosInstance.get<{ cityId: string; name: string; total: number; withRisk: number; byStatus: Record<string, number> }>(`/trees/city/${cityId}/stats`)
+  }
+
+  /**
+   * Lista todas as cidades/regiões disponíveis (endpoint legado)
+   */
+  public getAvailableCities() {
+    return this.axiosInstance.get<{ cities: Array<{ id: string; name: string; type: string }> }>('/trees/cities')
+  }
+
+  /**
+   * Lista todas as regiões/cidades do banco (novo endpoint)
+   * Mais completo - inclui bounds e metadados
+   */
+  public getRegions() {
+    return this.axiosInstance.get<Array<{
+      id: string;
+      slug: string;
+      name: string;
+      type: string;
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+      isActive: boolean;
+    }>>('/regions')
+  }
+
+  /**
+   * Busca uma região específica pelo slug
+   */
+  public getRegionBySlug(slug: string) {
+    return this.axiosInstance.get<{
+      id: string;
+      slug: string;
+      name: string;
+      type: string;
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+    }>(`/regions/${slug}`)
+  }
+
   public post<T = unknown>(url: string, data?: unknown, config = {}) {
     return this.axiosInstance.post<T>(url, data, config)
   }

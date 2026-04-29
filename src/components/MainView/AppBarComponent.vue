@@ -72,19 +72,92 @@
   </v-app-bar>
 
   <!-- ===== Mobile AppBar ===== -->
-  <v-app-bar v-else flat>
-    <v-btn icon @click="drawer = !drawer">
-      <v-icon>mdi-menu</v-icon>
-    </v-btn>
+  <template v-else>
+    <!-- Navigation Drawer - FORA da AppBar -->
+    <v-navigation-drawer
+      v-model="drawer"
+      location="left"
+      temporary
+      color="white"
+      class="mobile-drawer"
+    >
+      <!-- Logo no drawer -->
+      <div class="pa-4 text-center">
+        <img
+          src="@/assets/LogomaptreeHeaderpng.png"
+          alt="Logo MapTree"
+          style="height: 40px; max-width: 100%;"
+          @click="goToHome(); drawer = false"
+        />
+      </div>
 
-    <v-navigation-drawer v-model="drawer" temporary>
-      <v-list>
-        <v-list-item v-for="item in currentMenu" :key="item.to" :prepend-icon="item.icon" @click="goTo(item.to)">
-          <v-list-item-title>{{ item.title }}</v-list-item-title>
-        </v-list-item>
+      <v-divider />
+
+      <v-list nav density="compact">
+        <v-list-item
+          v-for="item in currentMenu"
+          :key="item.to"
+          :prepend-icon="item.icon"
+          :title="item.title"
+          :active="isActive(item.to)"
+          :color="isActive(item.to) ? 'green-darken-1' : undefined"
+          @click="goTo(item.to); drawer = false"
+          class="mb-1"
+        />
       </v-list>
+
+      <template v-slot:append>
+        <div class="pa-4">
+          <v-btn
+            block
+            variant="tonal"
+            color="grey"
+            prepend-icon="mdi-logout"
+            @click="logout"
+          >
+            Sair
+          </v-btn>
+        </div>
+      </template>
     </v-navigation-drawer>
-  </v-app-bar>
+
+    <!-- AppBar Mobile -->
+    <v-app-bar
+      color="white"
+      flat
+      class="appbar-mobile"
+      elevation="1"
+    >
+      <v-btn
+        icon
+        variant="text"
+        @click="drawer = !drawer"
+      >
+        <v-icon>mdi-menu</v-icon>
+      </v-btn>
+
+      <!-- Logo centralizada -->
+      <div class="logo-mobile" @click="goToHome()">
+        <img
+          src="@/assets/LogomaptreeHeaderpng.png"
+          alt="MapTree"
+          style="height: 32px;"
+        />
+      </div>
+
+      <v-spacer />
+
+      <!-- Notificações -->
+      <v-btn
+        icon
+        variant="text"
+        :color="isActive('/notifications') ? green : 'black'"
+        @click="goToNotification()"
+      >
+        <v-icon>mdi-bell-outline</v-icon>
+      </v-btn>
+    </v-app-bar>
+  </template>
 </template>
 
 <script lang="ts">

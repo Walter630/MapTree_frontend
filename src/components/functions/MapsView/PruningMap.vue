@@ -9,6 +9,20 @@ import { apiConnect, type TreeWithAi } from '@/plugins/apiConnect'
 import TreeAiStats from '@/components/functions/TreeAiStats.vue'
 import { SOIL_TYPES, getSoilInfo } from '@/utils/soilData'
 import 'leaflet-routing-machine'
+import {
+  CEARA_REGIONS,
+  loadRegionData,
+  findRegionAtLocation,
+  getVisibleTiles,
+  loadTileData,
+  getTileKey,
+  type Region
+} from '@/utils/regionPipeline'
+import {
+  renderSoilLayer,
+  SOIL_RENDER_PRESETS,
+  type SoilRenderMode
+} from '@/utils/soilRenderers'
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
 /* ===================================
@@ -192,6 +206,60 @@ export default defineComponent({
     const showPowerLines = ref(true)
     let lastPosition: L.LatLng | null = null
 
+    /* ---------- Carregamento Progressivo ---------- */
+    const loadRadius = ref(2) // Raio inicial em km
+    const maxRadius = ref(50) // Raio máximo em km
+    const totalTreesInArea = ref(0) // Total de árvores disponíveis na API
+    const hasMoreTrees = ref(false) // Se há mais árvores para carregar
+    const loadMode = ref<'radius' | 'bounds' | 'region' | 'tile'>('radius') // Modo de carregamento
+    const loadedTreeIds = new Set<string>() // Cache para evitar duplicatas
+
+    /* ---------- Sistema de Regiões ---------- */
+    const availableRegions = ref<Region[]>(CEARA_REGIONS)
+    const selectedRegion = ref<Region | null>(null)
+    const regionTrees = ref<Map<string, any[]>>(new Map()) // Cache por região
+    const tileCache = ref<Map<string, any[]>>(new Map()) // Cache por tile
+    const loadingRegion = ref(false)
+    const cityStats = ref<{ total: number; withRisk: number; byStatus: Record<string, number> } | null>(null)
+
+    /* ---------- Carregar Regiões do Backend ---------- */
+    const loadRegionsFromApi = async () => {
+      try {
+        // Tenta buscar do endpoint /regions (novo)
+        const res = await apiConnect.getRegions()
+        if (res.data && res.data.length > 0) {
+          // Converte do formato da API para o formato interno
+          availableRegions.value = res.data.map(r => ({
+            id: r.slug,
+            name: r.name,
+            type: r.type as 'city' | 'district' | 'state' | 'quadrant',
+            bounds: {
+              north: r.north,
+              south: r.south,
+              east: r.east,
+              west: r.west
+            },
+            center: {
+              lat: (r.north + r.south) / 2,
+              lng: (r.east + r.west) / 2
+            },
+            loaded: false
+          }))
+          console.log(`${availableRegions.value.length} regiões carregadas do banco`)
+        }
+      } catch {
+        // Silencioso - usa hardcoded como fallback
+        console.log('Usando regiões hardcoded (endpoint /regions não disponível)')
+      }
+    }
+
+    /* ---------- Configuração de Solo ---------- */
+    const soilRenderMode = ref<SoilRenderMode>('circles')
+    const showSoilControls = ref(false)
+
+    /* ---------- Accordion Sidebar ---------- */
+    const expandedPanels = ref(['carregamento', 'filtros'])
+
     /* ---------- IA Drawer ---------- */
     const aiDrawerOpen = ref(false)
     const aiTreeData = ref<TreeWithAi | null>(null)
@@ -300,42 +368,162 @@ export default defineComponent({
     }
 
     /* ---------- API ---------- */
-    const fetchTrees = async () => {
+
+    /**
+     * Converte dados da API para o formato TreeOnMap
+     */
+    const parseTreeData = (t: any): TreeOnMap | null => {
+      const lat = Number(t.lat ?? t.latitude ?? 0)
+      const lng = Number(t.lng ?? t.longitude ?? 0)
+      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null
+
+      const curH = Number(t.currentHeight || t.estimatedHeight || t.estimated_height_m || t.aiPrediction?.estimated_height_m || 0)
+      const wireH = Number(t.wireHeight || t.wire_height_m || t.aiPrediction?.wire_height_m || 6.5)
+      const treeStatus = t.status || 'NORMAL'
+      const isDanger = checkNearPowerLine(lat, lng) || (curH / wireH >= 0.9)
+
+      // Extrair dados de solo se disponíveis
+      const soilQuality = t.soil?.quality || t.soilQuality || 'UNKNOWN'
+      const vigor = t.vigor || t.soil?.vigor || 'GOOD'
+
+      return {
+        id: t.id,
+        latitude: lat,
+        longitude: lng,
+        status: treeStatus,
+        speciesName: t.species?.commonName || 'Árvore #' + t.id.slice(-4),
+        scientificName: t.species?.scientificName || '',
+        family: t.species?.family || '',
+        nearPowerLine: isDanger,
+        soilQuality: soilQuality,
+        vigor: vigor,
+        currentHeight: curH,
+        wireHeight: wireH
+      }
+    }
+
+    /**
+     * Carrega árvores próximas ao usuário com raio progressivo
+     * Inicia com 2km e permite expandir até o máximo definido
+     */
+    const fetchTreesNearby = async (reset = false) => {
+      if (!userLat.value || !userLng.value) {
+        // Se não tem localização, usa o endpoint tradicional
+        return fetchTreesLegacy()
+      }
+
       loadingTrees.value = true
       try {
-        // Usar o endpoint principal para garantir que temos todos os dados (height, wire, etc.)
+        if (reset) {
+          // Reset: limpa cache e começa do raio inicial
+          loadedTreeIds.clear()
+          trees.value = []
+          loadRadius.value = 2
+        }
+
+        const limit = loadRadius.value <= 2 ? 150 : loadRadius.value <= 5 ? 300 : 500
+        const res = await apiConnect.getTreesNearby(userLat.value, userLng.value, loadRadius.value, limit)
+
+        const newTrees: TreeOnMap[] = []
+        let duplicates = 0
+
+        ;(res.data || []).forEach((t: any) => {
+          if (loadedTreeIds.has(t.id)) {
+            duplicates++
+            return
+          }
+          const parsed = parseTreeData(t)
+          if (parsed) {
+            loadedTreeIds.add(t.id)
+            newTrees.push(parsed)
+          }
+        })
+
+        // Adiciona novas árvores à lista existente
+        trees.value = [...trees.value, ...newTrees]
+
+        // Verifica se há mais árvores para carregar
+        totalTreesInArea.value = res.data?.length || 0
+        hasMoreTrees.value = loadRadius.value < maxRadius.value && totalTreesInArea.value >= limit
+
+        console.log(`Raio ${loadRadius.value}km: ${newTrees.length} novas, ${duplicates} duplicatas, total: ${trees.value.length}`)
+        notify(`${trees.value.length} árvore(s) próximas carregada(s)`, 'success')
+
+        // Centraliza no usuário na primeira carga
+        if (reset && map && trees.value.length > 0) {
+          map.setView([userLat.value, userLng.value], 15)
+        }
+      } catch (err) {
+        console.error('Erro ao buscar árvores próximas:', err)
+        notify('Erro ao carregar árvores próximas', 'error')
+      } finally {
+        loadingTrees.value = false
+      }
+    }
+
+    /**
+     * Expande o raio de busca e carrega mais árvores
+     */
+    const loadMoreTrees = async () => {
+      if (loadRadius.value < 5) loadRadius.value = 5
+      else if (loadRadius.value < 10) loadRadius.value = 10
+      else if (loadRadius.value < 20) loadRadius.value = 20
+      else loadRadius.value = maxRadius.value
+
+      await fetchTreesNearby(false)
+    }
+
+    /**
+     * Carrega árvores da área visível no mapa (bounds)
+     * Útil quando usuário navega para outra região
+     */
+    const fetchTreesInBounds = async () => {
+      if (!map) return
+
+      const bounds = map.getBounds()
+      const north = bounds.getNorth()
+      const south = bounds.getSouth()
+      const east = bounds.getEast()
+      const west = bounds.getWest()
+
+      loadingTrees.value = true
+      try {
+        const res = await apiConnect.getTreesInBounds(north, south, east, west, 500)
+
+        const newTrees: TreeOnMap[] = []
+        ;(res.data || []).forEach((t: any) => {
+          if (!loadedTreeIds.has(t.id)) {
+            const parsed = parseTreeData(t)
+            if (parsed) {
+              loadedTreeIds.add(t.id)
+              newTrees.push(parsed)
+            }
+          }
+        })
+
+        trees.value = [...trees.value, ...newTrees]
+        notify(`${newTrees.length} árvore(s) da área visível carregada(s)`, 'success')
+      } catch (err) {
+        console.error('Erro ao buscar árvores na área:', err)
+      } finally {
+        loadingTrees.value = false
+      }
+    }
+
+    /**
+     * Fallback: endpoint tradicional quando não há geolocalização
+     */
+    const fetchTreesLegacy = async () => {
+      loadingTrees.value = true
+      try {
         const res = await apiConnect.get<any[]>('/trees')
         trees.value = (res.data || [])
           .filter((t: any) => (t.latitude != null || t.lat != null) && (t.longitude != null || t.lng != null))
-          .map((t: any) => {
-            const lat = Number(t.lat ?? t.latitude ?? 0)
-            const lng = Number(t.lng ?? t.longitude ?? 0)
-            const curH = Number(t.currentHeight || t.estimatedHeight || t.estimated_height_m || t.aiPrediction?.estimated_height_m || 0)
-            const wireH = Number(t.wireHeight || t.wire_height_m || t.aiPrediction?.wire_height_m || 6.5)
-            
-            // Usa o status calculado diretamente do backend
-            const treeStatus = t.status || 'NORMAL'
-            const isDanger = checkNearPowerLine(lat, lng) || (curH / wireH >= 0.9)
-            
-            return {
-              id: t.id,
-              latitude: lat,
-              longitude: lng,
-              status: treeStatus,
-              speciesName: 'Árvore #' + t.id.slice(-4),
-              scientificName: '',
-              family: '',
-              nearPowerLine: isDanger,
-              soilQuality: 'UNKNOWN',
-              vigor: 'GOOD',
-              currentHeight: curH,
-              wireHeight: wireH
-            }
-          })
-        console.log('Total de árvores carregadas:', trees.value.length)
+          .map((t: any) => parseTreeData(t))
+          .filter((t): t is TreeOnMap => t !== null)
+
         notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
-        
-        // AUTO-CENTER: Centraliza o mapa para mostrar todas as árvores apenas na primeira carga
+
         if (map && trees.value.length > 0 && isInitialLoad.value) {
           const bounds = L.latLngBounds(trees.value.map(t => [t.latitude, t.longitude]))
           map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
@@ -347,6 +535,168 @@ export default defineComponent({
         notify('Erro ao carregar árvores da API', 'error')
       } finally {
         loadingTrees.value = false
+      }
+    }
+
+    // Alias para compatibilidade com código existente
+    const fetchTrees = fetchTreesNearby
+
+    /* ---------- Carregamento por Região ---------- */
+    const fetchTreesByRegion = async (region: Region, reset = true) => {
+      if (reset) {
+        trees.value = []
+        loadedTreeIds.clear()
+        regionTrees.value.clear()
+        selectedRegion.value = region
+      }
+
+      loadingRegion.value = true
+      try {
+        // Verifica se já temos dados desta região em cache
+        const cached = regionTrees.value.get(region.id)
+        if (cached && !reset) {
+          const newTrees = cached.filter(t => !loadedTreeIds.has(t.id))
+          newTrees.forEach(t => loadedTreeIds.add(t.id))
+          trees.value = [...trees.value, ...newTrees]
+          notify(`${newTrees.length} árvores da região ${region.name} (cache)`, 'success')
+          return
+        }
+
+        // Tenta usar endpoint de cidade (mais eficiente) ou fallback para bounds
+        let regionTreeList: TreeOnMap[] = []
+
+        try {
+          // Primeiro tenta o endpoint específico de cidade
+          const cityRes = await apiConnect.getTreesByCity(region.id, 1000)
+          regionTreeList = (cityRes.data.trees || [])
+            .map((t: any) => parseTreeData(t))
+            .filter((t): t is TreeOnMap => t !== null)
+        } catch {
+          // Fallback: usa bounds se endpoint de cidade não existir ou falhar
+          const res = await apiConnect.getTreesInBounds(
+            region.bounds.north,
+            region.bounds.south,
+            region.bounds.east,
+            region.bounds.west,
+            1000
+          )
+          regionTreeList = (res.data || [])
+            .map((t: any) => parseTreeData(t))
+            .filter((t): t is TreeOnMap => t !== null)
+        }
+
+        // Armazena em cache
+        regionTrees.value.set(region.id, regionTreeList)
+
+        // Adiciona à lista global
+        regionTreeList.forEach(t => {
+          if (!loadedTreeIds.has(t.id)) {
+            loadedTreeIds.add(t.id)
+            trees.value.push(t)
+          }
+        })
+
+        notify(`${regionTreeList.length} árvores carregadas de ${region.name}`, 'success')
+
+        // Centraliza no mapa
+        if (map) {
+          map.flyTo([region.center.lat, region.center.lng], 14, { duration: 1 })
+        }
+      } catch (err) {
+        console.error('Erro ao carregar região:', err)
+        notify('Erro ao carregar dados da região', 'error')
+      } finally {
+        loadingRegion.value = false
+      }
+    }
+
+    /* ---------- Carregar Estatísticas de Cidade ---------- */
+    const loadCityStats = async (region: Region | string) => {
+      // Se receber string (ID), busca o objeto completo
+      let regionObj: Region | null = null
+      if (typeof region === 'string') {
+        regionObj = availableRegions.value.find(r => r.id === region) || null
+        if (!regionObj) {
+          notify('Região não encontrada', 'error')
+          return null
+        }
+      } else {
+        regionObj = region
+      }
+
+      selectedRegion.value = regionObj
+
+      try {
+        const res = await apiConnect.getCityStats(regionObj.id)
+        const stats = res.data
+        cityStats.value = stats
+
+        // Atualiza contadores na UI (pode ser usado para mostrar preview)
+        notify(`${stats.name}: ${stats.total} árvores (${stats.withRisk} em risco)`, 'info')
+
+        return stats
+      } catch {
+        // Silencioso - estatísticas são opcionais
+        cityStats.value = null
+        return null
+      }
+    }
+
+    /* ---------- Carregamento por Tiles (Dinâmico) ---------- */
+    const loadVisibleTiles = async () => {
+      if (!map) return
+
+      const bounds = map.getBounds()
+      const zoom = map.getZoom()
+
+      // Apenas carrega tiles em zoom suficiente
+      if (zoom < 12) {
+        notify('Aproxime o mapa para carregar árvores por área', 'info')
+        return
+      }
+
+      const visibleTiles = getVisibleTiles({
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      }, Math.min(zoom, 16)) // Limita zoom para tiles
+
+      loadingTrees.value = true
+      let newTreesCount = 0
+
+      for (const tileCoord of visibleTiles.slice(0, 6)) { // Máximo 6 tiles por vez
+        const tileKey = getTileKey(tileCoord)
+
+        // Pula se já está em cache
+        if (tileCache.value.has(tileKey)) continue
+
+        const tileData = await loadTileData(tileCoord)
+        if (!tileData || !tileData.trees) continue
+
+        // Processa árvores do tile
+        const tileTrees = tileData.trees
+          .map((t: any) => parseTreeData(t))
+          .filter((t): t is TreeOnMap => t !== null)
+
+        tileCache.value.set(tileKey, tileTrees)
+
+        // Adiciona árvores novas
+        for (const tree of tileTrees) {
+          if (!loadedTreeIds.has(tree.id)) {
+            loadedTreeIds.add(tree.id)
+            trees.value.push(tree)
+            newTreesCount++
+          }
+        }
+      }
+
+      loadingTrees.value = false
+
+      if (newTreesCount > 0) {
+        notify(`${newTreesCount} árvores carregadas da área visível`, 'success')
+      } else {
+        notify('Área já carregada ou sem árvores novas', 'info')
       }
     }
 
@@ -362,54 +712,53 @@ export default defineComponent({
   }
 }
 
-  const renderSoilLayer = () => {
+  const renderSoilLayerLocal = () => {
     if (!soilLayer || !map) return
     soilLayer.clearLayers()
     if (!showSoilLayer.value) return
 
-    // Otimização: Uso de Canvas para processar centenas de áreas sem travar
-    const soilCanvas = L.canvas({ padding: 0.5 })
+    // Converte SoilMapPoint para SoilPoint
+    const points = soilPoints.value.map(p => ({
+      lat: p.lat,
+      lng: p.lng,
+      soilType: p.soilType,
+      soilQuality: p.soilQuality
+    }))
 
-    soilPoints.value.forEach((point) => {
-      const typeKey = point.soilType || point.soilQuality || 'UNKNOWN'
-      const info = getSoilInfo(typeKey)
-      const color = info.color
-
-      // Área de Solo (Zona Regional) via CANVAS
-      const area = L.circle([point.lat, point.lng], {
-        radius: 650,
-        color: color,
-        fillColor: color,
-        fillOpacity: 0.12,
-        weight: 1,
-        dashArray: '5, 5',
-        interactive: false,
-        renderer: soilCanvas // CRÍTICO: Usa canvas em vez de SVG para performance
-      })
-      soilLayer!.addLayer(area)
-
-      // Marcador Central simplificado (CircleMarker é mais leve que DivIcon animado)
-      const centerMarker = L.circleMarker([point.lat, point.lng], {
-        radius: 6,
-        color: '#fff',
-        fillColor: color,
-        fillOpacity: 1,
-        weight: 2,
-        renderer: soilCanvas
-      })
-
-      centerMarker.bindPopup(`
-        <div class="soil-intelligence-card text-center">
-          <div class="pa-3">
-            <div class="text-overline font-weight-bold" style="color: ${color}">${info.name}</div>
-            <div class="text-body-2 mb-2">${info.description}</div>
-            <v-chip size="x-small" color="brown-darken-1" variant="flat">${info.growthImpact}</v-chip>
-          </div>
-        </div>
-      `, { maxWidth: 240, className: 'soil-glass-popup' })
-
-      soilLayer!.addLayer(centerMarker)
+    // Usa o novo sistema de renderização
+    renderSoilLayer(map, soilLayer, points, soilRenderMode.value, {
+      opacity: 0.2,
+      interactive: true,
+      showLabels: true
     })
+  }
+
+  const changeSoilRenderMode = (mode: SoilRenderMode) => {
+    soilRenderMode.value = mode
+    renderSoilLayerLocal()
+    notify(`Modo de visualização de solo: ${mode}`, 'info')
+  }
+
+  const toggleSoilControls = () => {
+    showSoilControls.value = !showSoilControls.value
+  }
+
+  const detectAndLoadRegion = async () => {
+    if (!userLat.value || !userLng.value) {
+      notify('Localização não disponível. Ative a geolocalização.', 'warning')
+      goToUserLocation()
+      return
+    }
+
+    const region = findRegionAtLocation(userLat.value, userLng.value)
+    if (region) {
+      selectedRegion.value = region
+      await fetchTreesByRegion(region, true)
+      notify(`Região detectada: ${region.name}`, 'success')
+    } else {
+      notify('Você está fora das regiões mapeadas. Usando carregamento por raio.', 'info')
+      await fetchTreesNearby(true)
+    }
   }
 
   const toggleSoilLayer = async () => {
@@ -419,7 +768,7 @@ export default defineComponent({
       await fetchSoilData()
     }
 
-    renderSoilLayer()
+    renderSoilLayerLocal()
     notify(showSoilLayer.value ? 'Camada de solo ativada' : 'Camada de solo oculta', 'info')
   }
 
@@ -768,8 +1117,8 @@ export default defineComponent({
       if (isMobile.value) sidebarOpen.value = false
     }
 
-    const refreshData = async () => {
-      await fetchTrees()
+    const refreshData = async (reset = false) => {
+      await fetchTreesNearby(reset)
       renderTrees()
     }
 
@@ -958,7 +1307,22 @@ export default defineComponent({
       goToUserLocation()
       startWatchingPosition()
       fetchTrees().then(() => renderTrees())
-      refreshInterval = setInterval(refreshData, 60000)
+      // Refresh automático a cada 5 minutos (sem resetar - só atualiza dados existentes)
+      refreshInterval = setInterval(() => refreshData(false), 300000)
+
+      // Carregamento dinâmico: Carrega tiles quando usuário navega/zoom
+      let tileLoadTimeout: ReturnType<typeof setTimeout> | null = null
+      map.on('moveend', () => {
+        // Debounce para evitar múltiplas chamadas durante movimento contínuo
+        if (tileLoadTimeout) clearTimeout(tileLoadTimeout)
+        tileLoadTimeout = setTimeout(() => {
+          const zoom = map!.getZoom()
+          // Só carrega tiles em zoom suficiente (nível de bairro/rua)
+          if (zoom >= 14 && selectedRegion.value) {
+            loadVisibleTiles()
+          }
+        }, 500) // Aguarda 500ms após parar de mover
+      })
     }
 
     /* ---------- Lifecycle ---------- */
@@ -987,7 +1351,15 @@ export default defineComponent({
       loadingRoute, showPowerLines, togglePowerLines,
       aiDrawerOpen, aiTreeData, loadingAiData, openAiDrawer, closeAiDrawer,
       showSoilLayer, loadingSoil, toggleSoilLayer, getSoilInfo, SOIL_TYPES,
-      importingIA, syncIA, importCsvMode, csvPath, syncCsvIA
+      importingIA, syncIA, importCsvMode, csvPath, syncCsvIA,
+      // Carregamento progressivo
+      loadRadius, hasMoreTrees, totalTreesInArea, loadMoreTrees, fetchTreesNearby, fetchTreesInBounds,
+      // Sistema de regiões e solo
+      availableRegions, selectedRegion, loadingRegion, cityStats, fetchTreesByRegion,
+      loadRegionsFromApi, loadCityStats, loadVisibleTiles, detectAndLoadRegion,
+      soilRenderMode, changeSoilRenderMode, showSoilControls, toggleSoilControls,
+      // UI
+      expandedPanels
     }
   },
 })
@@ -1184,12 +1556,18 @@ export default defineComponent({
     <Transition name="slide">
       <div v-show="sidebarOpen" class="map-sidebar">
 
-        <!-- Mini dashboard -->
-        <div class="sidebar-section">
-          <p class="sidebar-title">
-            <v-icon size="20" color="green-darken-2" class="mr-1">mdi-leaf</v-icon>
-            Mapa de Podas
-          </p>
+        <!-- Mini dashboard compacto -->
+        <div class="sidebar-section dashboard-section">
+          <div class="d-flex align-center justify-space-between mb-3">
+            <p class="sidebar-title mb-0">
+              <v-icon size="20" color="green-darken-2" class="mr-1">mdi-leaf</v-icon>
+              Mapa de Podas
+            </p>
+            <v-chip size="x-small" color="green" variant="flat" class="font-weight-bold">
+              {{ treeCount }} árvores
+            </v-chip>
+          </div>
+
           <div class="stats-grid">
             <div class="stat-card" style="--accent:#4CAF50" @click="activeFilter = 'ALL'">
               <div class="stat-number">{{ treeCount }}</div>
@@ -1210,79 +1588,216 @@ export default defineComponent({
           </div>
         </div>
 
-        <v-divider />
+        <!-- Accordion Organizado -->
+        <v-expansion-panels v-model="expandedPanels" multiple variant="accordion" class="sidebar-panels">
 
-        <!-- Filtros -->
-        <div class="sidebar-section">
-          <p class="sidebar-subtitle">Filtrar por status</p>
-          <div class="filter-chips">
-            <v-chip
-              size="small"
-              :variant="activeFilter === 'ALL' ? 'flat' : 'outlined'"
-              :color="activeFilter === 'ALL' ? 'green' : 'grey'"
-              @click="activeFilter = 'ALL'"
-              class="mr-1 mb-1"
-            >
-              Todos
-            </v-chip>
-            <v-chip
-              v-for="(cfg, key) in STATUS_CONFIG"
-              :key="key"
-              size="small"
-              :variant="activeFilter === key ? 'flat' : 'outlined'"
-              :color="cfg.color"
-              @click="activeFilter = String(key)"
-              class="mr-1 mb-1"
-            >
-              {{ cfg.emoji }} {{ cfg.label }}
-            </v-chip>
-          </div>
-        </div>
+          <!-- Painel 1: Carregamento de Árvores -->
+          <v-expansion-panel value="carregamento" class="sidebar-panel">
+            <v-expansion-panel-title class="panel-title">
+              <v-icon size="18" class="mr-2" color="green-darken-2">mdi-map-marker-multiple</v-icon>
+              <span class="text-subtitle-2 font-weight-medium">Carregar Árvores</span>
+              <v-spacer />
+              <v-chip v-if="selectedRegion" size="x-small" color="teal" variant="flat" class="ml-2">
+                {{ selectedRegion.name }}
+              </v-chip>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text class="panel-content">
 
-        <v-divider />
+              <!-- Seleção de Região -->
+              <v-select
+                v-model="selectedRegion"
+                :items="availableRegions"
+                item-title="name"
+                return-object
+                label="Selecionar cidade/região"
+                density="compact"
+                variant="outlined"
+                class="mb-2"
+                clearable
+                hide-details
+                @update:model-value="(region) => region && loadCityStats(region)"
+              />
 
-        <!-- Botão Atualizar -->
-        <div class="sidebar-section">
-          <v-btn block size="small" variant="tonal" color="green" prepend-icon="mdi-refresh" :loading="loadingTrees" @click="refreshData">
-            Atualizar Árvores
-          </v-btn>
-          <v-progress-linear v-if="loadingTrees" indeterminate color="green" class="mt-2" />
-        </div>
+              <!-- Preview de estatísticas da cidade -->
+              <div v-if="selectedRegion" class="city-stats-preview mb-3">
+                <!-- Card de estatísticas -->
+                <div v-if="cityStats" class="stats-card mb-2 pa-2 rounded-lg" style="background: linear-gradient(135deg, #f5f5f5, #e0e0e0);">
+                  <div class="d-flex justify-space-between align-center mb-1">
+                    <span class="text-caption font-weight-bold text-grey-darken-2">
+                      <v-icon size="14" color="green" class="mr-1">mdi-tree</v-icon>
+                      {{ cityStats.total }} árvores
+                    </span>
+                    <span v-if="cityStats.withRisk > 0" class="text-caption font-weight-bold text-red-darken-2">
+                      <v-icon size="14" color="red" class="mr-1">mdi-alert</v-icon>
+                      {{ cityStats.withRisk }} em risco
+                    </span>
+                  </div>
+                  <!-- Barra de progresso de status -->
+                  <div class="d-flex" style="height: 4px; border-radius: 2px; overflow: hidden;">
+                    <div
+                      v-for="(count, status) in cityStats.byStatus"
+                      :key="status"
+                      :style="{
+                        width: (count / cityStats.total * 100) + '%',
+                        backgroundColor: STATUS_CONFIG[status]?.color || '#999'
+                      }"
+                      :title="`${status}: ${count}`"
+                    />
+                  </div>
+                </div>
 
-        <!-- Sincronização IA -->
-        <div class="sidebar-section">
-          <p class="sidebar-subtitle">IA & Big Data</p>
-          <v-btn 
-            block 
-            size="small" 
-            variant="flat" 
-            color="deep-purple-darken-2" 
-            prepend-icon="mdi-brain" 
-            :loading="importingIA" 
-            @click="syncIA"
-            class="mb-2"
-          >
-            Sincronizar IA (396+)
-          </v-btn>
+                <v-btn
+                  block
+                  size="small"
+                  variant="tonal"
+                  color="blue-darken-1"
+                  prepend-icon="mdi-download"
+                  @click="fetchTreesByRegion(selectedRegion, true)"
+                  :loading="loadingRegion"
+                >
+                  Carregar {{ selectedRegion.name }}
+                </v-btn>
+              </div>
 
-          <v-btn 
-            block 
-            size="x-small" 
-            variant="outlined" 
-            color="deep-purple-lighten-2" 
-            prepend-icon="mdi-file-delimited" 
-            @click="importCsvMode = true"
-            class="mb-2"
-          >
-            Importar CSV MapTree
-          </v-btn>
+              <div class="d-flex gap-2 mb-3">
+                <v-btn
+                  size="small"
+                  variant="flat"
+                  color="teal-darken-1"
+                  prepend-icon="mdi-crosshairs-gps"
+                  @click="detectAndLoadRegion"
+                  class="flex-grow-1"
+                  density="comfortable"
+                >
+                  Minha Região
+                </v-btn>
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  color="green-darken-1"
+                  prepend-icon="mdi-refresh"
+                  :loading="loadingTrees"
+                  @click="fetchTreesNearby(true)"
+                  density="comfortable"
+                  title="Carregar por raio"
+                />
+              </div>
 
-          <p class="text-caption text-grey text-center">
-            Importa predições do script de mapeamento IA.
-          </p>
-        </div>
+              <!-- Botão Carregar Mais -->
+              <v-btn
+                v-if="hasMoreTrees"
+                block
+                size="small"
+                variant="flat"
+                color="blue-darken-1"
+                prepend-icon="mdi-map-marker-radius"
+                :loading="loadingTrees"
+                @click="loadMoreTrees"
+                class="mb-2"
+              >
+                Expandir raio ({{ loadRadius < 5 ? '5km' : loadRadius < 10 ? '10km' : loadRadius < 20 ? '20km' : '50km' }})
+              </v-btn>
 
-        <v-divider />
+              <!-- Carregamento por Tiles -->
+              <v-btn
+                block
+                size="small"
+                variant="text"
+                color="grey-darken-1"
+                prepend-icon="mdi-grid"
+                :loading="loadingTrees"
+                :disabled="!selectedRegion"
+                @click="loadVisibleTiles"
+                class="mb-2"
+              >
+                Carregar área visível (tiles)
+              </v-btn>
+
+              <v-progress-linear v-if="loadingTrees" indeterminate color="green" class="mt-2" height="2" />
+
+              <div class="text-caption text-grey-darken-1 mt-2 text-center">
+                <v-icon size="12" class="mr-1">mdi-information-outline</v-icon>
+                {{ treeCount }} carregadas · Auto-carregamento ativo
+              </div>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+          <!-- Painel 2: Filtros -->
+          <v-expansion-panel value="filtros" class="sidebar-panel">
+            <v-expansion-panel-title class="panel-title">
+              <v-icon size="18" class="mr-2" color="orange-darken-2">mdi-filter-variant</v-icon>
+              <span class="text-subtitle-2 font-weight-medium">Filtros</span>
+              <v-spacer />
+              <v-chip size="x-small" color="orange" variant="flat" class="ml-2">
+                {{ activeFilter === 'ALL' ? 'Todos' : STATUS_CONFIG[activeFilter]?.label || activeFilter }}
+              </v-chip>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text class="panel-content">
+              <div class="filter-chips">
+                <v-chip
+                  size="small"
+                  :variant="activeFilter === 'ALL' ? 'flat' : 'outlined'"
+                  :color="activeFilter === 'ALL' ? 'green' : 'grey'"
+                  @click="activeFilter = 'ALL'"
+                  class="mr-1 mb-1"
+                >
+                  Todos
+                </v-chip>
+                <v-chip
+                  v-for="(cfg, key) in STATUS_CONFIG"
+                  :key="key"
+                  size="small"
+                  :variant="activeFilter === key ? 'flat' : 'outlined'"
+                  :color="cfg.color"
+                  @click="activeFilter = String(key)"
+                  class="mr-1 mb-1"
+                >
+                  {{ cfg.emoji }} {{ cfg.label }}
+                </v-chip>
+              </div>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+          <!-- Painel 3: IA & Importação -->
+          <v-expansion-panel value="ia" class="sidebar-panel">
+            <v-expansion-panel-title class="panel-title">
+              <v-icon size="18" class="mr-2" color="purple-darken-2">mdi-brain</v-icon>
+              <span class="text-subtitle-2 font-weight-medium">IA & Importação</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text class="panel-content">
+              <v-btn
+                block
+                size="small"
+                variant="flat"
+                color="deep-purple-darken-2"
+                prepend-icon="mdi-sync"
+                :loading="importingIA"
+                @click="syncIA"
+                class="mb-2"
+              >
+                Sincronizar IA (396+)
+              </v-btn>
+
+              <v-btn
+                block
+                size="x-small"
+                variant="outlined"
+                color="deep-purple-lighten-2"
+                prepend-icon="mdi-file-delimited"
+                @click="importCsvMode = true"
+              >
+                Importar CSV MapTree
+              </v-btn>
+
+              <p class="text-caption text-grey text-center mt-2">
+                Importa predições do script de mapeamento IA.
+              </p>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+        </v-expansion-panels>
+
+        <v-divider class="my-3" />
 
         <!-- Lista de árvores -->
         <div class="sidebar-section tree-list-section">
@@ -1357,15 +1872,45 @@ export default defineComponent({
             <v-icon size="14" color="brown" class="mr-1">mdi-layers</v-icon>
             Legenda de Solos
           </p>
-          
+
           <div v-if="!showSoilLayer" class="text-caption text-grey italic mb-2">
             Ative a camada de solo para ver detalhes.
           </div>
-          
-          <div v-else class="soil-legend-scroll mt-2">
-            <div v-for="(info, key) in SOIL_TYPES" :key="key" class="legend-row mb-1">
-              <span class="legend-dot" :style="{ background: info.color, width: '10px', height: '10px' }" />
-              <span class="text-caption" style="font-size: 10px !important; color: #444;">{{ info.name }}</span>
+
+          <div v-else>
+            <!-- Controles de modo de visualização -->
+            <div class="mb-2">
+              <v-btn-toggle
+                v-model="soilRenderMode"
+                density="compact"
+                variant="outlined"
+                divided
+                class="w-100"
+                @update:model-value="changeSoilRenderMode"
+              >
+                <v-btn value="circles" size="x-small" title="Círculos">
+                  <v-icon size="14">mdi-circle-outline</v-icon>
+                </v-btn>
+                <v-btn value="dots" size="x-small" title="Pontos">
+                  <v-icon size="14">mdi-circle-small</v-icon>
+                </v-btn>
+                <v-btn value="grid" size="x-small" title="Grid">
+                  <v-icon size="14">mdi-grid</v-icon>
+                </v-btn>
+                <v-btn value="heatmap" size="x-small" title="Heatmap">
+                  <v-icon size="14">mdi-heatmap</v-icon>
+                </v-btn>
+              </v-btn-toggle>
+              <div class="text-caption text-grey text-center mt-1" style="font-size: 10px;">
+                Modo: {{ soilRenderMode === 'circles' ? 'Círculos' : soilRenderMode === 'dots' ? 'Pontos' : soilRenderMode === 'grid' ? 'Grid' : 'Heatmap' }}
+              </div>
+            </div>
+
+            <div class="soil-legend-scroll mt-2">
+              <div v-for="(info, key) in SOIL_TYPES" :key="key" class="legend-row mb-1">
+                <span class="legend-dot" :style="{ background: info.color, width: '10px', height: '10px' }" />
+                <span class="text-caption" style="font-size: 10px !important; color: #444;">{{ info.name }}</span>
+              </div>
             </div>
           </div>
         </div>

@@ -134,26 +134,48 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
 };
 
 export function getSoilInfo(type: string): SoilTypeInfo {
+  // Fallback seguro - sempre retorna um valor válido
+  const getFallback = (): SoilTypeInfo => ({
+    name: 'Latossolo Vermelho',
+    color: '#B71C1C',
+    quality: 'GOOD',
+    description: 'Solos profundos, muito intemperizados e ricos em ferro.',
+    growthImpact: 'Acelerado (+20%)',
+    typicalClay: 65,
+    typicalPh: 5.2
+  });
+
   if (!type || type === 'UNKNOWN') {
-    // Para o demo não ficar todo vermelho, distribuímos os solos comuns do Brasil
-    const types = ['LATOSSOLO_VERMELHO', 'LATOSSOLO_AMARELO', 'ARGISSOLO', 'NITOSSOLO', 'CAMBISSOLO'];
-    // Determinismo básico baseado no tamanho da string ou fallback fixo
-    const index = (type || 'A').length % types.length;
-    return SOIL_TYPES[types[index]!] || SOIL_TYPES.LATOSSOLO_VERMELHO;
+    return getFallback();
   }
 
   const normalizedKey = type.toUpperCase().replace(/\s+/g, '_');
-  if (SOIL_TYPES[normalizedKey]) return SOIL_TYPES[normalizedKey];
 
+  // Busca por chave usando verificação segura
+  for (const [key, value] of Object.entries(SOIL_TYPES)) {
+    if (key === normalizedKey) {
+      return value;
+    }
+  }
+
+  // Busca por nome
   const typeLower = type.toLowerCase().trim();
-  const foundByName = Object.values(SOIL_TYPES).find(t => 
-    t.name.toLowerCase() === typeLower
-  );
-  if (foundByName) return foundByName;
+  for (const value of Object.values(SOIL_TYPES)) {
+    if (value.name.toLowerCase() === typeLower) {
+      return value;
+    }
+  }
 
-  if (type === 'GOOD' || type === 'VERDE') return SOIL_TYPES.LATOSSOLO_VERMELHO;
-  if (type === 'REGULAR' || type === 'AMARELO') return SOIL_TYPES.ARGISSOLO;
-  if (type === 'BAD' || type === 'AZUL') return SOIL_TYPES.NEOSSOLO_QUARTZARENICO;
+  // Mapeamento por qualidade
+  if (type === 'GOOD' || type === 'VERDE') {
+    return SOIL_TYPES.LATOSSOLO_VERMELHO ?? getFallback();
+  }
+  if (type === 'REGULAR' || type === 'AMARELO') {
+    return SOIL_TYPES.ARGISSOLO ?? getFallback();
+  }
+  if (type === 'BAD' || type === 'AZUL') {
+    return SOIL_TYPES.NEOSSOLO_QUARTZARENICO ?? getFallback();
+  }
 
-  return SOIL_TYPES.LATOSSOLO_VERMELHO;
+  return getFallback();
 }

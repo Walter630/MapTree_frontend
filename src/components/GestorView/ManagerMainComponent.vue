@@ -1,27 +1,12 @@
 <template>
   <v-container class="pa-8">
     <!-- ===== Cabeçalho ===== -->
-    <v-row align="center" justify="space-between" class="mb-8">
-      <v-col cols="12" md="6">
+    <v-row align="center" class="mb-8">
+      <v-col cols="12">
         <p class="text-caption text-grey-darken-1 mb-1">Meu Painel</p>
         <p class="text-h6 font-weight-regular mb-0">
           Olá, {{ user?.name || 'Usuário' }}, Aqui Está o Resumo de Suas Operações.
         </p>
-      </v-col>
-
-      <v-col cols="12" md="6" class="d-flex justify-end">
-        <div style="width: 400px; max-width: 100%">
-          <v-text-field
-            v-model="search"
-            placeholder="Pesquisar"
-            density="comfortable"
-            variant="outlined"
-            prepend-inner-icon="mdi-magnify"
-            hide-details
-            class="search-input"
-          />
-        </div>
-        <v-btn color="black" variant="flat" size="large" @click="performSearch">BUSCAR</v-btn>
       </v-col>
     </v-row>
 
@@ -363,7 +348,6 @@ export default defineComponent({
 
   data() {
     return {
-      search: '',
       user: null as User | null,
       trees: null as Tree[] | null,
       species: [] as any[],
@@ -399,10 +383,6 @@ export default defineComponent({
   },
 
   methods: {
-    performSearch() {
-      console.log('Pesquisando:', this.search)
-    },
-
     goToMap() {
       this.$router.push('/manager/map')
     },
@@ -603,13 +583,5 @@ export default defineComponent({
 .glass-card {
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.95) !important;
-}
-
-/* ===== Busca ===== */
-.search-input :deep(.v-field__append-inner) {
-  align-items: center;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-left: 0;
 }
 </style>
