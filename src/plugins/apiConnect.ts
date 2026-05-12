@@ -360,7 +360,7 @@ class ApiConnect {
    * Busca árvores dentro de uma área geográfica (bounding box)
    * Útil para carregar apenas árvores visíveis no mapa
    */
-  public getTreesInBounds(north: number, south: number, east: number, west: number, limit = 500) {
+  public getTreesInBounds(north: number, south: number, east: number, west: number, limit = 10000) {
     return this.axiosInstance.get<any[]>('/trees/bounds', {
       params: { north, south, east, west, limit }
     })
@@ -370,7 +370,7 @@ class ApiConnect {
    * Busca árvores próximas a uma coordenada (raio em km)
    * Útil para carregar árvores da localização do usuário
    */
-  public getTreesNearby(lat: number, lng: number, radiusKm = 5, limit = 300) {
+  public getTreesNearby(lat: number, lng: number, radiusKm = 5, limit = 5000) {
     return this.axiosInstance.get<any[]>('/trees/nearby', {
       params: { lat, lng, radius: radiusKm, limit }
     })
@@ -380,7 +380,7 @@ class ApiConnect {
    * Busca árvores por cidade/região pré-definida
    * Mais eficiente que bounds para regiões conhecidas
    */
-  public getTreesByCity(cityId: string, limit = 1000) {
+  public getTreesByCity(cityId: string, limit = 10000) {
     return this.axiosInstance.get<{ cityId: string; bounds: any; count: number; trees: any[] }>(`/trees/city/${cityId}`, {
       params: { limit }
     })

@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-8">
+  <v-container class="pt-3 pb-6 px-6" style="max-width: 1400px; margin: 0 auto;">
     <!-- ===== Cabeçalho ===== -->
     <v-row align="center" class="mb-8">
       <v-col cols="12">
@@ -10,56 +10,93 @@
       </v-col>
     </v-row>
 
-    <!-- ===== Cards de Resumo ===== -->
-    <v-row class="mt-6 d-flex" justify="start">
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Árvores</span><v-icon>mdi-tree</v-icon></div>
-          <p class="card-numero">{{ countTrees }}</p>
-          <p class="card-info">+3 este mês</p>
+    <!-- ===== Cards de Resumo Modernos ===== -->
+    <v-row class="mt-6" dense>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Árvores</span>
+            <v-icon size="20" color="green-darken-2">mdi-tree</v-icon>
+          </div>
+          <div class="kpi-value">{{ countTrees }}</div>
+          <div class="kpi-subtitle">Cadastradas</div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Podas</span><v-icon>mdi-content-cut</v-icon></div>
-          <p class="card-numero">{{ countPrunings }}</p>
-          <p class="card-info">+7 este mês</p>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Podas</span>
+            <v-icon size="20" color="blue-darken-2">mdi-content-cut</v-icon>
+          </div>
+          <div class="kpi-value">{{ countPrunings }}</div>
+          <div class="kpi-subtitle">Realizadas</div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Áreas Críticas</span><v-icon>mdi-alert</v-icon></div>
-          <p class="card-numero">{{ countCritical }}</p>
-          <p class="card-info">Catalogadas</p>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" :class="{ 'kpi-card--danger': countCritical > 0 }" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Áreas Críticas</span>
+            <v-icon size="20" :color="countCritical > 0 ? 'error' : 'grey'">mdi-alert</v-icon>
+          </div>
+          <div class="kpi-value" :class="{ 'text-error': countCritical > 0 }">{{ countCritical }}</div>
+          <div class="kpi-subtitle">Em risco</div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Espécies</span><v-icon>mdi-sprout</v-icon></div>
-          <p class="card-numero">{{ countSpecies }}</p>
-          <p class="card-info">Catalogadas</p>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Espécies</span>
+            <v-icon size="20" color="orange-darken-2">mdi-sprout</v-icon>
+          </div>
+          <div class="kpi-value">{{ countSpecies }}</div>
+          <div class="kpi-subtitle">Catalogadas</div>
         </v-card>
       </v-col>
     </v-row>
 
     <!-- ===== Seção: Mapa + Gráfico + Alertas ===== -->
     <v-row class="mb-6 mt-10" dense>
-      <!-- Mapa de Risco -->
+      <!-- Mapa de Risco - Design Premium -->
       <v-col cols="12" md="5">
-        <v-card class="pa-4 section-card" flat>
-          <p class="section-title">
-            <v-icon class="mr-2">mdi-map-marker-alert-outline</v-icon>
-            Região em risco
-          </p>
-          <MiniMap
-            ref="miniMapRef"
-            filter-status="TO_PRUNE"
-            style="height: 270px; border-radius: 8px; overflow: hidden"
-          />
-          <v-btn icon @click="goToMap"><v-icon>mdi-map</v-icon></v-btn>
+        <v-card class="risk-map-card" flat>
+          <div class="risk-map-header">
+            <div class="d-flex align-center">
+              <div class="risk-icon-container mr-3">
+                <v-icon size="24" color="white">mdi-map-marker-alert</v-icon>
+              </div>
+              <div>
+                <p class="risk-title mb-0">Alertas Geográficos</p>
+                <p class="risk-subtitle mb-0">Áreas com intervenção prioritária</p>
+              </div>
+            </div>
+            <v-btn
+              variant="tonal"
+              size="small"
+              color="error"
+              prepend-icon="mdi-open-in-app"
+              @click="goToMap"
+              class="view-map-btn"
+            >
+              Ver no Mapa
+            </v-btn>
+          </div>
+
+          <div class="risk-map-container">
+            <MiniMap
+              ref="miniMapRef"
+              filter-status="TO_PRUNE"
+              style="height: 260px; width: 100%;"
+            />
+            <div class="risk-overlay-badge">
+              <v-chip color="error" size="small" variant="flat" class="font-weight-bold">
+                <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                {{ filteredTrees.length }} pontos críticos
+              </v-chip>
+            </div>
+          </div>
         </v-card>
       </v-col>
 
@@ -74,48 +111,46 @@
         </v-card>
       </v-col>
 
-      <!-- Árvores em risco -->
+      <!-- Árvores em risco - Lista Premium -->
       <v-col cols="12" md="4">
-        <v-card class="pa-4 section-card-white" flat>
-          <p class="section-title">
-            <v-icon class="mr-2">mdi-alert-outline</v-icon>
-            Árvores em risco
-          </p>
+        <v-card class="risk-list-card" flat>
+          <div class="risk-list-header">
+            <div class="d-flex align-center">
+              <div class="risk-list-icon mr-3">
+                <v-icon size="20" color="white">mdi-alert</v-icon>
+              </div>
+              <div>
+                <p class="risk-list-title mb-0">Lista de Alertas</p>
+                <p class="risk-list-subtitle mb-0">{{ filteredTrees.length }} árvores pendentes</p>
+              </div>
+            </div>
+          </div>
 
-          <div class="alerts-container">
+          <div class="risk-list-container">
             <v-card
               v-for="tree in filteredTrees"
               :key="tree.id"
-              class="pa-4 mb-3 rounded-xl alert-card-premium pointer-cursor"
+              class="risk-item mb-2"
               flat
               @click="focusOnTree(tree)"
             >
-              <div class="d-flex justify-space-between align-center mb-2">
-                <v-chip color="error" size="x-small" variant="flat" class="font-weight-bold">
-                  PODA URGENTE
-                </v-chip>
-                <v-icon color="error" size="20">mdi-alert-decagram</v-icon>
-              </div>
-              
-              <p class="text-subtitle-1 font-weight-bold mb-1">{{ tree.status === 'TO_PRUNE' ? 'Necessita Poda' : tree.status }}</p>
-              
-              <div class="d-flex align-center text-caption text-grey-darken-1 mb-1">
-                <v-icon size="14" class="mr-1">mdi-map-marker</v-icon>
-                <span>
-                  Lat: {{ (tree.lat || tree.latitude || 0).toFixed(4) }} / 
-                  Lng: {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
-                </span>
-              </div>
-              
-              <div class="mt-2 d-flex align-center">
-                <v-icon size="16" color="warning" class="mr-1">mdi-lightning-bolt</v-icon>
-                <span class="text-caption font-weight-medium text-warning">Risco de fiação detectado</span>
+              <div class="d-flex align-center">
+                <div class="risk-indicator mr-3">
+                  <v-icon size="18" color="error">mdi-alert-circle</v-icon>
+                </div>
+                <div class="flex-grow-1">
+                  <p class="risk-item-title mb-0">{{ tree.status === 'TO_PRUNE' ? 'Poda Urgente' : 'Risco Crítico' }}</p>
+                  <p class="risk-item-coords mb-0">
+                    {{ (tree.lat || tree.latitude || 0).toFixed(4) }}, {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
+                  </p>
+                </div>
+                <v-icon size="16" color="grey-lighten-1">mdi-chevron-right</v-icon>
               </div>
             </v-card>
 
-            <div v-if="filteredTrees.length === 0" class="text-center py-8">
-              <v-icon size="48" color="grey-lighten-2">mdi-check-circle-outline</v-icon>
-              <p class="text-body-2 text-grey mt-2">Nenhum alerta crítico pendente</p>
+            <div v-if="filteredTrees.length === 0" class="text-center py-6 empty-state">
+              <v-icon size="40" color="success-lighten-2">mdi-shield-check</v-icon>
+              <p class="text-body-2 text-grey mt-2">Sem alertas pendentes</p>
             </div>
           </div>
         </v-card>
@@ -481,32 +516,50 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ===== Cards de Resumo ===== */
-.card-resumo {
-  background: #f6f6f6;
-  border: 1px solid #cdcdcd;
-  height: 150px;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: none;
+/* ===== Cards KPI Modernos ===== */
+.kpi-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  height: 100%;
+  transition: all 0.2s ease;
 }
 
-.card-header {
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.kpi-card--danger {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  border-color: #ffcdd2;
+}
+
+.kpi-header {
   display: flex;
   justify-content: space-between;
-  font-weight: 600;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.card-numero {
-  font-size: 26px;
-  margin-top: 25px;
-  font-weight: bold;
+.kpi-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
 }
 
-.card-info {
-  margin-top: 5px;
-  font-size: 13px;
-  color: #777;
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  line-height: 1;
+}
+
+.kpi-subtitle {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 4px;
 }
 
 /* ===== Seções ===== */
@@ -560,6 +613,166 @@ export default defineComponent({
 .alerts-container::-webkit-scrollbar-thumb {
   background: #e0e0e0;
   border-radius: 4px;
+}
+
+/* ===== Card de Mapa de Risco Premium ===== */
+.risk-map-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.risk-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(200, 12, 52, 0.1);
+}
+
+.risk-icon-container {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #c80c34 0%, #e53935 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(200, 12, 52, 0.3);
+}
+
+.risk-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #c80c34;
+}
+
+.risk-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.view-map-btn {
+  border-radius: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+.risk-map-container {
+  position: relative;
+  height: 260px;
+}
+
+.risk-overlay-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 10;
+}
+
+/* ===== Card de Lista de Riscos Premium ===== */
+.risk-list-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  height: 100%;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.risk-list-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(200, 12, 52, 0.1);
+}
+
+.risk-list-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #c80c34 0%, #e53935 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(200, 12, 52, 0.3);
+}
+
+.risk-list-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #c80c34;
+}
+
+.risk-list-subtitle {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.risk-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  max-height: 320px;
+}
+
+.risk-list-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.risk-list-container::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 4px;
+}
+
+.risk-item {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.risk-item:hover {
+  background: white;
+  border-color: #c80c34;
+  box-shadow: 0 4px 12px rgba(200, 12, 52, 0.1);
+  transform: translateX(4px);
+}
+
+.risk-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(200, 12, 52, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.risk-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.risk-item-coords {
+  font-size: 0.75rem;
+  color: #888;
+  font-family: monospace;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
 }
 
 /* ===== Tabela de Relatórios ===== */

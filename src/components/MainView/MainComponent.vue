@@ -1,76 +1,102 @@
 <template>
-  <v-container class="pa-8">
+  <v-container class="pt-3 pb-6 px-6">
     <!-- ===== Cabeçalho ===== -->
-    <v-row align="center" justify="space-between" class="mb-8">
-      <v-col cols="12" md="6">
+    <v-row align="center" class="mb-8">
+      <v-col cols="12">
         <p class="text-caption text-grey-darken-1 mb-1">Meu Painel</p>
         <p class="text-h6 font-weight-regular mb-0">
           Olá, {{ user?.name || 'Usuário' }}, Aqui Está o Resumo de Suas Operações.
         </p>
       </v-col>
-
-      <v-col cols="12" md="6" class="d-flex justify-end">
-        <div style="width: 400px; max-width: 100%">
-          <v-text-field
-            v-model="search"
-            placeholder="Pesquisar"
-            density="comfortable"
-            variant="outlined"
-            prepend-inner-icon="mdi-magnify"
-            hide-details
-            class="search-input"
-          />
-        </div>
-        <v-btn color="black" variant="flat" size="large" @click="performSearch">BUSCAR</v-btn>
-      </v-col>
     </v-row>
 
-    <!-- ===== Cards de Resumo ===== -->
-    <v-row class="mt-6 d-flex" justify="start">
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Árvores</span><v-icon>mdi-tree</v-icon></div>
-          <p class="card-numero">{{ countTrees }}</p>
-          <p class="card-info">Cadastradas</p>
+    <!-- ===== Cards de Resumo Modernos ===== -->
+    <v-row class="mt-6" dense>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Árvores</span>
+            <v-icon size="20" color="green-darken-2">mdi-tree</v-icon>
+          </div>
+          <div class="kpi-value">{{ countTrees }}</div>
+          <div class="kpi-subtitle">Cadastradas</div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Podas</span><v-icon>mdi-content-cut</v-icon></div>
-          <p class="card-numero">{{ countPrunings }}</p>
-          <p class="card-info">Realizadas</p>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Podas</span>
+            <v-icon size="20" color="blue-darken-2">mdi-content-cut</v-icon>
+          </div>
+          <div class="kpi-value">{{ countPrunings }}</div>
+          <div class="kpi-subtitle">Realizadas</div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo" :class="{ 'card-resumo--danger': countCritical > 0 }">
-          <div class="card-header"><span>Áreas Críticas</span><v-icon>mdi-alert</v-icon></div>
-          <p class="card-numero">{{ countCritical }}</p>
-          <p class="card-info">Em risco</p>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" :class="{ 'kpi-card--danger': countCritical > 0 }" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Áreas Críticas</span>
+            <v-icon size="20" :color="countCritical > 0 ? 'error' : 'grey'">mdi-alert</v-icon>
+          </div>
+          <div class="kpi-value" :class="{ 'text-error': countCritical > 0 }">{{ countCritical }}</div>
+          <div class="kpi-subtitle">Em risco</div>
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card class="card-resumo">
-          <div class="card-header"><span>Espécies</span><v-icon>mdi-sprout</v-icon></div>
-          <p class="card-numero">{{ countSpecies }}</p>
-          <p class="card-info">Catalogadas</p>
+      <v-col cols="6" md="3">
+        <v-card class="kpi-card" flat>
+          <div class="kpi-header">
+            <span class="kpi-label">Espécies</span>
+            <v-icon size="20" color="orange-darken-2">mdi-sprout</v-icon>
+          </div>
+          <div class="kpi-value">{{ countSpecies }}</div>
+          <div class="kpi-subtitle">Catalogadas</div>
         </v-card>
       </v-col>
     </v-row>
 
     <!-- ===== Seção: Mapa + Gráfico + Alertas ===== -->
     <v-row class="mb-6 mt-10" dense>
-      <!-- Mapa de Risco -->
+      <!-- Mapa de Risco - Design Premium -->
       <v-col cols="12" md="5">
-        <v-card class="pa-4 section-card" flat>
-          <p class="section-title">
-            <v-icon class="mr-2">mdi-map-marker-alert-outline</v-icon>
-            Região em risco
-          </p>
-          <PruningMap ref="pruningMapRef" style="height: 270px; border-radius: 8px; overflow: hidden" />
-          <v-btn icon @click="goToMap" class="mt-2"><v-icon>mdi-map</v-icon></v-btn>
+        <v-card class="risk-map-card" flat>
+          <div class="risk-map-header">
+            <div class="d-flex align-center">
+              <div class="risk-icon-container mr-3">
+                <v-icon size="24" color="white">mdi-map-marker-alert</v-icon>
+              </div>
+              <div>
+                <p class="risk-title mb-0">Alertas Geográficos</p>
+                <p class="risk-subtitle mb-0">Áreas com intervenção prioritária</p>
+              </div>
+            </div>
+            <v-btn
+              variant="tonal"
+              size="small"
+              color="error"
+              prepend-icon="mdi-open-in-app"
+              @click="goToMap"
+              class="view-map-btn"
+            >
+              Ver no Mapa
+            </v-btn>
+          </div>
+
+          <div class="risk-map-container">
+            <MiniMap
+              ref="miniMapRef"
+              filter-status="TO_PRUNE"
+              style="height: 260px; width: 100%;"
+            />
+            <div class="risk-overlay-badge">
+              <v-chip color="error" size="small" variant="flat" class="font-weight-bold">
+                <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                {{ filteredTrees.length }} pontos críticos
+              </v-chip>
+            </div>
+          </div>
         </v-card>
       </v-col>
 
@@ -78,148 +104,202 @@
       <v-col cols="12" md="3">
         <v-card class="pa-4 section-card-white" flat>
           <p class="section-title">
-            <v-icon class="mr-2">mdi-chart-bar</v-icon>
+            <v-icon class="mr-2" color="success">mdi-chart-line</v-icon>
             Podas por mês
           </p>
-          <v-skeleton-loader height="270" type="image" class="rounded-lg" />
+          <v-skeleton-loader height="260" type="image" class="rounded-lg" />
         </v-card>
       </v-col>
 
       <!-- Árvores em risco -->
       <v-col cols="12" md="4">
-        <v-card class="pa-4 section-card-white d-flex flex-column" flat>
-          <p class="section-title">
-            <v-icon class="mr-2">mdi-alert-outline</v-icon>
-            Árvores em risco
-          </p>
-
-          <div v-if="filteredTrees.length === 0" class="text-center text-grey py-6">
-            <v-icon size="40" color="grey-lighten-1">mdi-tree-outline</v-icon>
-            <p class="text-body-2 mt-2">Nenhuma árvore em risco no momento</p>
+        <v-card class="risk-list-card" flat>
+          <div class="risk-list-header">
+            <div class="d-flex align-center">
+              <div class="risk-list-icon mr-3">
+                <v-icon size="22" color="white">mdi-alert</v-icon>
+              </div>
+              <div>
+                <p class="risk-title mb-0">Árvores em Risco</p>
+                <p class="risk-subtitle mb-0">{{ filteredTrees.length }} árvores precisam de atenção</p>
+              </div>
+            </div>
           </div>
 
-          <div class="trees-risk-list flex-grow-1" style="overflow-y: auto; max-height: 320px;">
-            <v-card
-              v-for="tree in filteredTrees"
-              :key="tree.id"
-              class="pa-3 mb-2 rounded-lg alert-card"
-              flat
-            >
-              <div class="d-flex align-center mb-1">
-                <v-icon size="18" color="red-darken-2" class="mr-2">
-                  {{ statusIcons[tree.status] || 'mdi-alert' }}
-                </v-icon>
-                <span class="text-subtitle-2 font-weight-bold">
-                  {{ tree.species?.commonName || 'Espécie não identificada' }}
-                </span>
-              </div>
+          <div class="risk-list-content">
+            <div v-if="filteredTrees.length === 0" class="text-center text-grey py-8">
+              <v-icon size="48" color="grey-lighten-1">mdi-tree-outline</v-icon>
+              <p class="text-body-2 mt-3">Nenhuma árvore em risco no momento</p>
+            </div>
 
-              <v-chip
-                size="x-small"
-                color="#C62828"
-                variant="flat"
-                class="mb-2"
-                style="color: #fff !important; font-weight: 600;"
+            <div v-else class="alerts-container">
+              <v-card
+                v-for="tree in filteredTrees"
+                :key="tree.id"
+                class="alert-card-premium pa-3 mb-2"
+                flat
+                @click="focusTree(tree)"
               >
-                {{ statusLabels[tree.status] || tree.status }}
-              </v-chip>
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <div class="d-flex align-center">
+                    <v-icon size="18" color="red-darken-2" class="mr-2">
+                      {{ statusIcons[tree.status] || 'mdi-alert' }}
+                    </v-icon>
+                    <span class="text-subtitle-2 font-weight-bold text-truncate" style="max-width: 140px;">
+                      {{ tree.species?.commonName || 'Espécie não identificada' }}
+                    </span>
+                  </div>
+                  <v-icon size="16" color="grey-lighten-1">mdi-chevron-right</v-icon>
+                </div>
 
-              <div class="d-flex align-center text-caption text-grey-darken-2">
-                <v-icon size="14" class="mr-1">mdi-map-marker</v-icon>
-                {{ tree.latitude?.toFixed(5) }}, {{ tree.longitude?.toFixed(5) }}
-              </div>
-            </v-card>
+                <v-chip
+                  size="x-small"
+                  color="error"
+                  variant="flat"
+                  class="mb-2"
+                >
+                  {{ statusLabels[tree.status] || tree.status }}
+                </v-chip>
+
+                <div class="d-flex align-center text-caption text-grey-darken-2">
+                  <v-icon size="14" class="mr-1">mdi-map-marker</v-icon>
+                  {{ tree.latitude?.toFixed(5) }}, {{ tree.longitude?.toFixed(5) }}
+                </div>
+              </v-card>
+            </div>
           </div>
         </v-card>
       </v-col>
     </v-row>
 
     <!-- ===== Seção: Relatórios ===== -->
-    <v-row dense align="stretch">
+    <v-row dense>
       <v-col cols="12">
-        <v-card class="pa-4 section-card" style="box-shadow: none">
-          <p class="text-subtitle-1 font-weight-bold mb-4">Últimos Relatórios de Poda</p>
+        <!-- Header da seção -->
+        <div class="d-flex align-center mb-4">
+          <div class="section-icon mr-3">
+            <v-icon size="22" color="white">mdi-clipboard-text</v-icon>
+          </div>
+          <span class="text-h6 font-weight-bold">Últimas Podas Realizadas</span>
+        </div>
 
-          <div v-if="prunings.length === 0" class="text-center text-grey py-6">
-            <v-icon size="40" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
-            <p class="text-body-2 mt-2">Nenhum relatório de poda encontrado</p>
+        <!-- Loading -->
+        <v-card v-if="loading" class="pa-8 text-center" flat>
+          <v-progress-circular indeterminate color="green" size="48" />
+          <p class="mt-4 text-grey">Carregando podas...</p>
+        </v-card>
+
+        <!-- Tabela de Podas -->
+        <v-card v-else class="pruning-card" flat>
+          <div class="d-flex align-center justify-space-between mb-4">
+            <span class="text-subtitle-1 font-weight-bold">Histórico de Podas</span>
+            <v-chip size="small" color="grey-lighten-3">{{ prunings.length }} registros</v-chip>
           </div>
 
-          <v-table v-else class="report-table">
-            <thead>
-              <tr>
-                <th class="text-left text-caption text-grey-darken-1 font-weight-medium py-3">Árvore</th>
-                <th class="text-left text-caption text-grey-darken-1 font-weight-medium py-3">Localização</th>
-                <th class="text-left text-caption text-grey-darken-1 font-weight-medium py-3">Tipo de Poda</th>
-                <th class="text-left text-caption text-grey-darken-1 font-weight-medium py-3">Status da Árvore</th>
-                <th class="text-left text-caption text-grey-darken-1 font-weight-medium py-3">Observações</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="report in prunings" :key="report.idTree">
-                <!-- Árvore: nome popular + descrição -->
-                <td class="py-3">
-                  <div class="d-flex align-center">
-                    <v-icon size="20" color="green-darken-2" class="mr-2">mdi-tree</v-icon>
-                    <div>
-                      <span class="text-body-2 font-weight-bold">
-                        {{ report.tree?.species?.commonName ?? 'Não identificada' }}
-                      </span>
-                      <p
-                        v-if="report.tree?.species?.description"
-                        class="text-caption text-grey-darken-1 mb-0"
-                        style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                      >
-                        {{ report.tree.species.description }}
-                      </p>
-                    </div>
-                  </div>
-                </td>
+          <div v-if="prunings.length === 0" class="text-center text-grey py-8">
+            <v-icon size="48" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
+            <p class="text-body-1 mt-3">Nenhuma poda registrada ainda</p>
+            <v-btn
+              color="#C5E11F"
+              variant="flat"
+              class="mt-3 text-none font-weight-bold"
+              @click="goToPruningRegistration"
+            >
+              Registrar Primeira Poda
+            </v-btn>
+          </div>
 
-                <!-- Localização -->
-                <td class="py-3 text-body-2">
-                  <div class="d-flex align-center">
-                    <v-icon size="16" color="grey-darken-1" class="mr-1">mdi-map-marker</v-icon>
-                    <span v-if="report.tree?.latitude && report.tree?.longitude">
-                      {{ report.tree.latitude.toFixed(5) }}, {{ report.tree.longitude.toFixed(5) }}
-                    </span>
-                    <span v-else class="text-grey">Sem localização</span>
-                  </div>
-                </td>
+          <v-data-table
+            v-else
+            :items="recentPrunings"
+            :headers="pruningHeaders"
+            :items-per-page="5"
+            density="comfortable"
+            class="pruning-table"
+            no-data-text="Nenhuma poda encontrada"
+          >
+            <!-- Árvore -->
+            <template #item.tree="{ item }">
+              <div class="d-flex align-center">
+                <v-icon size="18" color="green-darken-2" class="mr-2">mdi-tree</v-icon>
+                <span class="text-body-2 font-weight-medium">
+                  {{ item.tree?.species?.commonName || 'Árvore #' + item.idTree?.slice(-4) }}
+                </span>
+              </div>
+            </template>
 
-                <!-- Tipo de Poda em português -->
-                <td class="py-3">
-                  <v-chip
-                    :style="`background-color: ${pruningColors[report.type]}; color: #ffffff !important;`"
-                    variant="flat"
-                    size="small"
-                    class="type-chip"
-                  >
-                    {{ pruningLabels[report.type] || report.type }}
-                  </v-chip>
-                </td>
+            <!-- Localização -->
+            <template #item.location="{ item }">
+              <div v-if="item.tree?.latitude" class="text-caption text-grey-darken-1">
+                {{ item.tree.latitude.toFixed(4) }}, {{ item.tree.longitude.toFixed(4) }}
+              </div>
+              <span v-else class="text-caption text-grey">—</span>
+            </template>
 
-                <!-- Status da Árvore em português -->
-                <td class="py-3">
-                  <v-chip
-                    v-if="report.tree?.status"
-                    :style="`background-color: ${treeStatusColors[report.tree.status]}; color: #ffffff !important;`"
-                    variant="flat"
-                    size="small"
-                    class="type-chip"
-                  >
-                    {{ statusLabels[report.tree.status] || report.tree.status }}
-                  </v-chip>
-                  <span v-else class="text-caption text-grey">—</span>
-                </td>
+            <!-- Tipo -->
+            <template #item.type="{ item }">
+              <v-chip
+                :color="getPruningTypeColor(item.type)"
+                size="small"
+                variant="flat"
+                class="font-weight-medium"
+              >
+                {{ getPruningTypeLabel(item.type) }}
+              </v-chip>
+            </template>
 
-                <!-- Observações -->
-                <td class="py-3 text-body-2" style="max-width: 250px;">
-                  {{ report.observations || '—' }}
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+            <!-- Data -->
+            <template #item.date="{ item }">
+              <span class="text-body-2">{{ formatDate(item.date) }}</span>
+            </template>
+
+            <!-- Status da Árvore -->
+            <template #item.treeStatus="{ item }">
+              <v-chip
+                v-if="item.tree?.status"
+                :color="getStatusColor(item.tree.status)"
+                size="small"
+                variant="flat"
+                class="font-weight-medium"
+              >
+                {{ statusLabels[item.tree.status] || item.tree.status }}
+              </v-chip>
+              <span v-else class="text-caption text-grey">—</span>
+            </template>
+
+            <!-- Observações -->
+            <template #item.observations="{ item }">
+              <span class="text-caption text-grey-darken-1 text-truncate" style="max-width: 180px; display: block;">
+                {{ item.observations || '—' }}
+              </span>
+            </template>
+
+            <!-- Ações -->
+            <template #item.actions="{ item }">
+              <v-btn
+                icon
+                size="small"
+                variant="text"
+                color="primary"
+                @click="viewPruningDetails(item)"
+              >
+                <v-icon size="18">mdi-eye</v-icon>
+              </v-btn>
+            </template>
+          </v-data-table>
+
+          <!-- Ver todas -->
+          <div v-if="prunings.length > 5" class="d-flex justify-center mt-4">
+            <v-btn
+              variant="text"
+              color="primary"
+              class="text-none"
+              @click="goToPruningList"
+            >
+              Ver todas as podas
+              <v-icon end>mdi-arrow-right</v-icon>
+            </v-btn>
+          </div>
         </v-card>
       </v-col>
     </v-row>
@@ -352,6 +432,7 @@ export default defineComponent({
       species: null as Species[] | null,
       filteredTrees: [] as Tree[],
       prunings: [] as Pruning[],
+      loading: false,
 
       // Contadores
       countTrees: 0,
@@ -366,9 +447,33 @@ export default defineComponent({
       statusLabels: STATUS_LABELS,
       statusIcons: STATUS_ICONS,
 
+      // Headers da tabela de podas
+      pruningHeaders: [
+        { title: 'Árvore', key: 'tree', sortable: false },
+        { title: 'Localização', key: 'location', sortable: false },
+        { title: 'Tipo', key: 'type', sortable: true },
+        { title: 'Data', key: 'date', sortable: true },
+        { title: 'Status', key: 'treeStatus', sortable: false },
+        { title: 'Observações', key: 'observations', sortable: false },
+        { title: 'Ações', key: 'actions', sortable: false, align: 'center' as const },
+      ],
+
       // Auto-refresh
       refreshInterval: null as ReturnType<typeof setInterval> | null,
     }
+  },
+
+  computed: {
+    /** Retorna apenas as 5 podas mais recentes */
+    recentPrunings(): Pruning[] {
+      return [...this.prunings]
+        .sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0
+          const dateB = b.date ? new Date(b.date).getTime() : 0
+          return dateB - dateA
+        })
+        .slice(0, 5)
+    },
   },
 
   mounted() {
@@ -501,53 +606,254 @@ export default defineComponent({
         })
         .catch((error: unknown) => console.error('Erro ao buscar usuário:', error))
     },
+
+    /* ---------- Navegação ---------- */
+
+    goToPruningRegistration() {
+      this.$router.push('/user/podas/nova')
+    },
+
+    goToPruningList() {
+      this.$router.push('/user/podas')
+    },
+
+    viewPruningDetails(item: Pruning) {
+      console.log('Ver detalhes da poda:', item)
+      // this.$router.push(`/user/podas/${item.id}`)
+    },
+
+    focusTree(tree: Tree) {
+      // Centraliza o mapa na árvore selecionada
+      if (this.$refs.miniMapRef) {
+        const mapRef = this.$refs.miniMapRef as any
+        if (mapRef.map && tree.latitude && tree.longitude) {
+          mapRef.map.flyTo([tree.latitude, tree.longitude], 17, { duration: 1.5 })
+        }
+      }
+      console.log('Focar na árvore:', tree)
+    },
+
+    /* ---------- Helpers ---------- */
+
+    getPruningTypeColor(type: string): string {
+      const colors: Record<string, string> = {
+        LIGHT: 'blue',
+        MODERATE: 'orange',
+        HEAVY: 'green',
+      }
+      return colors[type] || 'grey'
+    },
+
+    getPruningTypeLabel(type: string): string {
+      const labels: Record<string, string> = {
+        LIGHT: 'Leve',
+        MODERATE: 'Moderada',
+        HEAVY: 'Pesada',
+      }
+      return labels[type] || type
+    },
+
+    getStatusColor(status: string): string {
+      const colors: Record<string, string> = {
+        TO_PRUNE: 'error',
+        UNDER_OBSERVATION: 'warning',
+        NORMAL: 'success',
+        PRUNED: 'info',
+      }
+      return colors[status] || 'grey'
+    },
+
+    formatDate(date: string | Date | undefined): string {
+      if (!date) return '—'
+      const d = new Date(date)
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    },
   },
 })
 </script>
 
 <style scoped>
-/* ===== Cards de Resumo ===== */
-.card-resumo {
-  background: #f6f6f6;
-  border: 1px solid #cdcdcd;
-  min-height: 150px;
+/* ===== Cards KPI Modernos ===== */
+.kpi-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
   height: 100%;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
+  transition: all 0.2s ease;
 }
 
-.card-header {
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.kpi-card--danger {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  border-color: #ffcdd2;
+}
+
+.kpi-header {
   display: flex;
   justify-content: space-between;
-  font-weight: 600;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.card-numero {
-  font-size: 26px;
-  margin-top: 25px;
-  font-weight: bold;
+.kpi-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
 }
 
-.card-info {
-  margin-top: 5px;
-  font-size: 13px;
-  color: #777;
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  line-height: 1;
 }
 
-.card-resumo--danger {
-  background: #fef2f2;
-  border-color: #f5c6cb;
+.kpi-subtitle {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 4px;
 }
 
-.card-resumo--danger .card-numero {
-  color: #C62828;
+/* ===== Seção de Relatórios ===== */
+.section-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #C5E11F 0%, #9ed013 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.card-resumo--danger .card-header {
-  color: #C62828;
+.pruning-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.pruning-table :deep(th) {
+  font-weight: 600 !important;
+  color: #555 !important;
+  font-size: 0.8rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pruning-table :deep(td) {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+/* ===== Mapa de Risco Premium ===== */
+.risk-map-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.risk-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(200, 12, 52, 0.1);
+}
+
+.risk-icon-container {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff5252 0%, #c80c34 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(200, 12, 52, 0.3);
+}
+
+.risk-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.risk-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.risk-map-container {
+  position: relative;
+}
+
+.risk-overlay-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 10;
+}
+
+/* ===== Lista de Riscos Premium ===== */
+.risk-list-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.risk-list-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(200, 12, 52, 0.1);
+}
+
+.risk-list-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff5252 0%, #c80c34 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.risk-list-content {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 320px;
+  padding: 12px;
+}
+
+.alerts-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.alerts-container::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 4px;
+}
+
+.alert-card-premium {
+  border: 1px solid rgba(200, 12, 52, 0.1);
+  background: linear-gradient(135deg, #ffffff 0%, #fff5f5 100%);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+  cursor: pointer;
+}
+
+.alert-card-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(200, 12, 52, 0.1) !important;
 }
 
 /* ===== Seções ===== */

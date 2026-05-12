@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-6">
+  <v-container class="pt-3 pb-6 px-6" style="max-width: 1400px; margin: 0 auto;">
     <v-row>
       <v-col cols="12">
         <PageHeader
@@ -10,26 +10,6 @@
             { text: '#Relatórios' },
           ]"
         />
-      </v-col>
-
-      <v-col cols="12" sm="6" md="12" class="d-flex justify-end align-center search-bar-container">
-        <div style="width: 400px; max-width: 100%">
-          <v-text-field
-            v-model="search"
-            placeholder="Pesquisar"
-            density="comfortable"
-            variant="outlined"
-            prepend-inner-icon="mdi-magnify"
-            hide-details
-            class="search-input"
-          >
-            <template #append-inner>
-              <v-btn class="search-button" @click="performSearch" flat color="black">
-                Buscar
-              </v-btn>
-            </template>
-          </v-text-field>
-        </div>
       </v-col>
     </v-row>
 

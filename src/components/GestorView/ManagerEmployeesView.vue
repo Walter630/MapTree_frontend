@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-6">
+  <v-container class="pt-3 pb-6 px-6" style="max-width: 1400px; margin: 0 auto;">
     <v-row align="center" class="mb-2">
       <v-col cols="12">
         <PageHeader
@@ -142,10 +142,10 @@ export default defineComponent({
       itemsPerPage: 10,
       page: 1,
       headers: [
-        { title: 'Nome Completo', key: 'name', align: 'start' },
-        { title: 'CPF / Registro', key: 'cpf', align: 'center' },
-        { title: 'Status', key: 'isActive', align: 'center' },
-        { title: 'Ações', key: 'acoes', align: 'end', sortable: false },
+        { title: 'Nome Completo', key: 'name', align: 'start' as const },
+        { title: 'CPF / Registro', key: 'cpf', align: 'center' as const },
+        { title: 'Status', key: 'isActive', align: 'center' as const },
+        { title: 'Ações', key: 'acoes', align: 'end' as const, sortable: false },
       ],
       dialogDelete: {
         active: false,

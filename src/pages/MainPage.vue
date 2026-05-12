@@ -33,13 +33,27 @@ const HIDDEN_ROUTES = [
 ]
 
 const showAppBar = computed(() => !HIDDEN_ROUTES.includes(route.path))
+
+const MAP_ROUTES = ['/user/mapUser', '/manager/map', '/admin/map']
+const isMapPage = computed(() => MAP_ROUTES.some(r => route.path.startsWith(r)))
 </script>
+
+<style>
+/* Remove padding do v-main para páginas de mapa */
+.map-page {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+</style>
 
 <template>
   <!-- Só mostra o AppBar se não estiver em login/cadastro -->
   <AppBarComponent v-if="showAppBar"  />
 
-  <v-main :style="isMobile ? 'padding-bottom: 10px !important;' : ''">
+  <v-main
+    :class="{ 'map-page': isMapPage }"
+    :style="isMobile ? 'padding-bottom: 10px !important;' : ''"
+  >
     <router-view />
   </v-main>
 </template>

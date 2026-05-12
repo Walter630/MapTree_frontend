@@ -7,9 +7,14 @@ export default defineComponent({
 </script>
 
 <template>
-  <v-main>
+  <v-main class="user-main">
     <router-view />
   </v-main>
 </template>
 
-<style scoped></style>
+<style scoped>
+.user-main {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+</style>

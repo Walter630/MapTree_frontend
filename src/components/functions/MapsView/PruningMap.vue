@@ -25,6 +25,65 @@ import {
 } from '@/utils/soilRenderers'
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
+/* =====================================================
+   ESTRUTURA DO COMPONENTE PRUNINGMAP
+   =====================================================
+
+   Este componente gerencia o mapa de podas com as seguintes seções:
+
+   1. TIPOS (Interfaces TypeScript)
+      - TreeOnMap, ApiTree, MarkedLocation, etc.
+
+   2. SETUP / ESTADO REATIVO
+      - Variáveis ref() e computed() para dados e UI
+      - Estados: trees, selectedTree, loadingTrees, etc.
+
+   3. CONFIGURAÇÕES
+      - STATUS_CONFIG: Cores e ícones por status
+      - SOIL_TYPES: Tipos de solo e cores
+      - STATUS_EMOJI: Emojis para cada status
+
+   4. FUNÇÕES DE DADOS
+      - parseTreeData(): Converte API para formato interno
+      - fetchTrees(): Carrega árvores da API
+      - fetchTreesNearby(): Carrega por proximidade
+      - fetchTreesByRegion(): Carrega por região/cidade
+      - loadVisibleTiles(): Carrega área visível no mapa
+
+   5. FUNÇÕES DO MAPA (Leaflet)
+      - initMap(): Inicializa o mapa
+      - renderTrees(): Renderiza marcadores no mapa
+      - drawPowerLines(): Desenha rede elétrica
+      - toggleSoilLayer(): Ativa/desativa camada de solo
+
+   6. GEOLOCALIZAÇÃO
+      - goToUserLocation(): Centraliza no usuário
+      - startWatchingPosition(): Acompanha movimento
+
+   7. UI / SIDEBAR v2 (Novo - Abril/2025)
+      - Dashboard flutuante: Sempre visível com mini mapa
+      - Abas: Carregar / Árvores / Config
+      - Lista de árvores com filtros
+      - Legenda e configurações
+
+   8. TEMPLATE (HTML)
+      - Mapa Leaflet
+      - Botões flutuantes (ações rápidas)
+      - Sidebar com abas
+      - Drawer de IA
+      - Dialogs (importação CSV)
+
+   9. ESTILOS (CSS)
+      - Layout do mapa
+      - Sidebar v2 (novo design)
+      - Dashboard flutuante
+      - Animações e responsivo
+
+   BACKUP: Menu lateral anterior salvo em:
+   /src/components/functions/MapsView/PruningMap_sidebar_backup.vue
+
+   ===================================================== */
+
 /* ===================================
    TIPOS
 =================================== */
@@ -212,6 +271,9 @@ export default defineComponent({
     const totalTreesInArea = ref(0) // Total de árvores disponíveis na API
     const hasMoreTrees = ref(false) // Se há mais árvores para carregar
     const loadMode = ref<'radius' | 'bounds' | 'region' | 'tile'>('radius') // Modo de carregamento
+    const autoLoadOnZoom = ref(true) // Carregar automaticamente ao ampliar o mapa
+    const followUserPosition = ref(false) // Se true, mapa segue o usuário automaticamente
+    const userHasMovedMap = ref(false) // Detecta se usuário navegou manualmente no mapa
     const loadedTreeIds = new Set<string>() // Cache para evitar duplicatas
 
     /* ---------- Sistema de Regiões ---------- */
@@ -260,6 +322,9 @@ export default defineComponent({
     /* ---------- Accordion Sidebar ---------- */
     const expandedPanels = ref(['carregamento', 'filtros'])
 
+    /* ---------- Abas do Novo Sidebar v2 ---------- */
+    const activeTab = ref<'carregar' | 'arvores' | 'config'>('carregar')
+
     /* ---------- IA Drawer ---------- */
     const aiDrawerOpen = ref(false)
     const aiTreeData = ref<TreeWithAi | null>(null)
@@ -282,6 +347,19 @@ export default defineComponent({
       const counts: Record<string, number> = { NORMAL: 0, TO_PRUNE: 0, UNDER_OBSERVATION: 0, PRUNED: 0, CRITICAL: 0 }
       trees.value.forEach(t => { counts[t.status] = (counts[t.status] || 0) + 1 })
       return counts
+    })
+
+    // Refs reativas para bounds do mapa (para tornar visibleTreeCount reativo)
+    const mapBounds = ref<L.LatLngBounds | null>(null)
+    const mapZoom = ref<number>(DEFAULT_ZOOM)
+
+    // Contador de árvores visíveis na tela (bounds atual do mapa) - AGORA REATIVO
+    const visibleTreeCount = computed(() => {
+      if (!map || !mapBounds.value) return trees.value.length
+      const bounds = mapBounds.value
+      return trees.value.filter(t => {
+        return bounds.contains([t.latitude, t.longitude])
+      }).length
     })
 
     /* ---------- Notificação ---------- */
@@ -380,7 +458,7 @@ export default defineComponent({
       const curH = Number(t.currentHeight || t.estimatedHeight || t.estimated_height_m || t.aiPrediction?.estimated_height_m || 0)
       const wireH = Number(t.wireHeight || t.wire_height_m || t.aiPrediction?.wire_height_m || 6.5)
       const treeStatus = t.status || 'NORMAL'
-      const isDanger = checkNearPowerLine(lat, lng) || (curH / wireH >= 0.9)
+      const isDanger = checkNearPowerLine(lat, lng) || (wireH > 0 && curH / wireH >= 0.9)
 
       // Extrair dados de solo se disponíveis
       const soilQuality = t.soil?.quality || t.soilQuality || 'UNKNOWN'
@@ -407,8 +485,10 @@ export default defineComponent({
      * Inicia com 2km e permite expandir até o máximo definido
      */
     const fetchTreesNearby = async (reset = false) => {
+      console.log('[PruningMap] fetchTreesNearby chamado. userLat:', userLat.value, 'userLng:', userLng.value)
       if (!userLat.value || !userLng.value) {
         // Se não tem localização, usa o endpoint tradicional
+        console.log('[PruningMap] Sem localização, usando fetchTreesLegacy()')
         return fetchTreesLegacy()
       }
 
@@ -421,7 +501,7 @@ export default defineComponent({
           loadRadius.value = 2
         }
 
-        const limit = loadRadius.value <= 2 ? 150 : loadRadius.value <= 5 ? 300 : 500
+        const limit = loadRadius.value <= 2 ? 500 : loadRadius.value <= 5 ? 2000 : 5000
         const res = await apiConnect.getTreesNearby(userLat.value, userLng.value, loadRadius.value, limit)
 
         const newTrees: TreeOnMap[] = []
@@ -453,8 +533,14 @@ export default defineComponent({
         if (reset && map && trees.value.length > 0) {
           map.setView([userLat.value, userLng.value], 15)
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao buscar árvores próximas:', err)
+        const status = err.response?.status
+        if (status === 500 || status === 404) {
+          console.log('[PruningMap] API /trees/nearby indisponível, usando fallback /trees')
+          notify('Usando modo de compatibilidade para carregar árvores', 'warning')
+          return fetchTreesLegacy() // Fallback para endpoint tradicional
+        }
         notify('Erro ao carregar árvores próximas', 'error')
       } finally {
         loadingTrees.value = false
@@ -514,13 +600,18 @@ export default defineComponent({
      * Fallback: endpoint tradicional quando não há geolocalização
      */
     const fetchTreesLegacy = async () => {
+      console.log('[PruningMap] fetchTreesLegacy() - chamando /trees')
       loadingTrees.value = true
       try {
         const res = await apiConnect.get<any[]>('/trees')
-        trees.value = (res.data || [])
-          .filter((t: any) => (t.latitude != null || t.lat != null) && (t.longitude != null || t.lng != null))
+        console.log('[PruningMap] /trees resposta:', res.data?.length || 0, 'árvores brutas')
+        const rawTrees = res.data || []
+        const withCoords = rawTrees.filter((t: any) => (t.latitude != null || t.lat != null) && (t.longitude != null || t.lng != null))
+        console.log('[PruningMap] Árvores com coordenadas:', withCoords.length)
+        trees.value = withCoords
           .map((t: any) => parseTreeData(t))
           .filter((t): t is TreeOnMap => t !== null)
+        console.log('[PruningMap] Árvores parseadas válidas:', trees.value.length)
 
         notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
 
@@ -529,13 +620,50 @@ export default defineComponent({
           map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
           isInitialLoad.value = false
         }
-      } catch (err) {
-        console.error('Erro ao buscar árvores:', err)
-        trees.value = []
-        notify('Erro ao carregar árvores da API', 'error')
+      } catch (err: any) {
+        console.error('[PruningMap] Erro ao buscar árvores no fallback:', err)
+        // Último recurso: dados mockados para demonstração
+        console.log('[PruningMap] Gerando árvores mockadas para demonstração...')
+        trees.value = getMockTrees()
+        console.log('[PruningMap] Árvores mockadas geradas:', trees.value.length)
+        notify(`Modo offline: ${trees.value.length} árvores de demonstração carregadas`, 'warning')
+        if (map && trees.value.length > 0) {
+          const bounds = L.latLngBounds(trees.value.map(t => [t.latitude, t.longitude]))
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
+        }
       } finally {
         loadingTrees.value = false
       }
+    }
+
+    // Dados mockados de árvores para demonstração quando API falha completamente
+    const getMockTrees = (): TreeOnMap[] => {
+      const centerLat = userLat.value || -3.7319
+      const centerLng = userLng.value || -38.5267
+      const statuses: Array<TreeOnMap['status']> = ['NORMAL', 'TO_PRUNE', 'UNDER_OBSERVATION', 'PRUNED', 'CRITICAL']
+      const species = ['Mangueira', 'Ipê Amarelo', 'Flamboyant', 'Cajueiro', 'Coconut Palm', 'Acacia']
+      const mockTrees: TreeOnMap[] = []
+      for (let i = 0; i < 50; i++) {
+        const angle = (i / 50) * Math.PI * 2
+        const radius = 0.005 + Math.random() * 0.01
+        mockTrees.push({
+          id: `mock-${i}`,
+          latitude: centerLat + Math.cos(angle) * radius,
+          longitude: centerLng + Math.sin(angle) * radius,
+          speciesName: species[Math.floor(Math.random() * species.length)],
+          scientificName: 'Mockus treeus',
+          status: statuses[Math.floor(Math.random() * statuses.length)],
+          nearPowerLine: Math.random() > 0.8,
+          height: 5 + Math.random() * 15,
+          distanceToPowerLine: Math.random() * 10,
+          pruningNeed: Math.floor(Math.random() * 100),
+          vigor: ['EXCELLENT', 'GOOD', 'POOR'][Math.floor(Math.random() * 3)] as TreeOnMap['vigor'],
+          soil: { type: 'LATOSSOLO', quality: 'GOOD', vigor: 'GOOD' },
+          currentHeight: 5 + Math.random() * 10,
+          wireHeight: 8 + Math.random() * 5
+        })
+      }
+      return mockTrees
     }
 
     // Alias para compatibilidade com código existente
@@ -567,7 +695,7 @@ export default defineComponent({
 
         try {
           // Primeiro tenta o endpoint específico de cidade
-          const cityRes = await apiConnect.getTreesByCity(region.id, 1000)
+          const cityRes = await apiConnect.getTreesByCity(region.id, 10000)
           regionTreeList = (cityRes.data.trees || [])
             .map((t: any) => parseTreeData(t))
             .filter((t): t is TreeOnMap => t !== null)
@@ -578,7 +706,7 @@ export default defineComponent({
             region.bounds.south,
             region.bounds.east,
             region.bounds.west,
-            1000
+            10000
           )
           regionTreeList = (res.data || [])
             .map((t: any) => parseTreeData(t))
@@ -643,8 +771,9 @@ export default defineComponent({
     }
 
     /* ---------- Carregamento por Tiles (Dinâmico) ---------- */
+    let isLoadingTiles = false
     const loadVisibleTiles = async () => {
-      if (!map) return
+      if (!map || isLoadingTiles) return
 
       const bounds = map.getBounds()
       const zoom = map.getZoom()
@@ -662,10 +791,11 @@ export default defineComponent({
         west: bounds.getWest()
       }, Math.min(zoom, 16)) // Limita zoom para tiles
 
+      isLoadingTiles = true
       loadingTrees.value = true
       let newTreesCount = 0
 
-      for (const tileCoord of visibleTiles.slice(0, 6)) { // Máximo 6 tiles por vez
+      for (const tileCoord of visibleTiles.slice(0, 20)) { // Máximo 20 tiles por vez (aumentado para grandes volumes)
         const tileKey = getTileKey(tileCoord)
 
         // Pula se já está em cache
@@ -692,6 +822,7 @@ export default defineComponent({
       }
 
       loadingTrees.value = false
+      isLoadingTiles = false
 
       if (newTreesCount > 0) {
         notify(`${newTreesCount} árvores carregadas da área visível`, 'success')
@@ -700,22 +831,82 @@ export default defineComponent({
       }
     }
 
+    // Dados mockados de solo para demonstração quando API falha
+  const getMockSoilData = (): SoilMapPoint[] => {
+    const centerLat = -3.7319
+    const centerLng = -38.5267
+    const soilTypes = ['ARGISSOLO', 'LATOSSOLO', 'NEOSSOLO', 'CAMBISSOLO', 'GLEISSOLO']
+    const qualities = ['GOOD', 'REGULAR', 'BAD']
+    const statuses = ['NORMAL', 'TO_PRUNE', 'UNDER_OBSERVATION']
+    const species = ['Mangueira', 'Ipê Amarelo', 'Oiti', 'Castanhola', 'Palmeira Imperial']
+
+    const getRandomItem = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!
+
+    const mockPoints: SoilMapPoint[] = []
+    for (let i = 0; i < 50; i++) {
+      const angle = (i / 50) * Math.PI * 2
+      const radius = 0.005 + Math.random() * 0.01
+
+      mockPoints.push({
+        treeId: `mock-tree-${i}`,
+        lat: centerLat + Math.cos(angle) * radius + (Math.random() - 0.5) * 0.005,
+        lng: centerLng + Math.sin(angle) * radius + (Math.random() - 0.5) * 0.005,
+        status: getRandomItem(statuses),
+        species: getRandomItem(species),
+        soilType: getRandomItem(soilTypes),
+        soilQuality: getRandomItem(qualities),
+        soilDepth: Math.floor(Math.random() * 200) + 50,
+        clay: Math.floor(Math.random() * 40) + 10,
+        sand: Math.floor(Math.random() * 60) + 20,
+        ph: Number((5.5 + Math.random() * 2).toFixed(1)),
+        hasSoilData: true,
+        markerColor: undefined,
+      })
+    }
+    return mockPoints
+  }
+
     const fetchSoilData = async () => {
   loadingSoil.value = true
+  console.log('[PruningMap] Carregando dados de solo...')
   try {
     const res = await apiConnect.get<SoilMapPoint[]>('/soil/map')
     soilPoints.value = res.data || []
-  } catch (err) {
-    notify('Erro ao carregar dados de solo', 'error')
+    console.log(`[PruningMap] ${soilPoints.value.length} pontos de solo carregados da API`)
+    if (soilPoints.value.length === 0) {
+      notify('Nenhum dado de solo disponível na região. Usando dados de demonstração.', 'info')
+      soilPoints.value = getMockSoilData()
+    }
+  } catch (err: any) {
+    console.error('[PruningMap] Erro ao carregar solo:', err)
+    // Se 401, 403 ou qualquer erro, usar dados mockados
+    const status = err.response?.status
+    if (status === 401) {
+      notify('Sessão expirada ou sem autorização. Usando dados de demonstração.', 'warning')
+    } else if (status === 403) {
+      notify('Sem permissão para acessar dados de solo (apenas Admin/Gestor). Usando dados de demonstração.', 'warning')
+    } else {
+      notify('Erro ao carregar dados de solo. Usando dados de demonstração.', 'warning')
+    }
+    soilPoints.value = getMockSoilData()
+    console.log(`[PruningMap] ${soilPoints.value.length} pontos de solo mockados gerados`)
   } finally {
     loadingSoil.value = false
   }
 }
 
   const renderSoilLayerLocal = () => {
-    if (!soilLayer || !map) return
+    if (!soilLayer || !map) {
+      console.log('[PruningMap] Não pode renderizar: soilLayer ou map não existe')
+      return
+    }
     soilLayer.clearLayers()
-    if (!showSoilLayer.value) return
+    if (!showSoilLayer.value) {
+      console.log('[PruningMap] Camada de solo desativada')
+      return
+    }
+
+    console.log(`[PruningMap] Renderizando ${soilPoints.value.length} pontos de solo`)
 
     // Converte SoilMapPoint para SoilPoint
     const points = soilPoints.value.map(p => ({
@@ -731,6 +922,8 @@ export default defineComponent({
       interactive: true,
       showLabels: true
     })
+
+    console.log('[PruningMap] Renderização de solo concluída')
   }
 
   const changeSoilRenderMode = (mode: SoilRenderMode) => {
@@ -746,7 +939,7 @@ export default defineComponent({
   const detectAndLoadRegion = async () => {
     if (!userLat.value || !userLng.value) {
       notify('Localização não disponível. Ative a geolocalização.', 'warning')
-      goToUserLocation()
+      await goToUserLocation()
       return
     }
 
@@ -762,10 +955,14 @@ export default defineComponent({
   }
 
   const toggleSoilLayer = async () => {
+    console.log('[PruningMap] toggleSoilLayer chamado. Estado atual:', showSoilLayer.value)
     showSoilLayer.value = !showSoilLayer.value
+    console.log('[PruningMap] Novo estado:', showSoilLayer.value, 'soilPoints:', soilPoints.value.length)
 
     if (showSoilLayer.value && soilPoints.value.length === 0) {
+      console.log('[PruningMap] Carregando dados de solo...')
       await fetchSoilData()
+      console.log('[PruningMap] Dados carregados. Total:', soilPoints.value.length)
     }
 
     renderSoilLayerLocal()
@@ -783,10 +980,10 @@ export default defineComponent({
       notify('Rota finalizada', 'info')
     }
 
-    const startRouting = (destLat: number, destLng: number, destName: string) => {
+    const startRouting = async (destLat: number, destLng: number, destName: string) => {
       if (!userLat.value || !userLng.value) {
         notify('Sua localização ainda não foi encontrada!', 'warning')
-        goToUserLocation()
+        await goToUserLocation()
         return
       }
 
@@ -854,8 +1051,17 @@ export default defineComponent({
 
     /* ---------- Renderização ---------- */
     const renderTrees = () => {
-      if (!treeClusterGroup) return
+      console.log('[PruningMap] renderTrees() - treeClusterGroup:', !!treeClusterGroup, 'filteredTrees:', filteredTrees.value.length)
+      if (!treeClusterGroup) {
+        console.error('[PruningMap] treeClusterGroup não existe!')
+        return
+      }
       treeClusterGroup.clearLayers()
+
+      if (filteredTrees.value.length === 0) {
+        console.warn('[PruningMap] Nenhuma árvore para renderizar')
+        return
+      }
 
       filteredTrees.value.forEach((t) => {
         if (isNaN(t.latitude) || isNaN(t.longitude)) return
@@ -965,67 +1171,85 @@ export default defineComponent({
     }
 
     /* ---------- Geolocalização ---------- */
-    const goToUserLocation = () => {
-      if (!navigator.geolocation) { locationError.value = 'Geolocalização não suportada neste navegador'; return }
-      locating.value = true
-      locationError.value = ''
+    /**
+     * Obtém a posição do usuário.
+     * Se followUserPosition=true, move o mapa para a posição.
+     * Se false, apenas atualiza o marcador sem mover o mapa.
+     */
+    const goToUserLocation = (): Promise<boolean> => {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          locationError.value = 'Geolocalização não suportada neste navegador'
+          resolve(false)
+          return
+        }
+        locating.value = true
+        locationError.value = ''
 
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords
-          userLat.value = latitude
-          userLng.value = longitude
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude, accuracy } = pos.coords
+            userLat.value = latitude
+            userLng.value = longitude
 
-          if (map) {
-            map.flyTo([latitude, longitude], 17, { duration: 1.5 })
+            if (map) {
+              // SEMPRE move o mapa para o usuário na inicialização
+              const shouldMoveMap = followUserPosition.value || trees.value.length === 0
 
-            if (userMarker) {
-              userMarker.setLatLng([latitude, longitude])
-            } else {
-              userMarker = L.marker([latitude, longitude], { icon: createUserIcon(), zIndexOffset: 1000 })
-                .addTo(map)
-                .bindPopup('<div style="text-align:center;font-weight:600;">📍 Você está aqui</div>')
+              if (shouldMoveMap && !userHasMovedMap.value) {
+                map.flyTo([latitude, longitude], 17, { duration: 1.5 })
+              }
+
+              if (userMarker) {
+                userMarker.setLatLng([latitude, longitude])
+              } else {
+                userMarker = L.marker([latitude, longitude], { icon: createUserIcon(), zIndexOffset: 1000 })
+                  .addTo(map)
+                  .bindPopup('<div style="text-align:center;font-weight:600;">📍 Você está aqui</div>')
+              }
+
+              if (userAccuracyCircle) {
+                userAccuracyCircle.setLatLng([latitude, longitude]).setRadius(accuracy)
+              } else {
+                userAccuracyCircle = L.circle([latitude, longitude], {
+                  radius: accuracy,
+                  color: '#1976D2',
+                  fillColor: '#1976D2',
+                  fillOpacity: 0.08,
+                  weight: 1,
+                }).addTo(map)
+              }
+
+              userMarker.openPopup()
             }
 
-            if (userAccuracyCircle) {
-              userAccuracyCircle.setLatLng([latitude, longitude]).setRadius(accuracy)
-            } else {
-              userAccuracyCircle = L.circle([latitude, longitude], {
-                radius: accuracy,
-                color: '#1976D2',
-                fillColor: '#1976D2',
-                fillOpacity: 0.08,
-                weight: 1,
-              }).addTo(map)
+            notify('📍 Localização encontrada!')
+            locating.value = false
+            resolve(true)
+          },
+          (err) => {
+            const msgs: Record<number, string> = {
+              1: 'Permissão de localização negada pelo navegador',
+              2: 'Localização indisponível no momento',
+              3: 'Tempo esgotado ao buscar localização',
             }
-
-            userMarker.openPopup()
-          }
-
-          notify('📍 Localização encontrada!')
-          locating.value = false
-        },
-        (err) => {
-          const msgs: Record<number, string> = {
-            1: 'Permissão de localização negada pelo navegador',
-            2: 'Localização indisponível no momento',
-            3: 'Tempo esgotado ao buscar localização',
-          }
-          locationError.value = msgs[err.code] || 'Erro desconhecido'
-          
-          // Fallback: Se falhar a localização, centraliza na primeira árvore
-          if (map?.getPane?.('mapPane') && trees.value.length > 0 && trees.value[0]) {
-            const first = trees.value[0]
-            map.flyTo([first.latitude, first.longitude], 15)
-            notify('Não foi possível obter sua posição. Centralizando nas árvores.', 'warning')
-          } else {
-            notify(locationError.value, 'warning')
-          }
-          
-          locating.value = false
-        },
-        { enableHighAccuracy: false, timeout: 30000, maximumAge: 10000 },
-      )
+            locationError.value = msgs[err.code] || 'Erro desconhecido'
+            
+            // Fallback: Se falhar a localização, centraliza na primeira árvore
+            if (map?.getPane?.('mapPane') && trees.value.length > 0 && trees.value[0]) {
+              const first = trees.value[0]
+              map.flyTo([first.latitude, first.longitude], 15)
+              notify('Não foi possível obter sua posição. Centralizando nas árvores.', 'warning')
+            } else {
+              notify(locationError.value, 'warning')
+            }
+            
+            locating.value = false
+            resolve(false)
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+        )
+      })
     }
 
     const startWatchingPosition = () => {
@@ -1059,10 +1283,15 @@ export default defineComponent({
 
     /* ---------- Busca de endereço (Nominatim) ---------- */
     const searchAddress = async () => {
-      if (!searchQuery.value.trim()) return
+      const query = searchQuery.value.trim()
+      if (!query || query.length < 2) return
+      if (query.length > 100) {
+        notify('Endereço muito longo', 'warning')
+        return
+      }
       searching.value = true
       try {
-        const q = encodeURIComponent(searchQuery.value.trim())
+        const q = encodeURIComponent(query.substring(0, 100))
         const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&countrycodes=br&limit=1`, {
           headers: { 'Accept-Language': 'pt-BR' },
         })
@@ -1205,7 +1434,14 @@ export default defineComponent({
     }
 
     /* ---------- Watch filtro ---------- */
-    watch(activeFilter, () => renderTrees())
+    let renderTimeout: ReturnType<typeof setTimeout> | null = null
+    watch(activeFilter, () => {
+      if (renderTimeout) clearTimeout(renderTimeout)
+      renderTimeout = setTimeout(() => {
+        renderTrees()
+        renderTimeout = null
+      }, 100)
+    })
 
     /* ---------- Teclado / Resize ---------- */
     const handleKeydown = (e: KeyboardEvent) => {
@@ -1218,7 +1454,21 @@ export default defineComponent({
 
     /* ---------- Init ---------- */
     const initMap = () => {
+      console.log('[PruningMap] initMap() - inicializando mapa...')
+      const container = document.getElementById('pruning-map-container')
+      console.log('[PruningMap] Container do mapa:', container ? 'encontrado' : 'NÃO ENCONTRADO!')
+
+      if (!container) {
+        console.error('[PruningMap] Container pruning-map-container não existe no DOM!')
+        return
+      }
+
       map = L.map('pruning-map-container', { zoomControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM)
+      console.log('[PruningMap] Mapa criado:', !!map)
+
+      // Inicializa bounds e zoom reativos
+      mapBounds.value = map.getBounds()
+      mapZoom.value = map.getZoom()
 
       streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CARTO &copy; OSM',
@@ -1262,7 +1512,10 @@ export default defineComponent({
 
       markedMarkersLayer = L.layerGroup().addTo(map)
       powerLinesLayer = L.layerGroup().addTo(map)
-      soilLayer = L.layerGroup().addTo(map)
+      // Criar pane para solo com z-index maior que o menu (1001) para ficar na frente
+      map.createPane('soilPane')
+      map.getPane('soilPane')!.style.zIndex = '1100'
+      soilLayer = L.layerGroup([], { pane: 'soilPane' } as L.LayerOptions).addTo(map)
       drawPowerLines()
 
       // Clique para marcação / simulação
@@ -1303,25 +1556,78 @@ export default defineComponent({
         notify('📌 Marcação adicionada!', 'info')
       })
 
-      // Iniciar
-      goToUserLocation()
-      startWatchingPosition()
-      fetchTrees().then(() => renderTrees())
+      // Iniciar: Primeiro obtém localização, depois carrega árvores
+      console.log('[PruningMap] Iniciando mapa...')
+      goToUserLocation().then((success) => {
+        console.log('[PruningMap] Localização:', success ? 'obtida' : 'falhou/indisponível')
+        startWatchingPosition()
+        // Carrega árvores mesmo se localização falhou (usa fallback)
+        console.log('[PruningMap] Carregando árvores...')
+        fetchTrees().then(() => {
+          console.log(`[PruningMap] Árvores carregadas: ${trees.value.length}`)
+          renderTrees()
+          console.log(`[PruningMap] Marcadores renderizados no cluster`)
+        }).catch((err) => {
+          console.error('[PruningMap] Erro ao carregar árvores:', err)
+        })
+      })
       // Refresh automático a cada 5 minutos (sem resetar - só atualiza dados existentes)
       refreshInterval = setInterval(() => refreshData(false), 300000)
 
       // Carregamento dinâmico: Carrega tiles quando usuário navega/zoom
       let tileLoadTimeout: ReturnType<typeof setTimeout> | null = null
-      map.on('moveend', () => {
-        // Debounce para evitar múltiplas chamadas durante movimento contínuo
+      let lastLoadedBounds: L.LatLngBounds | null = null
+
+      // Detecta quando usuário move o mapa manualmente (drag)
+      map.on('dragstart', () => {
+        userHasMovedMap.value = true
+        // Desativa followUserPosition quando usuário navega manualmente
+        if (followUserPosition.value) {
+          followUserPosition.value = false
+          notify('Modo de seguir usuário desativado (você navegou no mapa)', 'info')
+        }
+      })
+
+      // Atualiza bounds e zoom reativos sempre que o mapa se move
+      const updateMapState = () => {
+        if (!map) return
+        mapBounds.value = map.getBounds()
+        mapZoom.value = map.getZoom()
+        console.log(`[PruningMap] Mapa atualizado - Zoom: ${mapZoom.value}, Árvores visíveis: ${visibleTreeCount.value}`)
+      }
+
+      map.on('move', updateMapState)      // Atualiza em tempo real durante movimento
+      map.on('moveend', updateMapState)   // Atualiza quando para
+      map.on('zoom', updateMapState)      // Atualiza durante zoom
+      map.on('zoomend', () => {
+        updateMapState()
+
+        // Debounce para carregamento automático
         if (tileLoadTimeout) clearTimeout(tileLoadTimeout)
         tileLoadTimeout = setTimeout(() => {
-          const zoom = map!.getZoom()
-          // Só carrega tiles em zoom suficiente (nível de bairro/rua)
-          if (zoom >= 14 && selectedRegion.value) {
-            loadVisibleTiles()
+          const zoom = mapZoom.value
+          const currentBounds = mapBounds.value
+
+          // Só carrega em zoom suficiente (nível de rua/bairro) e se auto-load está ativo
+          if (autoLoadOnZoom.value && zoom >= 15 && currentBounds) {
+            // Verifica se já carregamos desta área recentemente (evita recarregar mesma área)
+            if (lastLoadedBounds && lastLoadedBounds.contains(currentBounds)) {
+              return // Já temos dados desta área
+            }
+
+            // Carrega área visível (com ou sem região selecionada)
+            loadVisibleTiles().then(() => {
+              lastLoadedBounds = currentBounds
+              // Atualiza bounds após carregar
+              updateMapState()
+              // Só notifica se carregou árvores novas
+              const newCount = visibleTreeCount.value
+              if (newCount > 0) {
+                notify(`${newCount} árvores visíveis na área`, 'info')
+              }
+            })
           }
-        }, 500) // Aguarda 500ms após parar de mover
+        }, 800) // Aguarda 800ms após parar de mover
       })
     }
 
@@ -1335,6 +1641,7 @@ export default defineComponent({
     onUnmounted(() => {
       if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId)
       if (refreshInterval) clearInterval(refreshInterval)
+      if (renderTimeout) clearTimeout(renderTimeout)
       window.removeEventListener('keydown', handleKeydown)
       window.removeEventListener('resize', handleResize)
       map?.remove()
@@ -1344,7 +1651,7 @@ export default defineComponent({
       trees, filteredTrees, markedLocations, markMode, isExpanded,
       loadingTrees, locating, locationError, searchQuery, searching,
       sidebarOpen, activeFilter, mapStyle, snackbar, snackbarText, snackbarColor,
-      selectedTree, treeCount, dangerCount, criticalCount, markedCount, statusCounts, isMobile,
+      selectedTree, treeCount, visibleTreeCount, dangerCount, criticalCount, markedCount, statusCounts, isMobile,
       goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
@@ -1353,13 +1660,15 @@ export default defineComponent({
       showSoilLayer, loadingSoil, toggleSoilLayer, getSoilInfo, SOIL_TYPES,
       importingIA, syncIA, importCsvMode, csvPath, syncCsvIA,
       // Carregamento progressivo
-      loadRadius, hasMoreTrees, totalTreesInArea, loadMoreTrees, fetchTreesNearby, fetchTreesInBounds,
+      loadRadius, hasMoreTrees, totalTreesInArea, loadMoreTrees, fetchTreesNearby, fetchTreesInBounds, autoLoadOnZoom, followUserPosition, userHasMovedMap,
+      // Estado do mapa (reativo)
+      mapBounds, mapZoom,
       // Sistema de regiões e solo
       availableRegions, selectedRegion, loadingRegion, cityStats, fetchTreesByRegion,
       loadRegionsFromApi, loadCityStats, loadVisibleTiles, detectAndLoadRegion,
       soilRenderMode, changeSoilRenderMode, showSoilControls, toggleSoilControls,
-      // UI
-      expandedPanels
+      // UI - Abas do novo sidebar v2
+      expandedPanels, activeTab
     }
   },
 })
@@ -1391,10 +1700,19 @@ export default defineComponent({
       </div>
     </v-fade-transition>
 
-    <!-- ============ MAPA ============ -->
+    <!-- =====================================================
+         SEÇÃO 1: MAPA LEAFLET (Container Principal)
+         - Inicializado via initMap() no onMounted
+         - Contém: tiles, marcadores de árvores, rede elétrica,
+           camada de solo, marcador do usuário
+         ===================================================== -->
     <div id="pruning-map-container" />
 
-    <!-- ============ OVERLAY LOADING ============ -->
+    <!-- =====================================================
+         SEÇÃO 2: OVERLAY DE LOADING
+         - Mostra spinner quando: buscando localização,
+           carregando árvores, calculando rota
+         ===================================================== -->
     <Transition name="fade">
       <div v-if="locating || loadingTrees || loadingRoute" class="locating-overlay glass-overlay">
         <v-progress-circular indeterminate color="#C1E328" size="70" width="6" />
@@ -1404,7 +1722,11 @@ export default defineComponent({
       </div>
     </Transition>
 
-    <!-- ============ BARRA DE BUSCA TOPO ============ -->
+    <!-- =====================================================
+         SEÇÃO 3: BARRA DE BUSCA DE ENDEREÇO (Nominatim)
+         - Busca endereços no Brasil via API Nominatim
+         - Centraliza o mapa no resultado encontrado
+         ===================================================== -->
     <div class="top-search-bar">
       <v-text-field
         v-model="searchQuery"
@@ -1535,6 +1857,18 @@ export default defineComponent({
       </v-fade-transition>
     </div>
 
+    <!-- =====================================================
+         SEÇÃO 4: MENU LATERAL v2 (Novo - Abril/2025)
+         Componentes:
+         4.1. Botão Toggle Sidebar (abre/fecha)
+         4.2. Dashboard Flutuante (sempre visível quando fechado)
+         4.3. Sidebar com Abas:
+              - Aba "Carregar": Seleção de região, estatísticas,
+                botões de carregamento, controles
+              - Aba "Árvores": Lista de árvores com filtros rápidos
+              - Aba "Config": IA, importação, legendas, marcações
+         ===================================================== -->
+
     <!-- ============ BOTÃO TOGGLE SIDEBAR ============ -->
     <v-btn
       class="sidebar-toggle-btn"
@@ -1542,124 +1876,191 @@ export default defineComponent({
       size="small"
       elevation="4"
       color="white"
-      :style="{ left: sidebarOpen ? '285px' : '12px' }"
+      :style="{ left: sidebarOpen ? '320px' : '12px' }"
       @click="sidebarOpen = !sidebarOpen"
     >
       <v-icon>{{ sidebarOpen ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
     </v-btn>
 
-    <!-- ============ SIDEBAR ============ -->
+    <!-- ============ DASHBOARD FLUTUANTE (Sempre visível) ============ -->
+    <Transition name="fade">
+      <div v-show="!sidebarOpen" class="floating-dashboard">
+        <div class="dashboard-card">
+          <div class="d-flex align-center justify-space-between mb-2">
+            <span class="text-caption font-weight-bold text-grey-darken-2">
+              <v-icon size="16" color="green-darken-2" class="mr-1">mdi-leaf</v-icon>
+              Mapa de Podas
+            </span>
+            <v-chip size="x-small" color="green" variant="flat" class="font-weight-bold">
+              {{ visibleTreeCount }}/{{ treeCount }}
+            </v-chip>
+          </div>
+
+          <!-- Stats compactos em grid -->
+          <div class="d-flex gap-2 align-center">
+            <v-btn
+              variant="flat"
+              size="small"
+              color="green-lighten-4"
+              class="stat-btn"
+              @click="sidebarOpen = true; activeTab = 'arvores'"
+            >
+              <v-icon size="14" color="green-darken-2" class="mr-1">mdi-eye</v-icon>
+              <span class="text-caption font-weight-bold text-green-darken-2">{{ visibleTreeCount }}</span>
+            </v-btn>
+
+            <v-btn
+              variant="flat"
+              size="small"
+              color="blue-lighten-4"
+              class="stat-btn"
+              @click="sidebarOpen = true; activeTab = 'arvores'"
+            >
+              <v-icon size="14" color="blue-darken-2" class="mr-1">mdi-tree</v-icon>
+              <span class="text-caption font-weight-bold text-blue-darken-2">{{ treeCount }}</span>
+            </v-btn>
+
+            <v-btn
+              variant="flat"
+              size="small"
+              color="red-lighten-4"
+              class="stat-btn"
+              @click="sidebarOpen = true; activeFilter = 'DANGER'; activeTab = 'arvores'"
+            >
+              <v-icon size="14" color="red-darken-2" class="mr-1">mdi-alert</v-icon>
+              <span class="text-caption font-weight-bold text-red-darken-2">{{ dangerCount }}</span>
+            </v-btn>
+
+            <v-btn
+              icon
+              size="small"
+              variant="flat"
+              color="grey"
+              @click="sidebarOpen = true"
+            >
+              <v-icon size="18">mdi-menu-open</v-icon>
+            </v-btn>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ============ SIDEBAR COM ABAS ============ -->
     <Transition name="fade">
       <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" @click="sidebarOpen = false" />
     </Transition>
 
     <Transition name="slide">
-      <div v-show="sidebarOpen" class="map-sidebar">
+      <div v-if="sidebarOpen" class="map-sidebar map-sidebar--tabs">
 
-        <!-- Mini dashboard compacto -->
-        <div class="sidebar-section dashboard-section">
-          <div class="d-flex align-center justify-space-between mb-3">
-            <p class="sidebar-title mb-0">
-              <v-icon size="20" color="green-darken-2" class="mr-1">mdi-leaf</v-icon>
-              Mapa de Podas
-            </p>
-            <v-chip size="x-small" color="green" variant="flat" class="font-weight-bold">
-              {{ treeCount }} árvores
+        <!-- Header com título e contador -->
+        <div class="sidebar-header pa-3">
+          <div class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center">
+              <v-icon size="22" color="green-darken-2" class="mr-2">mdi-leaf</v-icon>
+              <span class="font-weight-bold text-subtitle-1">Mapa de Podas</span>
+            </div>
+            <v-chip size="small" color="green" variant="flat" class="font-weight-bold">
+              {{ visibleTreeCount }} visíveis
             </v-chip>
           </div>
-
-          <div class="stats-grid">
-            <div class="stat-card" style="--accent:#4CAF50" @click="activeFilter = 'ALL'">
-              <div class="stat-number">{{ treeCount }}</div>
-              <div class="stat-label">Total</div>
-            </div>
-            <div class="stat-card" style="--accent:#FF3B3B" @click="activeFilter = 'DANGER'">
-              <div class="stat-number">{{ dangerCount }}</div>
-              <div class="stat-label">Risco ⚡</div>
-            </div>
-            <div class="stat-card" style="--accent:#FF9800" @click="activeFilter = 'TO_PRUNE'">
-              <div class="stat-number">{{ statusCounts['TO_PRUNE'] || 0 }}</div>
-              <div class="stat-label">Podar ✂️</div>
-            </div>
-            <div class="stat-card" style="--accent:#9C27B0" @click="activeFilter = 'ALL'">
-              <div class="stat-number">{{ markedCount }}</div>
-              <div class="stat-label">Marcações</div>
-            </div>
+          <div class="text-caption text-grey-darken-1 mt-1 d-flex justify-space-between">
+            <span>{{ treeCount }} árvores carregadas no total</span>
+            <span v-if="cityStats" class="text-grey-darken-2">
+              <v-icon size="12" color="blue" class="mr-1">mdi-city</v-icon>
+              {{ cityStats.total }} na cidade
+            </span>
           </div>
         </div>
 
-        <!-- Accordion Organizado -->
-        <v-expansion-panels v-model="expandedPanels" multiple variant="accordion" class="sidebar-panels">
+        <!-- Abas de Navegação -->
+        <v-tabs
+          v-model="activeTab"
+          color="green-darken-2"
+          density="compact"
+          grow
+          class="sidebar-tabs"
+        >
+          <v-tab value="carregar" prepend-icon="mdi-download">
+            <span class="text-caption">Carregar</span>
+          </v-tab>
+          <v-tab value="arvores" prepend-icon="mdi-tree">
+            <span class="text-caption">Árvores</span>
+          </v-tab>
+          <v-tab value="config" prepend-icon="mdi-cog">
+            <span class="text-caption">Config</span>
+          </v-tab>
+        </v-tabs>
 
-          <!-- Painel 1: Carregamento de Árvores -->
-          <v-expansion-panel value="carregamento" class="sidebar-panel">
-            <v-expansion-panel-title class="panel-title">
-              <v-icon size="18" class="mr-2" color="green-darken-2">mdi-map-marker-multiple</v-icon>
-              <span class="text-subtitle-2 font-weight-medium">Carregar Árvores</span>
-              <v-spacer />
-              <v-chip v-if="selectedRegion" size="x-small" color="teal" variant="flat" class="ml-2">
-                {{ selectedRegion.name }}
-              </v-chip>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text class="panel-content">
+        <v-divider />
 
-              <!-- Seleção de Região -->
-              <v-select
-                v-model="selectedRegion"
-                :items="availableRegions"
-                item-title="name"
-                return-object
-                label="Selecionar cidade/região"
-                density="compact"
-                variant="outlined"
-                class="mb-2"
-                clearable
-                hide-details
-                @update:model-value="(region) => region && loadCityStats(region)"
-              />
+        <!-- Conteúdo das Abas -->
+        <div class="sidebar-content">
 
-              <!-- Preview de estatísticas da cidade -->
-              <div v-if="selectedRegion" class="city-stats-preview mb-3">
-                <!-- Card de estatísticas -->
-                <div v-if="cityStats" class="stats-card mb-2 pa-2 rounded-lg" style="background: linear-gradient(135deg, #f5f5f5, #e0e0e0);">
-                  <div class="d-flex justify-space-between align-center mb-1">
-                    <span class="text-caption font-weight-bold text-grey-darken-2">
-                      <v-icon size="14" color="green" class="mr-1">mdi-tree</v-icon>
-                      {{ cityStats.total }} árvores
-                    </span>
-                    <span v-if="cityStats.withRisk > 0" class="text-caption font-weight-bold text-red-darken-2">
-                      <v-icon size="14" color="red" class="mr-1">mdi-alert</v-icon>
-                      {{ cityStats.withRisk }} em risco
-                    </span>
-                  </div>
-                  <!-- Barra de progresso de status -->
-                  <div class="d-flex" style="height: 4px; border-radius: 2px; overflow: hidden;">
-                    <div
-                      v-for="(count, status) in cityStats.byStatus"
-                      :key="status"
-                      :style="{
-                        width: (count / cityStats.total * 100) + '%',
-                        backgroundColor: STATUS_CONFIG[status]?.color || '#999'
-                      }"
-                      :title="`${status}: ${count}`"
-                    />
-                  </div>
-                </div>
+          <!-- === ABA 1: CARREGAR ÁRVORES === -->
+          <div v-show="activeTab === 'carregar'" class="tab-panel">
 
-                <v-btn
-                  block
-                  size="small"
-                  variant="tonal"
-                  color="blue-darken-1"
-                  prepend-icon="mdi-download"
-                  @click="fetchTreesByRegion(selectedRegion, true)"
-                  :loading="loadingRegion"
-                >
-                  Carregar {{ selectedRegion.name }}
-                </v-btn>
+            <!-- Info da Região -->
+            <div v-if="selectedRegion" class="d-flex align-center mb-3">
+              <v-icon size="16" color="green-darken-1" class="mr-2">mdi-map-marker</v-icon>
+              <span class="text-caption text-grey-darken-1">
+                Região: <strong>{{ selectedRegion.name }}</strong>
+              </span>
+            </div>
+
+            <!-- Seleção de Região -->
+            <v-select
+              v-model="selectedRegion"
+              :items="availableRegions"
+              item-title="name"
+              return-object
+              label="Selecionar cidade/região"
+              density="compact"
+              variant="outlined"
+              class="mb-3"
+              clearable
+              hide-details
+              @update:model-value="(region) => region && loadCityStats(region)"
+            />
+
+            <!-- Estatísticas da Cidade -->
+            <div v-if="selectedRegion && cityStats" class="city-stats-card mb-3">
+              <div class="d-flex justify-space-between align-center">
+                <span class="text-caption font-weight-bold">
+                  <v-icon size="14" color="green" class="mr-1">mdi-tree</v-icon>
+                  {{ cityStats.total }} árvores
+                </span>
+                <span v-if="cityStats.withRisk > 0" class="text-caption text-red-darken-2">
+                  <v-icon size="14" color="red">mdi-alert</v-icon>
+                  {{ cityStats.withRisk }}
+                </span>
               </div>
+              <v-progress-linear
+                v-if="cityStats.total > 0"
+                :model-value="(cityStats.withRisk / cityStats.total) * 100"
+                color="red"
+                height="3"
+                class="mt-1"
+              />
+            </div>
 
-              <div class="d-flex gap-2 mb-3">
+            <!-- Botões de Ação -->
+            <div class="action-buttons">
+              <v-btn
+                block
+                size="small"
+                variant="flat"
+                color="blue-darken-1"
+                prepend-icon="mdi-download"
+                :loading="loadingRegion"
+                :disabled="!selectedRegion"
+                @click="selectedRegion && fetchTreesByRegion(selectedRegion, true)"
+                class="mb-2"
+              >
+                Carregar Região
+              </v-btn>
+
+              <div class="d-flex gap-2 mb-2">
                 <v-btn
                   size="small"
                   variant="flat"
@@ -1679,26 +2080,23 @@ export default defineComponent({
                   :loading="loadingTrees"
                   @click="fetchTreesNearby(true)"
                   density="comfortable"
-                  title="Carregar por raio"
                 />
               </div>
 
-              <!-- Botão Carregar Mais -->
               <v-btn
                 v-if="hasMoreTrees"
                 block
                 size="small"
-                variant="flat"
-                color="blue-darken-1"
+                variant="tonal"
+                color="grey-darken-1"
                 prepend-icon="mdi-map-marker-radius"
                 :loading="loadingTrees"
                 @click="loadMoreTrees"
                 class="mb-2"
               >
-                Expandir raio ({{ loadRadius < 5 ? '5km' : loadRadius < 10 ? '10km' : loadRadius < 20 ? '20km' : '50km' }})
+                Expandir raio
               </v-btn>
 
-              <!-- Carregamento por Tiles -->
               <v-btn
                 block
                 size="small"
@@ -1706,34 +2104,55 @@ export default defineComponent({
                 color="grey-darken-1"
                 prepend-icon="mdi-grid"
                 :loading="loadingTrees"
-                :disabled="!selectedRegion"
                 @click="loadVisibleTiles"
                 class="mb-2"
               >
-                Carregar área visível (tiles)
+                Carregar Área Visível
               </v-btn>
+            </div>
 
-              <v-progress-linear v-if="loadingTrees" indeterminate color="green" class="mt-2" height="2" />
-
-              <div class="text-caption text-grey-darken-1 mt-2 text-center">
-                <v-icon size="12" class="mr-1">mdi-information-outline</v-icon>
-                {{ treeCount }} carregadas · Auto-carregamento ativo
+            <!-- Controles -->
+            <v-divider class="my-3" />
+            <div class="controls-section">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <div class="d-flex align-center">
+                  <v-icon size="14" class="mr-1">mdi-refresh-auto</v-icon>
+                  <span class="text-caption text-grey-darken-1">Auto-carregar ao ampliar</span>
+                  <v-tooltip location="bottom" max-width="250">
+                    <template #activator="{ props }">
+                      <v-icon v-bind="props" size="12" color="grey-lighten-1" class="ml-1">mdi-help-circle</v-icon>
+                    </template>
+                    <span class="text-caption">
+                      Quando ativado, o mapa carrega árvores automaticamente quando você dá zoom (amplia) em uma área.<br><br>
+                      <strong>Como funciona:</strong><br>
+                      • Detecta quando você para de mover o mapa<br>
+                      • Se o zoom for suficiente (nível de rua/bairro)<br>
+                      • Carrega as árvores da área visível<br><br>
+                      Isso evita carregar milhares de árvores de uma vez só.
+                    </span>
+                  </v-tooltip>
+                </div>
+                <v-switch v-model="autoLoadOnZoom" color="green" density="compact" hide-details size="small" />
               </div>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
+              <div class="d-flex align-center justify-space-between">
+                <span class="text-caption text-grey-darken-1">
+                  <v-icon size="14" class="mr-1">mdi-crosshairs-gps</v-icon>
+                  Seguir minha posição
+                </span>
+                <v-switch v-model="followUserPosition" color="blue" density="compact" hide-details size="small" />
+              </div>
+            </div>
 
-          <!-- Painel 2: Filtros -->
-          <v-expansion-panel value="filtros" class="sidebar-panel">
-            <v-expansion-panel-title class="panel-title">
-              <v-icon size="18" class="mr-2" color="orange-darken-2">mdi-filter-variant</v-icon>
-              <span class="text-subtitle-2 font-weight-medium">Filtros</span>
-              <v-spacer />
-              <v-chip size="x-small" color="orange" variant="flat" class="ml-2">
-                {{ activeFilter === 'ALL' ? 'Todos' : STATUS_CONFIG[activeFilter]?.label || activeFilter }}
-              </v-chip>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text class="panel-content">
-              <div class="filter-chips">
+            <v-progress-linear v-if="loadingTrees" indeterminate color="green" class="mt-3" height="2" />
+          </div>
+
+          <!-- === ABA 2: LISTA DE ÁRVORES === -->
+          <div v-show="activeTab === 'arvores'" class="tab-panel">
+
+            <!-- Filtros Rápidos -->
+            <div class="filter-section mb-3">
+              <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">Filtrar por status:</p>
+              <div class="filter-chips-scroll">
                 <v-chip
                   size="small"
                   :variant="activeFilter === 'ALL' ? 'flat' : 'outlined'"
@@ -1741,7 +2160,7 @@ export default defineComponent({
                   @click="activeFilter = 'ALL'"
                   class="mr-1 mb-1"
                 >
-                  Todos
+                  Todos ({{ treeCount }})
                 </v-chip>
                 <v-chip
                   v-for="(cfg, key) in STATUS_CONFIG"
@@ -1752,19 +2171,78 @@ export default defineComponent({
                   @click="activeFilter = String(key)"
                   class="mr-1 mb-1"
                 >
-                  {{ cfg.emoji }} {{ cfg.label }}
+                  {{ cfg.emoji }} {{ cfg.label }} ({{ statusCounts[key] || 0 }})
                 </v-chip>
               </div>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
+            </div>
 
-          <!-- Painel 3: IA & Importação -->
-          <v-expansion-panel value="ia" class="sidebar-panel">
-            <v-expansion-panel-title class="panel-title">
-              <v-icon size="18" class="mr-2" color="purple-darken-2">mdi-brain</v-icon>
-              <span class="text-subtitle-2 font-weight-medium">IA & Importação</span>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text class="panel-content">
+            <v-divider class="mb-2" />
+
+            <!-- Lista de Árvores -->
+            <div class="tree-list-header d-flex justify-space-between align-center mb-2">
+              <span class="text-caption font-weight-bold">🌳 Árvores ({{ filteredTrees.length }})</span>
+              <v-btn
+                v-if="filteredTrees.length > 0"
+                size="x-small"
+                variant="text"
+                color="primary"
+                @click="activeFilter = 'ALL'"
+              >
+                Ver todas
+              </v-btn>
+            </div>
+
+            <div v-if="filteredTrees.length === 0" class="text-caption text-center text-grey pa-4">
+              Nenhuma árvore encontrada com este filtro
+            </div>
+
+            <div class="tree-list-scroll-new">
+              <v-list density="compact" class="pa-0">
+                <v-list-item
+                  v-for="tree in filteredTrees.slice(0, 50)"
+                  :key="tree.id"
+                  :active="selectedTree?.id === tree.id"
+                  :color="tree.nearPowerLine ? 'red' : 'green'"
+                  @click="flyToTree(tree); openAiDrawer(tree)"
+                  class="tree-list-item-new"
+                  two-line
+                >
+                  <template #prepend>
+                    <v-avatar size="32" :color="tree.nearPowerLine ? 'red' : (STATUS_CONFIG[tree.status]?.bg || '#4CAF50')">
+                      <span class="text-caption">{{ tree.nearPowerLine ? '⚠️' : (STATUS_CONFIG[tree.status]?.emoji || '🌳') }}</span>
+                    </v-avatar>
+                  </template>
+
+                  <v-list-item-title class="text-body-2">
+                    {{ tree.speciesName }}
+                  </v-list-item-title>
+
+                  <v-list-item-subtitle class="text-caption">
+                    {{ STATUS_CONFIG[tree.status]?.label || tree.status }}
+                    <span v-if="tree.nearPowerLine" class="text-red"> · ⚡ Fiação</span>
+                  </v-list-item-subtitle>
+
+                  <template #append>
+                    <v-icon size="16" color="grey">mdi-chevron-right</v-icon>
+                  </template>
+                </v-list-item>
+              </v-list>
+
+              <div v-if="filteredTrees.length > 50" class="text-caption text-center text-grey pa-2">
+                +{{ filteredTrees.length - 50 }} árvores (use filtros para refinar)
+              </div>
+            </div>
+          </div>
+
+          <!-- === ABA 3: CONFIGURAÇÕES === -->
+          <div v-show="activeTab === 'config'" class="tab-panel">
+
+            <!-- IA & Importação -->
+            <div class="config-section mb-4">
+              <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">
+                <v-icon size="16" class="mr-1">mdi-brain</v-icon>
+                IA & Importação
+              </p>
               <v-btn
                 block
                 size="small"
@@ -1777,10 +2255,9 @@ export default defineComponent({
               >
                 Sincronizar IA (396+)
               </v-btn>
-
               <v-btn
                 block
-                size="x-small"
+                size="small"
                 variant="outlined"
                 color="deep-purple-lighten-2"
                 prepend-icon="mdi-file-delimited"
@@ -1788,131 +2265,95 @@ export default defineComponent({
               >
                 Importar CSV MapTree
               </v-btn>
+            </div>
 
-              <p class="text-caption text-grey text-center mt-2">
-                Importa predições do script de mapeamento IA.
+            <v-divider class="mb-4" />
+
+            <!-- Legenda -->
+            <div class="config-section mb-4">
+              <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">
+                <v-icon size="16" class="mr-1">mdi-palette</v-icon>
+                Legenda de Status
               </p>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-
-        </v-expansion-panels>
-
-        <v-divider class="my-3" />
-
-        <!-- Lista de árvores -->
-        <div class="sidebar-section tree-list-section">
-          <p class="sidebar-subtitle">
-            🌳 Árvores ({{ filteredTrees.length }})
-          </p>
-
-          <div v-if="filteredTrees.length === 0" class="text-caption text-center text-grey pa-4">
-            Nenhuma árvore encontrada
-          </div>
-
-          <div class="tree-list-scroll">
-            <div
-              v-for="tree in filteredTrees"
-              :key="tree.id"
-              class="tree-list-item"
-              :class="{ 'tree-list-item--danger': tree.nearPowerLine, 'tree-list-item--active': selectedTree?.id === tree.id }"
-              @click="flyToTree(tree); openAiDrawer(tree)"
-            >
-              <div class="tree-list-icon" :style="{ background: tree.nearPowerLine ? '#FF3B3B' : (STATUS_CONFIG[tree.status]?.bg || '#4CAF50') }">
-                {{ tree.nearPowerLine ? '⚠️' : (STATUS_CONFIG[tree.status]?.emoji || '🌳') }}
-              </div>
-              <div class="tree-list-info">
-                <div class="tree-list-name">{{ tree.speciesName }}</div>
-                <div class="tree-list-meta">
-                  {{ (STATUS_CONFIG[tree.status]?.label || tree.status) }}
-                  <span v-if="tree.nearPowerLine" style="color:#D32F2F;"> · ⚡ Fiação</span>
+              <div class="legend-grid">
+                <div v-for="(cfg, key) in STATUS_CONFIG" :key="key" class="legend-item">
+                  <span class="legend-dot-new" :style="{ background: cfg.bg }" />
+                  <span class="text-caption">{{ cfg.emoji }} {{ cfg.label }}</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-line-new" />
+                  <span class="text-caption">⚡ Rede elétrica</span>
                 </div>
               </div>
-              <v-icon size="16" color="grey">mdi-chevron-right</v-icon>
             </div>
-          </div>
-        </div>
 
-        <!-- Marcações -->
-        <template v-if="markedLocations.length > 0">
-          <v-divider />
-          <div class="sidebar-section">
-            <p class="sidebar-subtitle">📌 Marcações</p>
-            <div
-              v-for="loc in markedLocations"
-              :key="loc.id"
-              class="d-flex align-center justify-space-between py-1"
-            >
-              <span class="text-caption text-truncate" style="max-width:180px">{{ loc.notes || 'Sem nota' }}</span>
-              <v-btn icon size="x-small" variant="text" color="red" @click="removeMarkedLocation(loc.id)">
-                <v-icon size="14">mdi-close</v-icon>
-              </v-btn>
-            </div>
-          </div>
-        </template>
-
-        <!-- Legenda -->
-        <v-divider />
-        <div class="sidebar-section">
-          <p class="sidebar-subtitle">Legenda</p>
-          <div v-for="(cfg, key) in STATUS_CONFIG" :key="key" class="legend-row">
-            <span class="legend-dot" :style="{ background: cfg.bg }" />
-            <span class="text-caption">{{ cfg.emoji }} {{ cfg.label }}</span>
-          </div>
-          <div class="legend-row">
-            <span class="legend-line" />
-            <span class="text-caption">⚡ Rede elétrica</span>
-          </div>
-          <div class="legend-row">
-            <span class="legend-dot" style="background:linear-gradient(135deg,#1565C0,#42A5F5)" />
-            <span class="text-caption">📍 Sua posição</span>
-          </div>
-
-          <v-divider class="my-2" />
-          <p class="text-caption font-weight-bold mb-1" style="color: #5D4037">
-            <v-icon size="14" color="brown" class="mr-1">mdi-layers</v-icon>
-            Legenda de Solos
-          </p>
-
-          <div v-if="!showSoilLayer" class="text-caption text-grey italic mb-2">
-            Ative a camada de solo para ver detalhes.
-          </div>
-
-          <div v-else>
-            <!-- Controles de modo de visualização -->
-            <div class="mb-2">
+            <!-- Camada de Solo -->
+            <div class="config-section">
+              <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">
+                <v-icon size="16" class="mr-1">mdi-layers</v-icon>
+                Camada de Solo
+              </p>
               <v-btn-toggle
                 v-model="soilRenderMode"
                 density="compact"
                 variant="outlined"
                 divided
-                class="w-100"
+                class="w-100 mb-2"
                 @update:model-value="changeSoilRenderMode"
               >
-                <v-btn value="circles" size="x-small" title="Círculos">
+                <v-btn value="circles" size="x-small">
                   <v-icon size="14">mdi-circle-outline</v-icon>
                 </v-btn>
-                <v-btn value="dots" size="x-small" title="Pontos">
+                <v-btn value="dots" size="x-small">
                   <v-icon size="14">mdi-circle-small</v-icon>
                 </v-btn>
-                <v-btn value="grid" size="x-small" title="Grid">
+                <v-btn value="grid" size="x-small">
                   <v-icon size="14">mdi-grid</v-icon>
                 </v-btn>
-                <v-btn value="heatmap" size="x-small" title="Heatmap">
+                <v-btn value="heatmap" size="x-small">
                   <v-icon size="14">mdi-heatmap</v-icon>
                 </v-btn>
               </v-btn-toggle>
-              <div class="text-caption text-grey text-center mt-1" style="font-size: 10px;">
-                Modo: {{ soilRenderMode === 'circles' ? 'Círculos' : soilRenderMode === 'dots' ? 'Pontos' : soilRenderMode === 'grid' ? 'Grid' : 'Heatmap' }}
+              <div class="text-caption text-center text-grey mb-2" style="font-size: 10px;">
+                {{ soilRenderMode === 'circles' ? 'Círculos' : soilRenderMode === 'dots' ? 'Pontos' : soilRenderMode === 'grid' ? 'Grid' : 'Heatmap' }}
+              </div>
+
+              <div v-if="showSoilLayer" class="soil-legend-compact">
+                <div v-for="(info, key) in SOIL_TYPES" :key="key" class="soil-item">
+                  <span class="soil-dot" :style="{ background: info.color }" />
+                  <span class="text-caption" style="font-size: 10px;">{{ info.name }}</span>
+                </div>
               </div>
             </div>
 
-            <div class="soil-legend-scroll mt-2">
-              <div v-for="(info, key) in SOIL_TYPES" :key="key" class="legend-row mb-1">
-                <span class="legend-dot" :style="{ background: info.color, width: '10px', height: '10px' }" />
-                <span class="text-caption" style="font-size: 10px !important; color: #444;">{{ info.name }}</span>
+            <!-- Marcações -->
+            <template v-if="markedLocations.length > 0">
+              <v-divider class="my-4" />
+              <div class="config-section">
+                <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">
+                  <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
+                  Marcações ({{ markedLocations.length }})
+                </p>
+                <v-list density="compact" class="pa-0">
+                  <v-list-item
+                    v-for="loc in markedLocations"
+                    :key="loc.id"
+                    density="compact"
+                  >
+                    <template #title>
+                      <span class="text-caption text-truncate">{{ loc.notes || 'Sem nota' }}</span>
+                    </template>
+                    <template #append>
+                      <v-btn icon size="x-small" variant="text" color="red" @click="removeMarkedLocation(loc.id)">
+                        <v-icon size="14">mdi-close</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-list-item>
+                </v-list>
               </div>
-            </div>
+            </template>
           </div>
+
         </div>
       </div>
     </Transition>
@@ -1993,7 +2434,19 @@ export default defineComponent({
         </div>
       </div>
     </v-navigation-drawer>
-    <!-- Dialog Importação CSV -->
+
+    <!-- =====================================================
+         SEÇÃO 5: DRAWER DE IA (Análise de Árvore)
+         - Mostra dados de IA da árvore selecionada
+         - Componente: TreeAiStats
+         - Aberto via openAiDrawer()
+         ===================================================== -->
+
+    <!-- =====================================================
+         SEÇÃO 6: DIALOG DE IMPORTAÇÃO CSV
+         - Importa dados de arquivo CSV do MapTree
+         - Caminho do arquivo no servidor
+         ===================================================== -->
     <v-dialog v-model="importCsvMode" max-width="400">
       <v-card class="rounded-xl pa-4">
         <v-card-title class="headline d-flex align-center">
@@ -2127,7 +2580,7 @@ export default defineComponent({
 /* ============ BOTÕES FLUTUANTES DIREITA ============ */
 .floating-actions-right {
   position: absolute;
-  top: 70px;
+  top: 140px;
   right: 14px;
   z-index: 1001;
   display: flex;
@@ -2137,14 +2590,14 @@ export default defineComponent({
 /* ============ SIDEBAR ============ */
 .sidebar-toggle-btn {
   position: absolute;
-  top: 14px;
+  top: 80px;
   z-index: 1002;
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .map-sidebar {
   position: absolute;
-  top: 14px;
+  top: 80px;
   left: 14px;
   z-index: 1001;
   width: 280px;
@@ -2246,7 +2699,7 @@ export default defineComponent({
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background-color 0.15s;
 }
 
 .tree-list-item:hover { background: #f5f5f5; }
@@ -2478,6 +2931,7 @@ export default defineComponent({
   .map-sidebar {
     width: 280px;
     box-shadow: 6px 0 30px rgba(0, 0, 0, 0.2);
+    top: 70px;
   }
 
   .top-search-bar {
@@ -2489,12 +2943,12 @@ export default defineComponent({
   }
 
   .floating-actions-right {
-    top: 60px;
+    top: 130px;
     right: 8px;
   }
 
   .sidebar-toggle-btn {
-    top: 8px;
+    top: 70px;
     left: 8px !important;
   }
 
@@ -2543,6 +2997,269 @@ export default defineComponent({
   inset: 0;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.35);
+}
+
+/* =====================================================
+   ESTILOS DO NOVO MENU LATERAL v2
+   Com Abas, Dashboard Flutuante e Mini Mapa
+   ===================================================== */
+
+/* ============ DASHBOARD FLUTUANTE ============ */
+.floating-dashboard {
+  position: absolute;
+  top: 78px;
+  left: 12px;
+  z-index: 1001;
+}
+
+.dashboard-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  min-width: 180px;
+}
+
+.mini-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(var(--accent), 0.1);
+  border: 1px solid rgba(var(--accent), 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mini-stat:hover {
+  background: rgba(var(--accent), 0.2);
+  transform: translateY(-1px);
+}
+
+.mini-stat-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ============ DASHBOARD STATS ============ */
+.stat-btn {
+  min-width: 50px;
+  height: 28px;
+  padding: 0 8px !important;
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: 6px;
+}
+
+/* ============ SIDEBAR COM ABAS ============ */
+.map-sidebar--tabs {
+  width: 320px;
+  max-height: calc(100% - 28px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  background: linear-gradient(135deg, #f8faf8, #f0f4f0);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-tabs {
+  background: #fff;
+}
+
+.sidebar-tabs :deep(.v-tab) {
+  text-transform: none;
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.tab-panel {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ CARDS E STATS ============ */
+.city-stats-card {
+  background: linear-gradient(135deg, #f5f5f5, #fafafa);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.controls-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ============ FILTROS ============ */
+.filter-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.filter-chips-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ============ LISTA DE ÁRVORES NOVA ============ */
+.tree-list-header {
+  padding: 8px 0;
+}
+
+.tree-list-scroll-new {
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.tree-list-item-new {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.tree-list-item-new:hover {
+  background: rgba(76, 175, 80, 0.05);
+}
+
+.tree-list-item-new:last-child {
+  border-bottom: none;
+}
+
+/* ============ CONFIGURAÇÕES ============ */
+.config-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot-new {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-line-new {
+  width: 16px;
+  height: 2px;
+  background: #FF3B3B;
+  flex-shrink: 0;
+}
+
+.soil-legend-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.soil-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.soil-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ============ RESPONSIVO PARA NOVO MENU ============ */
+@media (max-width: 768px) {
+  .floating-dashboard {
+    top: 68px;
+    left: 8px;
+  }
+
+  .dashboard-card {
+    min-width: 160px;
+    padding: 8px 10px;
+  }
+
+  .stat-btn {
+    min-width: 44px;
+    height: 26px;
+    padding: 0 6px !important;
+  }
+
+  .map-sidebar--tabs {
+    width: 100%;
+    max-height: calc(100% - 140px);
+    left: 8px;
+    right: 8px;
+    top: 70px;
+    bottom: 72px;
+    position: fixed;
+  }
+
+  .sidebar-content {
+    padding: 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: calc(100vh - 200px);
+  }
+
+  .tree-list-scroll-new {
+    max-height: 200px;
+  }
+}
+
+@media (max-width: 400px) {
+  .map-sidebar--tabs {
+    width: calc(100% - 16px);
+  }
+
+  .mini-stat-number {
+    font-size: 11px;
+  }
 }
 
 /* ============ AI DRAWER ============ */

@@ -166,7 +166,7 @@ export const CEARA_REGIONS: Region[] = [
 // ============================================================
 
 const TILE_CACHE = new Map<string, TileData>()
-const MAX_CACHE_SIZE = 50 // Limite de tiles em memória
+const MAX_CACHE_SIZE = 200 // Limite de tiles em memória (aumentado para grandes volumes)
 
 /**
  * Gera chave única para um tile
@@ -258,7 +258,7 @@ export async function loadTileData(coord: TileCoord): Promise<TileData | null> {
       bounds.south,
       bounds.east,
       bounds.west,
-      200 // Limite por tile
+      5000 // Limite por tile (aumentado para suportar grandes volumes)
     )
 
     tileData.trees = res.data || []
@@ -313,7 +313,7 @@ export async function loadRegionData(regionId: string): Promise<Region | null> {
       region.bounds.south,
       region.bounds.east,
       region.bounds.west,
-      1000 // Limite por região
+      10000 // Limite por região (aumentado para suportar grandes volumes)
     )
 
     region.treeCount = (res.data || []).length

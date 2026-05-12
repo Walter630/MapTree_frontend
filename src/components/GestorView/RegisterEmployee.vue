@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-6">
+  <v-container class="pt-3 pb-6 px-6" style="max-width: 1400px; margin: 0 auto;">
     <PageHeader
       title="Cadastro de Funcionário"
       subtitle="Cadastre Os Funcionários E Suas Funções."

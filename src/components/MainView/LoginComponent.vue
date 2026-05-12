@@ -2,111 +2,112 @@
   <v-container class="login-container" fluid>
     <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh">
       <!-- Coluna do formulário -->
-      <v-col class="form-section" cols="12" md="4">
-        <div class="content-wrapper">
-          <!-- ✅ LOGO NO TOPO ESQUERDO -->
-          <div class="logo-container">
-            <img src="/icons/LogoMapTree.png" alt="Logo" class="logo-img" />
-            <span class="logo-text">MapTree</span>
-          </div>
+      <v-col class="form-section" cols="12" md="5" lg="4">
+        <!-- Logo fixo no canto superior esquerdo -->
+        <div class="logo-fixed">
+          <img src="/icons/LogoMapTree.png" alt="Logo" class="logo-img" />
+          <span class="logo-text">MapTree</span>
+        </div>
 
+        <div class="content-wrapper px-8">
           <!-- Formulário -->
           <div class="form-area">
-            <h2 class="title">Bem-vindo(a)!</h2>
+            <h2 class="title mb-8">Bem-vindo(a)!</h2>
 
-            <v-form ref="form" v-model="valid" lazy-validation>
-              <p>Email</p>
-              <v-text-field
-                v-model="username"
-                class="mb-2"
-                color="green"
-                dense
-                hide-details
-                variant="outlined"
-                placeholder="Digite seu email"
-                required
-                density="compact"
-              />
-              <p>Senha</p>
-              <v-text-field
-                v-model="password"
-                class="mb-2"
-                color="green"
-                dense
-                hide-details
-                variant="outlined"
-                placeholder="Digite sua senha"
-                required
-                density="compact"
-                :type="showPassword ? 'text' : 'password'"
-                @keyup.enter="login"
-              >
-                <template #append-inner>
-                  <v-icon @click="showPassword = !showPassword">{{
-                    showPassword ? 'mdi-eye-off' : 'mdi-eye'
-                  }}</v-icon>
-                </template>
-              </v-text-field>
+            <v-form ref="form" v-model="valid" lazy-validation class="login-form">
+              <div class="field-group mb-6">
+                <label class="field-label">Email</label>
+                <v-text-field
+                  v-model="username"
+                  color="green"
+                  hide-details
+                  variant="outlined"
+                  placeholder="Digite seu email"
+                  required
+                  density="comfortable"
+                />
+              </div>
+
+              <div class="field-group mb-6">
+                <label class="field-label">Senha</label>
+                <v-text-field
+                  v-model="password"
+                  color="green"
+                  hide-details
+                  variant="outlined"
+                  placeholder="Digite sua senha"
+                  required
+                  density="comfortable"
+                  :type="showPassword ? 'text' : 'password'"
+                  @keyup.enter="login"
+                >
+                  <template #append-inner>
+                    <v-icon @click="showPassword = !showPassword">{{
+                      showPassword ? 'mdi-eye-off' : 'mdi-eye'
+                    }}</v-icon>
+                  </template>
+                </v-text-field>
+              </div>
 
               <v-btn
                 block
-                class="mb-2"
+                class="mb-4 login-btn"
                 color="#C6F513"
-                style="display: flex; align-items: center; flex-direction: row"
+                size="large"
                 append-icon="mdi-arrow-right"
                 @click="login"
               >
                 entrar
               </v-btn>
 
-              <div class="text-left mb-2">
+              <div class="text-center mb-6">
                 <a class="forgot-password" @click="$router.push('/recovery')"
                   >Esqueceu sua senha?</a
                 >
               </div>
-              <div>
-                <hr class="hr" />
+
+              <div class="divider mb-6">
+                <span>ou</span>
               </div>
 
-              <v-btn block class="mb-2 google-btn" @click="loginWithGoogle">
+              <v-btn block class="mb-3 google-btn" size="large" @click="loginWithGoogle">
                 <img
                   alt="Google Icon"
                   class="mr-2"
-                  height="24"
+                  height="22"
                   src="https://www.svgrepo.com/show/475656/google-color.svg"
-                  width="24"
+                  width="22"
                 />
                 Continuar com Google
               </v-btn>
 
-              <v-btn block class="mb-2 facebook-btn" @click="loginFacebook">
+              <v-btn block class="mb-4 facebook-btn" size="large" @click="loginFacebook">
                 <img
                   class="mr-2"
-                  height="22"
+                  height="20"
                   :src="getFacebookLogo"
-                  width="22"
+                  width="20"
                   alt="facebook-action-login"
                 />
                 Continuar com Facebook
               </v-btn>
 
-              <div class="text-center mt-4">
+              <div class="text-center mt-6">
                 Não possui uma conta?
                 <a
                   class="register-link"
-                  style="color: blue; text-decoration: none; cursor: pointer"
                   @click="$router.push('/register')"
                   >Cadastre-se</a>
-                <v-icon color="blue">mdi-chevron-right</v-icon>
               </div>
             </v-form>
-
-            <div class="terms-privacy">
-              Termos e Condições
-              <v-icon small>mdi-circle-small</v-icon>
-              Política de Privacidade
-            </div>
           </div>
+        </div>
+
+        <!-- Termos no rodapé -->
+        <div class="terms-footer">
+          <a href="#" @click.prevent="showTerms">Termos e Condições</a>
+          <span class="separator">•</span>
+          <a href="#" @click.prevent="showPrivacy">Política de Privacidade</a>
         </div>
       </v-col>
 
@@ -181,6 +182,14 @@ export default defineComponent({
       // Lógica de login com Facebook aqui
       console.log('Login com Facebook')
     },
+    showTerms() {
+      console.log('Mostrar Termos e Condições')
+      // Aqui você pode abrir um dialog ou redirecionar
+    },
+    showPrivacy() {
+      console.log('Mostrar Política de Privacidade')
+      // Aqui você pode abrir um dialog ou redirecionar
+    },
   },
   computed: {
     getFacebookLogo() {
@@ -200,16 +209,19 @@ export default defineComponent({
   margin: 0;
 }
 
-/* ✅ LOGO SUPERIOR */
-.logo-container {
+/* ✅ LOGO FIXO NO CANTO SUPERIOR ESQUERDO */
+.logo-fixed {
+  position: absolute;
+  top: 24px;
+  left: 32px;
   display: flex;
   align-items: center;
-  margin-bottom: 40px;
+  z-index: 10;
 }
 
 .logo-img {
-  width: 59px;
-  height: 52px;
+  width: 48px;
+  height: 42px;
   margin-right: 8px;
 }
 
@@ -223,34 +235,54 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
-  justify-content: space-between;
+  max-width: 420px;
+  justify-content: center;
+  padding: 80px 0 40px;
 }
 
 .form-area {
-  flex-grow: 1;
-  width: 347px;
+  width: 100%;
+  max-width: 400px;
   margin: 0 auto;
 }
 
 /* Mantendo o resto dos seus estilos originais */
 .form-section {
   background-color: white;
-
-  width: 608px;
-}
-
-.hr {
-  border: none;
-  height: 1px;
-  background: linear-gradient(to right, #ccc, #999, #ccc);
-  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  position: relative;
+  padding-top: 60px;
 }
 
 .title {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 24px;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+/* Divider estilizado */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #888;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 16px;
+  font-size: 14px;
 }
 
 .info-section {
@@ -279,10 +311,63 @@ export default defineComponent({
   font-weight: bold;
   color: #000;
 }
-.terms-privacy {
+
+/* Termos no rodapé */
+.terms-footer {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 12px;
-  margin-top: 20px;
-  color: gray;
+  color: #888;
   text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.terms-footer a {
+  color: #666;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.terms-footer a:hover {
+  color: #333;
+  text-decoration: underline;
+}
+
+.terms-footer .separator {
+  color: #ccc;
+}
+
+/* Labels dos campos */
+.field-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+/* Ajustes nos botões sociais */
+.google-btn {
+  background-color: #fff !important;
+  border: 1px solid #ddd !important;
+  color: #333 !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+}
+
+.facebook-btn {
+  background-color: #1877f2 !important;
+  color: #fff !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+}
+
+/* Input fields */
+:deep(.v-field__input) {
+  font-size: 0.95rem;
 }
 </style>

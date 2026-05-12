@@ -4,9 +4,10 @@
     <!-- Logo -->
     <div class="logo-container" @click="goToHome()">
       <img
-        src="@/assets/LogomaptreeHeaderpng.png"
+        :src="logoSrc"
         alt="Logo MapTree"
         class="logo-img"
+        @error="onLogoError"
       />
     </div>
 
@@ -219,6 +220,7 @@ export default {
       drawer: false,
       green: '#C1E328',
       user: null as User | null,
+      logoSrc: new URL('@/assets/LogomaptreeHeaderpng.png', import.meta.url).href,
     }
   },
 
@@ -293,6 +295,12 @@ export default {
     logout(): void {
       this.$api.logout()
       this.$router.push('/login')
+    },
+
+    onLogoError(): void {
+      console.error('Erro ao carregar logo do AppBar')
+      // Fallback para um ícone ou texto
+      this.logoSrc = ''
     },
 
     editAccount(): void {

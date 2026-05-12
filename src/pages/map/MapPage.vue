@@ -21,5 +21,12 @@ export default defineComponent({
   padding: 0;
   margin: 0;
   overflow: hidden;
+  position: relative;
+}
+
+/* Remove padding do v-main para esta página */
+:deep(.v-main) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 </style>
