@@ -64,7 +64,7 @@ export default defineComponent({
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(map)
 
-      clusterGroup = L.markerClusterGroup()
+      clusterGroup = L.markerClusterGroup({ chunkedLoading: true })
       map.addLayer(clusterGroup)
     }
 
@@ -123,6 +123,8 @@ export default defineComponent({
 
       const grouped = groupByLocation(filteredTrees)
 
+      const markersArray: L.CircleMarker[] = []
+
       grouped.forEach((treesAtLocation) => {
         const first = treesAtLocation[0]
         if (!first) return
@@ -160,8 +162,10 @@ export default defineComponent({
           })
         })
 
-        clusterGroup.addLayer(marker)
+        markersArray.push(marker)
       })
+
+      clusterGroup.addLayers(markersArray)
     }
 
     /* ===============================

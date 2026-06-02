@@ -47,6 +47,7 @@ import NotificationPage from '@/pages/NotificationPage.vue'
 import PruningList from '@/pages/PruningList.vue'
 import PruningRegistration from '@/pages/PruningRegistration.vue'
 import LogoutPage from '@/pages/LogoutPage.vue'
+import NovaPagina from '@/pages/NovaPagina.vue'
 
 /* ===================================
    DEFINIÇÃO DAS ROTAS
@@ -67,6 +68,7 @@ const router = createRouter({
         { path: 'recovery-code', name: 'RecoveryCode', component: EmailMessageComponent },
         { path: 'reset-password', name: 'ResetPassword', component: ResetPasswordComponent },
         { path: 'logout', name: 'Logout', component: LogoutPage },
+        { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina },
         { path: 'edit-account', name: 'EditAccount', component: () => import('@/components/MainView/EditProfileComponent.vue') },
 
         /* --- Admin --- */

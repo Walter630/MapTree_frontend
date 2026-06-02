@@ -245,14 +245,24 @@ export default {
   computed: {
     pruningStats() {
       if (!this.prunings.length) return []
-      const counts: Record<string, number> = { LIGHT: 0, MODERATE: 0, HEAVY: 0 }
-      this.prunings.forEach((p) => { if (counts[p.type] !== undefined) counts[p.type]++ })
+      const counts = { LIGHT: 0, MODERATE: 0, HEAVY: 0 }
+      this.prunings.forEach((p) => {
+        const t = p.type
+        if (t === 'LIGHT') counts.LIGHT++
+        else if (t === 'MODERATE') counts.MODERATE++
+        else if (t === 'HEAVY') counts.HEAVY++
+      })
       const total = this.prunings.length
-      return Object.keys(counts).map((type) => ({
-        label: this.PRUNING_TYPE_MAP[type as keyof typeof counts].label,
-        value: Number(((counts[type] / total) * 100).toFixed(0)),
-        color: this.PRUNING_TYPE_MAP[type as keyof typeof counts].color,
-      }))
+      const keys = ['LIGHT', 'MODERATE', 'HEAVY'] as const
+      return keys.map((type) => {
+        const count = counts[type]
+        const mapItem = this.PRUNING_TYPE_MAP[type]
+        return {
+          label: mapItem.label,
+          value: Number(((count / total) * 100).toFixed(0)),
+          color: mapItem.color,
+        }
+      })
     },
 
     chartData() {

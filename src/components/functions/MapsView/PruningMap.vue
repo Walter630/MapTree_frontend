@@ -244,6 +244,7 @@ export default defineComponent({
     const isExpanded = ref(false)
     const loadingTrees = ref(false)
     const isInitialLoad = ref(true)
+    const isInitialMapLoading = ref(true)
     const locating = ref(false)
     const locationError = ref('')
     const userLat = ref<number | null>(null)
@@ -275,6 +276,7 @@ export default defineComponent({
     const followUserPosition = ref(false) // Se true, mapa segue o usuário automaticamente
     const userHasMovedMap = ref(false) // Detecta se usuário navegou manualmente no mapa
     const loadedTreeIds = new Set<string>() // Cache para evitar duplicatas
+    const blockingMapLoading = computed(() => isInitialMapLoading.value || loadingRoute.value)
 
     /* ---------- Sistema de Regiões ---------- */
     const availableRegions = ref<Region[]>(CEARA_REGIONS)
@@ -283,6 +285,15 @@ export default defineComponent({
     const tileCache = ref<Map<string, any[]>>(new Map()) // Cache por tile
     const loadingRegion = ref(false)
     const cityStats = ref<{ total: number; withRisk: number; byStatus: Record<string, number> } | null>(null)
+    let lastLoadedBounds: L.LatLngBounds | null = null
+    let lastLoadedZoom: number | null = null
+
+    const clearTreeLoadCache = () => {
+      loadedTreeIds.clear()
+      tileCache.value = new Map()
+      lastLoadedBounds = null
+      lastLoadedZoom = null
+    }
 
     /* ---------- Carregar Regiões do Backend ---------- */
     const loadRegionsFromApi = async () => {
@@ -484,19 +495,19 @@ export default defineComponent({
      * Carrega árvores próximas ao usuário com raio progressivo
      * Inicia com 2km e permite expandir até o máximo definido
      */
-    const fetchTreesNearby = async (reset = false) => {
+    const fetchTreesNearby = async (reset = false, silent = false) => {
       console.log('[PruningMap] fetchTreesNearby chamado. userLat:', userLat.value, 'userLng:', userLng.value)
       if (!userLat.value || !userLng.value) {
         // Se não tem localização, usa o endpoint tradicional
         console.log('[PruningMap] Sem localização, usando fetchTreesLegacy()')
-        return fetchTreesLegacy()
+        return fetchTreesLegacy(silent)
       }
 
       loadingTrees.value = true
       try {
         if (reset) {
           // Reset: limpa cache e começa do raio inicial
-          loadedTreeIds.clear()
+          clearTreeLoadCache()
           trees.value = []
           loadRadius.value = 2
         }
@@ -527,7 +538,7 @@ export default defineComponent({
         hasMoreTrees.value = loadRadius.value < maxRadius.value && totalTreesInArea.value >= limit
 
         console.log(`Raio ${loadRadius.value}km: ${newTrees.length} novas, ${duplicates} duplicatas, total: ${trees.value.length}`)
-        notify(`${trees.value.length} árvore(s) próximas carregada(s)`, 'success')
+        if (!silent) notify(`${trees.value.length} árvore(s) próximas carregada(s)`, 'success')
 
         // Centraliza no usuário na primeira carga
         if (reset && map && trees.value.length > 0) {
@@ -538,10 +549,10 @@ export default defineComponent({
         const status = err.response?.status
         if (status === 500 || status === 404) {
           console.log('[PruningMap] API /trees/nearby indisponível, usando fallback /trees')
-          notify('Usando modo de compatibilidade para carregar árvores', 'warning')
-          return fetchTreesLegacy() // Fallback para endpoint tradicional
+          if (!silent) notify('Usando modo de compatibilidade para carregar árvores', 'warning')
+          return fetchTreesLegacy(silent) // Fallback para endpoint tradicional
         }
-        notify('Erro ao carregar árvores próximas', 'error')
+        if (!silent) notify('Erro ao carregar árvores próximas', 'error')
       } finally {
         loadingTrees.value = false
       }
@@ -563,7 +574,7 @@ export default defineComponent({
      * Carrega árvores da área visível no mapa (bounds)
      * Útil quando usuário navega para outra região
      */
-    const fetchTreesInBounds = async () => {
+    const fetchTreesInBounds = async (silent = false) => {
       if (!map) return
 
       const bounds = map.getBounds()
@@ -588,7 +599,7 @@ export default defineComponent({
         })
 
         trees.value = [...trees.value, ...newTrees]
-        notify(`${newTrees.length} árvore(s) da área visível carregada(s)`, 'success')
+        if (!silent) notify(`${newTrees.length} árvore(s) da área visível carregada(s)`, 'success')
       } catch (err) {
         console.error('Erro ao buscar árvores na área:', err)
       } finally {
@@ -599,7 +610,7 @@ export default defineComponent({
     /**
      * Fallback: endpoint tradicional quando não há geolocalização
      */
-    const fetchTreesLegacy = async () => {
+    const fetchTreesLegacy = async (silent = false) => {
       console.log('[PruningMap] fetchTreesLegacy() - chamando /trees')
       loadingTrees.value = true
       try {
@@ -613,7 +624,7 @@ export default defineComponent({
           .filter((t): t is TreeOnMap => t !== null)
         console.log('[PruningMap] Árvores parseadas válidas:', trees.value.length)
 
-        notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
+        if (!silent) notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
 
         if (map && trees.value.length > 0 && isInitialLoad.value) {
           const bounds = L.latLngBounds(trees.value.map(t => [t.latitude, t.longitude]))
@@ -626,7 +637,7 @@ export default defineComponent({
         console.log('[PruningMap] Gerando árvores mockadas para demonstração...')
         trees.value = getMockTrees()
         console.log('[PruningMap] Árvores mockadas geradas:', trees.value.length)
-        notify(`Modo offline: ${trees.value.length} árvores de demonstração carregadas`, 'warning')
+        if (!silent) notify(`Modo offline: ${trees.value.length} árvores de demonstração carregadas`, 'warning')
         if (map && trees.value.length > 0) {
           const bounds = L.latLngBounds(trees.value.map(t => [t.latitude, t.longitude]))
           map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
@@ -650,15 +661,12 @@ export default defineComponent({
           id: `mock-${i}`,
           latitude: centerLat + Math.cos(angle) * radius,
           longitude: centerLng + Math.sin(angle) * radius,
-          speciesName: species[Math.floor(Math.random() * species.length)],
+          speciesName: species[Math.floor(Math.random() * species.length)] ?? 'Mangueira',
           scientificName: 'Mockus treeus',
-          status: statuses[Math.floor(Math.random() * statuses.length)],
+          family: 'Mockaceae',
+          status: statuses[Math.floor(Math.random() * statuses.length)] ?? 'NORMAL',
           nearPowerLine: Math.random() > 0.8,
-          height: 5 + Math.random() * 15,
-          distanceToPowerLine: Math.random() * 10,
-          pruningNeed: Math.floor(Math.random() * 100),
-          vigor: ['EXCELLENT', 'GOOD', 'POOR'][Math.floor(Math.random() * 3)] as TreeOnMap['vigor'],
-          soil: { type: 'LATOSSOLO', quality: 'GOOD', vigor: 'GOOD' },
+          vigor: ['EXCELLENT', 'GOOD', 'POOR'][Math.floor(Math.random() * 3)] ?? 'GOOD',
           currentHeight: 5 + Math.random() * 10,
           wireHeight: 8 + Math.random() * 5
         })
@@ -673,7 +681,7 @@ export default defineComponent({
     const fetchTreesByRegion = async (region: Region, reset = true) => {
       if (reset) {
         trees.value = []
-        loadedTreeIds.clear()
+        clearTreeLoadCache()
         regionTrees.value.clear()
         selectedRegion.value = region
       }
@@ -728,7 +736,7 @@ export default defineComponent({
 
         // Centraliza no mapa
         if (map) {
-          map.flyTo([region.center.lat, region.center.lng], 14, { duration: 1 })
+          map.flyTo([region.center.lat, region.center.lng], 13, { duration: 1 })
         }
       } catch (err) {
         console.error('Erro ao carregar região:', err)
@@ -770,18 +778,33 @@ export default defineComponent({
       }
     }
 
+    const onRegionSelected = async (region: Region) => {
+      selectedRegion.value = region
+      if (map) {
+        map.flyTo([region.center.lat, region.center.lng], 13, { duration: 1 })
+      }
+      await Promise.all([
+        loadCityStats(region),
+        fetchTreesByRegion(region, true)
+      ])
+    }
+
     /* ---------- Carregamento por Tiles (Dinâmico) ---------- */
     let isLoadingTiles = false
-    const loadVisibleTiles = async () => {
-      if (!map || isLoadingTiles) return
+    const loadVisibleTiles = async (silent = false) => {
+      if (!map || isLoadingTiles) return false
 
       const bounds = map.getBounds()
       const zoom = map.getZoom()
 
-      // Apenas carrega tiles em zoom suficiente
+      if (zoom < 8) {
+        if (!silent) notify('Aproxime o mapa para carregar árvores individuais', 'info')
+        return false
+      }
+
       if (zoom < 12) {
-        notify('Aproxime o mapa para carregar árvores por área', 'info')
-        return
+        await fetchTreesInBounds(silent)
+        return true
       }
 
       const visibleTiles = getVisibleTiles({
@@ -824,11 +847,16 @@ export default defineComponent({
       loadingTrees.value = false
       isLoadingTiles = false
 
+      if (silent) {
+        return true
+      }
+
       if (newTreesCount > 0) {
         notify(`${newTreesCount} árvores carregadas da área visível`, 'success')
       } else {
         notify('Área já carregada ou sem árvores novas', 'info')
       }
+      return true
     }
 
     // Dados mockados de solo para demonstração quando API falha
@@ -1063,6 +1091,7 @@ export default defineComponent({
         return
       }
 
+      const markersArray: L.Marker[] = []
       filteredTrees.value.forEach((t) => {
         if (isNaN(t.latitude) || isNaN(t.longitude)) return
         const icon = createTreeIcon(t.status, t.nearPowerLine)
@@ -1148,8 +1177,9 @@ export default defineComponent({
         })
 
         marker.on('click', () => { selectedTree.value = t })
-        treeClusterGroup!.addLayer(marker)
+        markersArray.push(marker)
       })
+      treeClusterGroup!.addLayers(markersArray)
     }
 
     const drawPowerLines = () => {
@@ -1196,7 +1226,7 @@ export default defineComponent({
               // SEMPRE move o mapa para o usuário na inicialização
               const shouldMoveMap = followUserPosition.value || trees.value.length === 0
 
-              if (shouldMoveMap && !userHasMovedMap.value) {
+              if (shouldMoveMap) {
                 map.flyTo([latitude, longitude], 17, { duration: 1.5 })
               }
 
@@ -1261,6 +1291,10 @@ export default defineComponent({
           userLng.value = longitude
           if (userMarker) userMarker.setLatLng([latitude, longitude])
           if (userAccuracyCircle) userAccuracyCircle.setLatLng([latitude, longitude]).setRadius(accuracy)
+
+          if (followUserPosition.value && map) {
+            map.panTo([latitude, longitude], { animate: true, duration: 0.5 })
+          }
 
           // Otimização: Só atualiza roteamento se moveu mais de 10 metros
           const currentPos = L.latLng(latitude, longitude)
@@ -1340,14 +1374,27 @@ export default defineComponent({
       }
     }
 
+    const setFollowUserPosition = (enabled: boolean | null) => {
+      followUserPosition.value = Boolean(enabled)
+
+      if (followUserPosition.value) {
+        userHasMovedMap.value = false
+        goToUserLocation().then((success) => {
+          if (success) notify('Seguindo sua posição em tempo real', 'info')
+        })
+      } else {
+        notify('Modo de seguir posição desativado', 'info')
+      }
+    }
+
     const flyToTree = (t: TreeOnMap) => {
       map?.flyTo([t.latitude, t.longitude], 18, { duration: 1 })
       selectedTree.value = t
       if (isMobile.value) sidebarOpen.value = false
     }
 
-    const refreshData = async (reset = false) => {
-      await fetchTreesNearby(reset)
+    const refreshData = async (reset = false, silent = false) => {
+      await fetchTreesNearby(reset, silent)
       renderTrees()
     }
 
@@ -1358,7 +1405,7 @@ export default defineComponent({
       try {
         const res = await apiConnect.importExternalData()
         notify('Sincronização de IA concluída!', 'success')
-        await refreshData()
+        await refreshData(false, true)
       } catch (err) {
         console.error(err)
         notify('Erro ao sincronizar dados da IA', 'error')
@@ -1375,7 +1422,7 @@ export default defineComponent({
         await apiConnect.importMapTreeCsv(csvPath.value)
         notify('Importação CSV concluída!', 'success')
         importCsvMode.value = false
-        await refreshData()
+        await refreshData(false, true)
       } catch (err) {
         console.error(err)
         notify('Erro ao importar CSV', 'error')
@@ -1433,9 +1480,9 @@ export default defineComponent({
       // durante a animação de fechamento do drawer.
     }
 
-    /* ---------- Watch filtro ---------- */
+    /* ---------- Watcher Reativo para Render ---------- */
     let renderTimeout: ReturnType<typeof setTimeout> | null = null
-    watch(activeFilter, () => {
+    watch(filteredTrees, () => {
       if (renderTimeout) clearTimeout(renderTimeout)
       renderTimeout = setTimeout(() => {
         renderTrees()
@@ -1472,7 +1519,8 @@ export default defineComponent({
 
       streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CARTO &copy; OSM',
-        maxZoom: 20,
+        maxZoom: 19,
+        detectRetina: true,
       })
 
       satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -1491,6 +1539,8 @@ export default defineComponent({
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
         disableClusteringAtZoom: 18,
+        chunkedLoading: true,
+        removeOutsideVisibleBounds: true,
         iconCreateFunction: (cluster: L.MarkerCluster) => {
           const count = cluster.getChildCount()
           const size = count < 10 ? 40 : count < 50 ? 50 : 60
@@ -1569,14 +1619,15 @@ export default defineComponent({
           console.log(`[PruningMap] Marcadores renderizados no cluster`)
         }).catch((err) => {
           console.error('[PruningMap] Erro ao carregar árvores:', err)
+        }).finally(() => {
+          isInitialMapLoading.value = false
         })
       })
       // Refresh automático a cada 5 minutos (sem resetar - só atualiza dados existentes)
-      refreshInterval = setInterval(() => refreshData(false), 300000)
+      refreshInterval = setInterval(() => refreshData(false, true), 300000)
 
       // Carregamento dinâmico: Carrega tiles quando usuário navega/zoom
       let tileLoadTimeout: ReturnType<typeof setTimeout> | null = null
-      let lastLoadedBounds: L.LatLngBounds | null = null
 
       // Detecta quando usuário move o mapa manualmente (drag)
       map.on('dragstart', () => {
@@ -1597,9 +1648,8 @@ export default defineComponent({
       }
 
       map.on('move', updateMapState)      // Atualiza em tempo real durante movimento
-      map.on('moveend', updateMapState)   // Atualiza quando para
       map.on('zoom', updateMapState)      // Atualiza durante zoom
-      map.on('zoomend', () => {
+      map.on('moveend', () => {
         updateMapState()
 
         // Debounce para carregamento automático
@@ -1608,16 +1658,18 @@ export default defineComponent({
           const zoom = mapZoom.value
           const currentBounds = mapBounds.value
 
-          // Só carrega em zoom suficiente (nível de rua/bairro) e se auto-load está ativo
-          if (autoLoadOnZoom.value && zoom >= 15 && currentBounds) {
+          if (autoLoadOnZoom.value && currentBounds) {
             // Verifica se já carregamos desta área recentemente (evita recarregar mesma área)
-            if (lastLoadedBounds && lastLoadedBounds.contains(currentBounds)) {
+            if (lastLoadedBounds && lastLoadedBounds.contains(currentBounds) && lastLoadedZoom === zoom) {
               return // Já temos dados desta área
             }
 
             // Carrega área visível (com ou sem região selecionada)
-            loadVisibleTiles().then(() => {
-              lastLoadedBounds = currentBounds
+            loadVisibleTiles(true).then((loaded) => {
+              if (loaded) {
+                lastLoadedBounds = currentBounds
+                lastLoadedZoom = zoom
+              }
               // Atualiza bounds após carregar
               updateMapState()
               // Só notifica se carregou árvores novas
@@ -1627,7 +1679,7 @@ export default defineComponent({
               }
             })
           }
-        }, 800) // Aguarda 800ms após parar de mover
+        }, 400) // Aguarda 400ms após parar de mover
       })
     }
 
@@ -1649,10 +1701,10 @@ export default defineComponent({
 
     return {
       trees, filteredTrees, markedLocations, markMode, isExpanded,
-      loadingTrees, locating, locationError, searchQuery, searching,
+      loadingTrees, blockingMapLoading, locating, locationError, searchQuery, searching,
       sidebarOpen, activeFilter, mapStyle, snackbar, snackbarText, snackbarColor,
       selectedTree, treeCount, visibleTreeCount, dangerCount, criticalCount, markedCount, statusCounts, isMobile,
-      goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle,
+      goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle, setFollowUserPosition,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
       loadingRoute, showPowerLines, togglePowerLines,
@@ -1665,7 +1717,7 @@ export default defineComponent({
       mapBounds, mapZoom,
       // Sistema de regiões e solo
       availableRegions, selectedRegion, loadingRegion, cityStats, fetchTreesByRegion,
-      loadRegionsFromApi, loadCityStats, loadVisibleTiles, detectAndLoadRegion,
+      loadRegionsFromApi, loadCityStats, onRegionSelected, loadVisibleTiles, detectAndLoadRegion,
       soilRenderMode, changeSoilRenderMode, showSoilControls, toggleSoilControls,
       // UI - Abas do novo sidebar v2
       expandedPanels, activeTab
@@ -1714,10 +1766,10 @@ export default defineComponent({
            carregando árvores, calculando rota
          ===================================================== -->
     <Transition name="fade">
-      <div v-if="locating || loadingTrees || loadingRoute" class="locating-overlay glass-overlay">
+      <div v-if="blockingMapLoading" class="locating-overlay glass-overlay">
         <v-progress-circular indeterminate color="#C1E328" size="70" width="6" />
         <p class="text-white mt-5 font-weight-bold" style="font-size: 18px; text-shadow: 0 2px 8px rgba(0,0,0,0.7);">
-          {{ locating ? 'Buscando sua localização…' : (loadingRoute ? 'Calculando melhor rota…' : 'Sincronizando dados das árvores…') }}
+          {{ loadingRoute ? 'Calculando melhor rota...' : (locating ? 'Buscando sua localização...' : 'Carregando dados iniciais do mapa...') }}
         </p>
       </div>
     </Transition>
@@ -2020,7 +2072,7 @@ export default defineComponent({
               class="mb-3"
               clearable
               hide-details
-              @update:model-value="(region) => region && loadCityStats(region)"
+              @update:model-value="(region) => region && onRegionSelected(region)"
             />
 
             <!-- Estatísticas da Cidade -->
@@ -2134,12 +2186,24 @@ export default defineComponent({
                 </div>
                 <v-switch v-model="autoLoadOnZoom" color="green" density="compact" hide-details size="small" />
               </div>
-              <div class="d-flex align-center justify-space-between">
-                <span class="text-caption text-grey-darken-1">
-                  <v-icon size="14" class="mr-1">mdi-crosshairs-gps</v-icon>
-                  Seguir minha posição
-                </span>
-                <v-switch v-model="followUserPosition" color="blue" density="compact" hide-details size="small" />
+              <div class="follow-control">
+                <div class="follow-control__text">
+                  <span class="text-caption text-grey-darken-1 d-flex align-center">
+                    <v-icon size="14" class="mr-1">mdi-crosshairs-gps</v-icon>
+                    Seguir minha posição
+                  </span>
+                  <span class="follow-control__hint">
+                    {{ followUserPosition ? 'Ativo: o mapa acompanha seu GPS.' : 'Ative para manter o mapa centralizado no seu GPS.' }}
+                  </span>
+                </div>
+                <v-switch
+                  v-model="followUserPosition"
+                  color="blue"
+                  density="compact"
+                  hide-details
+                  size="small"
+                  @update:model-value="setFollowUserPosition"
+                />
               </div>
             </div>
 
@@ -3115,6 +3179,25 @@ export default defineComponent({
   border-radius: 8px;
   padding: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.follow-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.follow-control__text {
+  min-width: 0;
+}
+
+.follow-control__hint {
+  display: block;
+  margin-top: 2px;
+  color: #78909c;
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 /* ============ FILTROS ============ */

@@ -69,6 +69,21 @@
               <v-text-field v-model="dialogEdit.item.email" label="Email" variant="outlined" density="comfortable" />
             </v-col>
             <v-col cols="12">
+              <v-text-field v-model="dialogEdit.item.cpf" label="CPF" variant="outlined" density="comfortable" />
+            </v-col>
+            <v-col cols="12">
+              <v-text-field v-model="dialogEdit.item.phone" label="Telefone" variant="outlined" density="comfortable" />
+            </v-col>
+            <v-col cols="12">
+              <v-select
+                v-model="dialogEdit.item.role"
+                :items="roleOptions"
+                label="Perfil"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+            <v-col cols="12">
               <v-select
                 v-model="dialogEdit.item.isActive"
                 :items="[{ title: 'Ativo', value: true }, { title: 'Inativo', value: false }]"
@@ -128,6 +143,7 @@ interface Funcionario {
   status: string // O status na imagem é "Fulano De Tal", vou manter como string para simulação
   email: string
   phone: string
+  role: string
   isActive: boolean
   companyId: Company[]
 }
@@ -136,7 +152,7 @@ export default defineComponent({
   components: { PageHeader },
   data() {
     return {
-      users: [] as any[],
+      users: [] as Funcionario[],
       loading: false,
       search: '',
       itemsPerPage: 10,
@@ -150,16 +166,20 @@ export default defineComponent({
       dialogDelete: {
         active: false,
         loading: false,
-        item: null as User | null,
+        item: null as Funcionario | null,
       },
       dialogEdit: {
         active: false,
         loading: false,
-        item: null as User | null,
+        item: null as Funcionario | null,
       },
+      roleOptions: [
+        { title: 'Usuário', value: 'USER' },
+        { title: 'Gestor', value: 'GESTOR' },
+      ],
 
       // backup para filtros
-      allUsers: [] as User[],
+      allUsers: [] as Funcionario[],
       totalUsers: 0,
       cpfMask: '###.###.###-##',
     }
@@ -188,8 +208,12 @@ export default defineComponent({
 
     async getAllUsers(): Promise<void> {
       try {
-        const response = await this.$api.get<User[]>('/users')
-        this.allUsers = response.data
+        const response = await this.$api.get<Funcionario[]>('/funcionario')
+        this.allUsers = response.data.map((user) => ({
+          ...user,
+          isActive: user.isActive ?? true,
+          role: user.role ?? 'USER',
+        }))
         this.totalUsers = this.allUsers.length
         this.users = [...this.allUsers]
       } catch (error) {
@@ -201,10 +225,12 @@ export default defineComponent({
       if (!this.dialogEdit.item) return
       try {
         this.dialogEdit.loading = true
-        await this.$api.patch(`/users/${this.dialogEdit.item.id}`, {
+        await this.$api.put(`/funcionario/${this.dialogEdit.item.id}`, {
           name: this.dialogEdit.item.name,
           email: this.dialogEdit.item.email,
-          isActive: this.dialogEdit.item.isActive,
+          cpf: this.onlyDigits(this.dialogEdit.item.cpf),
+          phone: this.onlyDigits(this.dialogEdit.item.phone),
+          role: this.dialogEdit.item.role,
         })
         this.notify('Funcionário atualizado!', 'success')
       } catch (error) {
@@ -216,7 +242,7 @@ export default defineComponent({
     },
 
     openDialogEdit(item: any) {
-      this.dialogEdit.item = { ...item } // Clone necessário para evitar erro de null na transição
+      this.dialogEdit.item = { ...item, role: item.role ?? 'USER' }
       this.dialogEdit.active = true
     },
     closeDialogEdit() {
@@ -227,6 +253,10 @@ export default defineComponent({
     notify(text: string, color = 'success') {
        // Notifica se houver snackbar ou similar no parent
        console.log(text, color)
+    },
+
+    onlyDigits(value: string) {
+      return value?.replace(/\D/g, '') ?? ''
     },
 
     /** 🔹 Usuário logado */
@@ -243,7 +273,7 @@ export default defineComponent({
       if (!this.dialogDelete.item) return
       try {
         this.dialogDelete.loading = true
-        await this.$api.delete(`/users/${this.dialogDelete.item.id}`)
+        await this.$api.delete(`/funcionario/${this.dialogDelete.item.id}`)
         this.notify('Usuário removido.', 'success')
       } catch (error) {
         console.error('Erro ao excluir:', error)
@@ -265,7 +295,7 @@ export default defineComponent({
       this.page = 1
     },
 
-    openDialogDelete(item: User) {
+    openDialogDelete(item: Funcionario) {
       this.dialogDelete.active = true
       this.dialogDelete.item = item
     },

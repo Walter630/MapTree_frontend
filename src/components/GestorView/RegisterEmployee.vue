@@ -141,11 +141,13 @@ export default {
         // Garantir que estamos registrando um 'USER' associado à organização do gestor
         const payload = {
           ...this.formData,
+          cpf: this.formData.cpf.replace(/\D/g, ''),
+          phone: this.formData.phone.replace(/\D/g, ''),
           role: 'USER',
           isActive: true
         }
 
-        const response = await this.$api.post<User>('/users', payload)
+        const response = await this.$api.post<User>('/funcionario', payload)
         if (response.status === 201) {
           this.$router.push('/manager/employees')
         }

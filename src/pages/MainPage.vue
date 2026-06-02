@@ -52,7 +52,7 @@ const isMapPage = computed(() => MAP_ROUTES.some(r => route.path.startsWith(r)))
 
   <v-main
     :class="{ 'map-page': isMapPage }"
-    :style="isMobile ? 'padding-bottom: 10px !important;' : ''"
+    :style="isMobile && !isMapPage ? 'padding-bottom: 10px !important;' : ''"
   >
     <router-view />
   </v-main>
