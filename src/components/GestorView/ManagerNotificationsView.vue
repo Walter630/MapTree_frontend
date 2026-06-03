@@ -5,8 +5,8 @@
       title="Notificações"
       subtitle="Gerencie as notificações do sistema"
       :breadcrumbs="[
-        { text: 'Meu Painel', to: '/manager' },
-        { text: '#Notificações' },
+        { text: 'Meu Painel', to: '/manager', icon: 'mdi-view-dashboard' },
+        { text: '#Notificações', icon: 'mdi-bell' },
       ]"
     />
 
@@ -21,16 +21,21 @@
     </v-tabs>
 
     <!-- Lista de Notificações -->
-    <v-window v-model="tab">
-      <v-window-item value="todas">
+    <div>
         <div v-if="loading" class="text-center py-12">
           <v-progress-circular indeterminate color="primary" />
           <p class="text-caption text-grey mt-2">Sincronizando alertas...</p>
         </div>
         
         <v-row v-else class="mt-3">
-          <v-col v-for="(notificacao, i) in filteredNotifications" :key="i" cols="12">
-            <v-card flat class="notification-card pa-5 mb-4 rounded-xl elevation-2" border>
+          <v-col v-for="notificacao in filteredNotifications" :key="notificacao.id" cols="12">
+            <v-card
+              flat
+              class="notification-card pa-5 mb-4 rounded-xl elevation-2"
+              :class="{ 'notification-card-clickable': notificacao.link }"
+              border
+              @click="goToNotificationLink(notificacao.link)"
+            >
               <div class="d-flex justify-space-between align-start mb-2">
                 <div class="d-flex align-center">
                   <v-avatar :color="notificacao.iconColor + '22'" size="48" class="mr-4">
@@ -66,7 +71,7 @@
                   size="small"
                   rounded="lg"
                   color="grey"
-                  @click="markAsRead(i)"
+                  @click.stop="markAsRead(notificacao.id)"
                 >
                   Ocultar
                 </v-btn>
@@ -76,8 +81,9 @@
                   variant="flat"
                   size="small"
                   rounded="lg"
-                  :to="notificacao.link"
+                  @click.stop="goToNotificationLink(notificacao.link)"
                 >
+                  <v-icon start size="16">{{ getRouteIcon(notificacao.link) }}</v-icon>
                   Ver Mais
                 </v-btn>
               </div>
@@ -89,8 +95,7 @@
              <p class="text-grey mt-2">Nenhuma notificação nesta categoria.</p>
           </v-col>
         </v-row>
-      </v-window-item>
-    </v-window>
+    </div>
   </v-container>
 </template>
 
@@ -99,6 +104,8 @@ import { defineComponent } from 'vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Notificacao {
+  id: string
+  type: string
   titulo: string
   descricao: string
   tempo: string
@@ -109,6 +116,8 @@ interface Notificacao {
   acao?: string
   botaoCor?: string
   acaoSecundaria?: string
+  link?: string
+  isNew?: boolean
 }
 
 export default defineComponent({
@@ -123,11 +132,7 @@ export default defineComponent({
 
   computed: {
     filteredNotifications() {
-      if (this.tab === 'todas') return this.notificacoes
-      if (this.tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
-      if (this.tab === 'agendamentos') return this.notificacoes.filter(n => n.type === 'SCHEDULE')
-      if (this.tab === 'relatorios') return this.notificacoes.filter(n => n.type === 'PRUNING')
-      return this.notificacoes
+      return this.getNotificationsByTab(this.tab)
     }
   },
 
@@ -136,6 +141,33 @@ export default defineComponent({
   },
 
   methods: {
+    getNotificationsByTab(tab: string) {
+      if (tab === 'todas') return this.notificacoes
+      if (tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
+      if (tab === 'agendamentos') return this.notificacoes.filter(n => n.type === 'SCHEDULE')
+      if (tab === 'concluidas') return this.notificacoes.filter(n => n.status === 'DONE' || n.status === 'COMPLETED')
+      if (tab === 'relatorios') return this.notificacoes.filter(n => n.type === 'PRUNING')
+      if (tab === 'sistema') return this.notificacoes.filter(n => n.type === 'SYSTEM')
+      return this.notificacoes
+    },
+
+    getRouteIcon(link: string) {
+      const icons: Record<string, string> = {
+        '/manager': 'mdi-view-dashboard',
+        '/manager/employees': 'mdi-account-group',
+        '/manager/register-employee': 'mdi-account-plus',
+        '/manager/reports': 'mdi-file-chart',
+        '/manager/notifications': 'mdi-bell',
+        '/manager/map': 'mdi-map',
+      }
+
+      return icons[link] || 'mdi-arrow-right'
+    },
+
+    goToNotificationLink(link?: string) {
+      if (link) this.$router.push(link)
+    },
+
     async fetchAllData() {
       this.loading = true
       try {
@@ -150,6 +182,7 @@ export default defineComponent({
         // 1. Riscos de IA
         treesRes.data?.filter(t => (t.aiPrediction?.estimated_height_m / t.aiPrediction?.wire_height_m) >= 0.8).forEach(t => {
           alerts.push({
+            id: `risk-${t.id}`,
             type: 'RISK',
             titulo: 'Alerta de Risco IA',
             descricao: `Árvore ${t.species?.commonName || ''} atingiu nível crítico de altura na rede elétrica.`,
@@ -167,6 +200,7 @@ export default defineComponent({
         // 2. Agendamentos
         schedulesRes.data?.filter(s => s.status === 'PENDING').forEach(s => {
           alerts.push({
+            id: `schedule-${s.id}`,
             type: 'SCHEDULE',
             titulo: 'Tarefa Pendente',
             descricao: `Poda agendada para árvore ${s.tree?.species?.commonName || ''} em ${new Date(s.plannedDate).toLocaleDateString()}.`,
@@ -183,6 +217,7 @@ export default defineComponent({
         // 3. Relatórios recentes
         pruningsRes.data?.slice(0, 5).forEach(p => {
           alerts.push({
+            id: `pruning-${p.id}`,
             type: 'PRUNING',
             titulo: 'Novo Relatório de Poda',
             descricao: `Finalizada intervenção do tipo ${p.type} por ${p.user?.name || 'Técnico'}.`,
@@ -204,8 +239,9 @@ export default defineComponent({
       }
     },
 
-    markAsRead(index: number) {
-      this.notificacoes.splice(index, 1)
+    markAsRead(id: string) {
+      const index = this.notificacoes.findIndex(n => n.id === id)
+      if (index >= 0) this.notificacoes.splice(index, 1)
     },
 
     goBack() {
@@ -225,6 +261,10 @@ export default defineComponent({
   border: 1px solid #e0e0e0;
   background-color: #fafafa;
   border-radius: 12px;
+}
+
+.notification-card-clickable {
+  cursor: pointer;
 }
 
 .action-btn {

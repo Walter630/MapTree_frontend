@@ -4,8 +4,8 @@
       title="Notificações"
       subtitle="Central de alertas e atualizações do sistema"
       :breadcrumbs="[
-        { text: 'Meu Painel', to: '/user' },
-        { text: '#Notificações' },
+        { text: 'Meu Painel', to: '/user', icon: 'mdi-view-dashboard' },
+        { text: '#Notificações', icon: 'mdi-bell' },
       ]"
     />
 
@@ -17,17 +17,16 @@
       style="box-shadow: none; background-color: #f6f6f6"
       grow
     >
-      <v-tab value="todas">Todas {{ notificacoes.length }}</v-tab>
-      <v-tab value="urgentes">Urgentes {{ notificacoes.filter((n) => n.prioridade === 'Alta').length }}</v-tab>
-      <v-tab value="agendamentos">Agendamentos {{ notificacoes.filter((n) => n.prioridade === 'Media').length }}</v-tab>
-      <v-tab value="concluidas">Concluídas {{ notificacoes.filter((n) => n.prioridade === 'Baixa').length }}</v-tab>
-      <v-tab value="relatorios">Relatórios {{ notificacoes.filter((n) => n.prioridade === 'Baixa').length }}</v-tab>
-      <v-tab value="sistema">Sistema {{ notificacoes.filter((n) => n.prioridade === 'Baixa').length }}</v-tab>
+      <v-tab value="todas">Todas {{ countByTab('todas') }}</v-tab>
+      <v-tab value="urgentes">Urgentes {{ countByTab('urgentes') }}</v-tab>
+      <v-tab value="agendamentos">Agendamentos {{ countByTab('agendamentos') }}</v-tab>
+      <v-tab value="concluidas">Concluídas {{ countByTab('concluidas') }}</v-tab>
+      <v-tab value="relatorios">Relatórios {{ countByTab('relatorios') }}</v-tab>
+      <v-tab value="sistema">Sistema {{ countByTab('sistema') }}</v-tab>
     </v-tabs>
 
     <!-- Lista de notificações -->
-    <v-window v-model="tab">
-      <v-window-item value="todas">
+    <div>
         <div v-if="loading" class="text-center py-10">
            <v-progress-circular indeterminate color="green" />
            <p class="text-caption mt-2">Buscando alertas de campo...</p>
@@ -38,7 +37,9 @@
             <v-card
               flat
               class="pa-5 mb-4 rounded-xl elevation-1"
+              :class="{ 'notification-card-clickable': notificacao.link }"
               border
+              @click="goToNotificationLink(notificacao.link)"
             >
               <div class="d-flex justify-space-between align-start mb-2">
                 <div class="d-flex align-center">
@@ -81,9 +82,10 @@
                   variant="flat"
                   size="small"
                   rounded="lg"
-                  :to="notificacao.link"
                   class="font-weight-bold"
+                  @click.stop="goToNotificationLink(notificacao.link)"
                 >
+                  <v-icon start size="16">{{ getRouteIcon(notificacao.link) }}</v-icon>
                   ACESSAR
                 </v-btn>
               </div>
@@ -94,8 +96,7 @@
              <p class="text-grey">Nenhum alerta pendente.</p>
           </v-col>
         </v-row>
-      </v-window-item>
-    </v-window>
+    </div>
   </v-container>
 </template>
 
@@ -114,10 +115,7 @@ export default defineComponent({
 
   computed: {
     filteredNotifications() {
-      if (this.tab === 'todas') return this.notificacoes
-      if (this.tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
-      if (this.tab === 'agendamentos') return this.notificacoes.filter(n => n.type === 'SCHEDULE')
-      return this.notificacoes
+      return this.getNotificationsByTab(this.tab)
     }
   },
 
@@ -126,6 +124,37 @@ export default defineComponent({
   },
 
   methods: {
+    countByTab(tab: string) {
+      return this.getNotificationsByTab(tab).length
+    },
+
+    getNotificationsByTab(tab: string) {
+      if (tab === 'todas') return this.notificacoes
+      if (tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
+      if (tab === 'agendamentos') return this.notificacoes.filter(n => n.type === 'SCHEDULE')
+      if (tab === 'concluidas') return this.notificacoes.filter(n => n.status === 'DONE' || n.status === 'COMPLETED')
+      if (tab === 'relatorios') return this.notificacoes.filter(n => n.type === 'PRUNING')
+      if (tab === 'sistema') return this.notificacoes.filter(n => n.type === 'SYSTEM')
+      return this.notificacoes
+    },
+
+    getRouteIcon(link: string) {
+      const icons: Record<string, string> = {
+        '/user': 'mdi-view-dashboard',
+        '/user/mapUser': 'mdi-map-marker-path',
+        '/user/podas': 'mdi-tree',
+        '/user/podas/nova': 'mdi-tree-outline',
+        '/user/reports': 'mdi-file-chart',
+        '/user/notifications': 'mdi-bell',
+      }
+
+      return icons[link] || 'mdi-arrow-right'
+    },
+
+    goToNotificationLink(link?: string) {
+      if (link) this.$router.push(link)
+    },
+
     async fetchUserAlerts() {
       this.loading = true
       try {
@@ -181,4 +210,8 @@ export default defineComponent({
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+.notification-card-clickable {
+  cursor: pointer;
+}
+</style>

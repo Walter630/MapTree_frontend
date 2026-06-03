@@ -53,7 +53,7 @@ import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
    5. FUNÇÕES DO MAPA (Leaflet)
       - initMap(): Inicializa o mapa
       - renderTrees(): Renderiza marcadores no mapa
-      - drawPowerLines(): Desenha rede elétrica
+      - drawPowerLines(): Mantém a camada de rede elétrica desativada
       - toggleSoilLayer(): Ativa/desativa camada de solo
 
    6. GEOLOCALIZAÇÃO
@@ -169,7 +169,6 @@ L.Icon.Default.mergeOptions({
    CONSTANTES
 =================================== */
 
-const POWER_LINE_DISTANCE_METERS = 15
 const DEFAULT_LAT = -3.7319
 const DEFAULT_LNG = -38.5267
 const DEFAULT_ZOOM = 15
@@ -187,7 +186,7 @@ const STATUS_CONFIG: { [key: string]: StatusInfo } = {
   TO_PRUNE:          { label: 'Para Podar',     emoji: '✂️', color: '#EF6C00', bg: '#EF6C00', border: '#E65100' },
   UNDER_OBSERVATION: { label: 'Observação',     emoji: '👁️', color: '#F9A825', bg: '#F9A825', border: '#F57F17' },
   PRUNED:            { label: 'Podada',         emoji: '🌿', color: '#4CAF50', bg: '#4CAF50', border: '#388E3C' },
-  DANGER:            { label: 'Risco Fiação',   emoji: '⚠️', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
+  DANGER:            { label: 'Risco',          emoji: '⚠️', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
   CRITICAL:          { label: 'CRÍTICO',        emoji: '🚨', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
 }
 
@@ -196,7 +195,7 @@ const DEFAULT_STATUS: StatusInfo = { label: 'Normal', emoji: '🌳', color: '#4C
 function getStatusCfg(status: string, danger: boolean): StatusInfo {
   const s = String(status).toUpperCase()
   
-  // SE ESTIVER EM PERIGO (por altura ou fiação), forçamos CRÍTICO (Vermelho)
+  // SE ESTIVER EM PERIGO (por altura/IA), forçamos CRÍTICO (Vermelho)
   if (danger || s === 'CRITICAL' || s === 'DANGER') {
     return STATUS_CONFIG['CRITICAL'] || STATUS_CONFIG['DANGER'] || DEFAULT_STATUS
   }
@@ -209,11 +208,6 @@ function getStatusCfg(status: string, danger: boolean): StatusInfo {
   // Caso contrário, respeita o status (incluindo TO_PRUNE em amarelo/laranja)
   return STATUS_CONFIG[s] || DEFAULT_STATUS
 }
-
-const SIMULATED_POWER_LINES: [number, number][][] = [
-  [[-3.7327, -38.5270], [-3.7335, -38.5255], [-3.7342, -38.5240], [-3.7350, -38.5225]],
-  [[-3.7310, -38.5280], [-3.7320, -38.5260], [-3.7330, -38.5245]],
-]
 
 /* ===================================
    COMPONENTE
@@ -263,7 +257,6 @@ export default defineComponent({
     const isSimulationMode = ref(false)
     const loadingRoute = ref(false)
     const currentRouteDest = ref<{ lat: number; lng: number } | null>(null)
-    const showPowerLines = ref(true)
     let lastPosition: L.LatLng | null = null
 
     /* ---------- Carregamento Progressivo ---------- */
@@ -427,32 +420,9 @@ export default defineComponent({
       className: 'mark-icon-marker',
     })
 
-    /* ---------- Geometria ---------- */
-    const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-      const R = 6371000
-      const toRad = (v: number) => (v * Math.PI) / 180
-      const dLat = toRad(lat2 - lat1)
-      const dLng = toRad(lng2 - lng1)
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    }
-
-    const distancePointToSegment = (pLat: number, pLng: number, aLat: number, aLng: number, bLat: number, bLng: number): number => {
-      const dx = bLng - aLng
-      const dy = bLat - aLat
-      if (dx === 0 && dy === 0) return haversineDistance(pLat, pLng, aLat, aLng)
-      const t = Math.max(0, Math.min(1, ((pLng - aLng) * dx + (pLat - aLat) * dy) / (dx * dx + dy * dy)))
-      return haversineDistance(pLat, pLng, aLat + t * dy, aLng + t * dx)
-    }
-
     const checkNearPowerLine = (lat: number, lng: number): boolean => {
-      for (const line of SIMULATED_POWER_LINES) {
-        for (let i = 0; i < line.length - 1; i++) {
-          const segA = line[i]!
-          const segB = line[i + 1]!
-          if (distancePointToSegment(lat, lng, segA[0], segA[1], segB[0], segB[1]) < 25) return true
-        }
-      }
+      void lat
+      void lng
       return false
     }
 
@@ -665,7 +635,7 @@ export default defineComponent({
           scientificName: 'Mockus treeus',
           family: 'Mockaceae',
           status: statuses[Math.floor(Math.random() * statuses.length)] ?? 'NORMAL',
-          nearPowerLine: Math.random() > 0.8,
+          nearPowerLine: false,
           vigor: ['EXCELLENT', 'GOOD', 'POOR'][Math.floor(Math.random() * 3)] ?? 'GOOD',
           currentHeight: 5 + Math.random() * 10,
           wireHeight: 8 + Math.random() * 5
@@ -1114,7 +1084,7 @@ export default defineComponent({
                   </p>
                 </div>
                 <div style="text-align:right;">
-                  <p style="margin:0; font-size:10px; color:#999; font-weight:700;">FIAÇÃO</p>
+                  <p style="margin:0; font-size:10px; color:#999; font-weight:700;">RISCO</p>
                   <p style="margin:0; font-size:12px; font-weight:700; color:${t.nearPowerLine ? '#E53935' : '#43A047'}">${t.nearPowerLine ? '⚠ RISCO' : '✓ SEGURO'}</p>
                 </div>
               </div>
@@ -1185,19 +1155,6 @@ export default defineComponent({
     const drawPowerLines = () => {
       if (!powerLinesLayer) return
       powerLinesLayer.clearLayers()
-      if (!showPowerLines.value) return
-
-      SIMULATED_POWER_LINES.forEach((line) => {
-        const polyline = L.polyline(line, { color: '#E53935', weight: 4, dashArray: '10, 8', opacity: 0.85 })
-        polyline.bindPopup('<div style="text-align:center;font-weight:600;">⚡ Rede Elétrica<br><span style="font-size:11px;color:#888;">(simulada)</span></div>')
-        powerLinesLayer!.addLayer(polyline)
-      })
-    }
-
-    const togglePowerLines = () => {
-      showPowerLines.value = !showPowerLines.value
-      drawPowerLines()
-      notify(showPowerLines.value ? 'Rede elétrica visível' : 'Rede elétrica oculta', 'info')
     }
 
     /* ---------- Geolocalização ---------- */
@@ -1707,7 +1664,7 @@ export default defineComponent({
       goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle, setFollowUserPosition,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
-      loadingRoute, showPowerLines, togglePowerLines,
+      loadingRoute,
       aiDrawerOpen, aiTreeData, loadingAiData, openAiDrawer, closeAiDrawer,
       showSoilLayer, loadingSoil, toggleSoilLayer, getSoilInfo, SOIL_TYPES,
       importingIA, syncIA, importCsvMode, csvPath, syncCsvIA,
@@ -1847,14 +1804,6 @@ export default defineComponent({
         <template #activator="{ props }">
           <v-btn v-bind="props" icon color="blue-grey-darken-2" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleMapStyle" class="mb-2">
             <v-icon>{{ mapStyle === 'street' ? 'mdi-satellite-variant' : 'mdi-map-outline' }}</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
-
-      <v-tooltip :text="showPowerLines ? 'Ocultar Rede Elétrica' : 'Mostrar Rede Elétrica'" location="left">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon :color="showPowerLines ? 'red-darken-1' : 'blue-grey-darken-1'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="togglePowerLines" class="mb-2">
-            <v-icon>{{ showPowerLines ? 'mdi-flash-off' : 'mdi-flash' }}</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
@@ -2283,7 +2232,7 @@ export default defineComponent({
 
                   <v-list-item-subtitle class="text-caption">
                     {{ STATUS_CONFIG[tree.status]?.label || tree.status }}
-                    <span v-if="tree.nearPowerLine" class="text-red"> · ⚡ Fiação</span>
+                    <span v-if="tree.nearPowerLine" class="text-red"> · ⚠ Risco</span>
                   </v-list-item-subtitle>
 
                   <template #append>
