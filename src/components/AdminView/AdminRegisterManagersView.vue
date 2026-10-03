@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-6">
+  <v-container fluid class="page-shell">
     <PageHeader
       title="Cadastro de Gestores"
       subtitle="Cadastre Os Gestores E Suas Funções."

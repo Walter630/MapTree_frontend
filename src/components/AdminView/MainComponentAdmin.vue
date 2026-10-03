@@ -147,7 +147,7 @@ export default defineComponent({
 });
 </script>
 <template>
-  <v-container class="pa-6">
+  <v-container fluid class="page-shell">
     <!-- Cabeçalho -->
     <v-row align="center" justify="space-between" class="mb-6">
       <v-col cols="12" md="7">

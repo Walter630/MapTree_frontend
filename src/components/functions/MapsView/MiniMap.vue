@@ -277,7 +277,8 @@ export default defineComponent({
         scrollWheelZoom: true,
       }).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM)
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
       }).addTo(map)
 

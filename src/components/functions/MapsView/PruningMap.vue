@@ -357,13 +357,20 @@ export default defineComponent({
     const mapBounds = ref<L.LatLngBounds | null>(null)
     const mapZoom = ref<number>(DEFAULT_ZOOM)
 
-    // Contador de árvores visíveis na tela (bounds atual do mapa) - AGORA REATIVO
+    // Contador de árvores visíveis na tela (bounds atual do mapa).
+    // Só recalcula quando trees ou mapBounds mudam (mapBounds agora só muda
+    // no 'moveend', não a cada frame). Conta com loop simples, sem alocar
+    // array intermediário, para suportar volumes grandes sem travar.
     const visibleTreeCount = computed(() => {
-      if (!map || !mapBounds.value) return trees.value.length
+      const list = trees.value
       const bounds = mapBounds.value
-      return trees.value.filter(t => {
-        return bounds.contains([t.latitude, t.longitude])
-      }).length
+      if (!map || !bounds) return list.length
+      let count = 0
+      for (let i = 0; i < list.length; i++) {
+        const t = list[i]!
+        if (bounds.contains([t.latitude, t.longitude])) count++
+      }
+      return count
     })
 
     /* ---------- Notificação ---------- */
@@ -1474,8 +1481,8 @@ export default defineComponent({
       mapBounds.value = map.getBounds()
       mapZoom.value = map.getZoom()
 
-      streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; CARTO &copy; OSM',
+      streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
         detectRetina: true,
       })
@@ -1601,11 +1608,13 @@ export default defineComponent({
         if (!map) return
         mapBounds.value = map.getBounds()
         mapZoom.value = map.getZoom()
-        console.log(`[PruningMap] Mapa atualizado - Zoom: ${mapZoom.value}, Árvores visíveis: ${visibleTreeCount.value}`)
       }
 
-      map.on('move', updateMapState)      // Atualiza em tempo real durante movimento
-      map.on('zoom', updateMapState)      // Atualiza durante zoom
+      // IMPORTANTE (performance): NÃO atualizamos o estado reativo durante
+      // 'move'/'zoom'. Esses eventos disparam dezenas de vezes por segundo e
+      // cada atualização de bounds força o computed visibleTreeCount a percorrer
+      // todas as árvores, travando o mapa durante o arraste. Atualizamos apenas
+      // quando o movimento termina ('moveend').
       map.on('moveend', () => {
         updateMapState()
 

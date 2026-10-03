@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pt-3 pb-6 px-6">
+  <v-container fluid class="page-shell">
     <!-- ===== Cabeçalho ===== -->
     <v-row align="center" class="mb-8">
       <v-col cols="12">

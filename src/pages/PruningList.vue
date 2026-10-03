@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pt-3 pb-6 px-6" style="max-width: 1400px; margin: 0 auto;">
+  <v-container fluid class="page-shell">
     <PageHeader
       title="Podas"
       subtitle="Gerencie Todas As Podas De Vegetação Próxima À Rede Elétrica"

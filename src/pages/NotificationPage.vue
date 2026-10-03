@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="bg-grey-lighten-4 pa-6">
+  <v-container fluid class="page-shell">
     <PageHeader
       title="Notificações"
       subtitle="Central de alertas e atualizações do sistema"

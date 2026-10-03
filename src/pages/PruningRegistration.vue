@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pt-3 pb-6 px-6" style="min-height: 100vh; max-width: 1400px; margin: 0 auto;">
+  <v-container fluid class="page-shell">
     <PageHeader
       title="Registrar Poda"
       subtitle="Registre uma nova poda realizada no sistema"
