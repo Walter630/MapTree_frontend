@@ -237,7 +237,17 @@ class ApiConnect {
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const url = originalRequest.url ?? ''
+
+        const isAuthRequest =
+          url.includes('/auth/login') ||
+          url.includes('/auth/refresh')
+
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          !isAuthRequest
+        ) {
           if (this.isRefreshing) {
             return new Promise((resolve, reject) => {
               this.failedRequestsQueue.push({
@@ -286,15 +296,24 @@ class ApiConnect {
   /* ---------- Refresh Token ---------- */
 
   private async refreshAccessToken(): Promise<string> {
-    const response = await axios.post<RefreshTokenResponse>(
-      `${this.axiosInstance.defaults.baseURL}/auth/refresh`,
-      {},
-      { withCredentials: true, headers: { 'Content-Type': 'application/json' } },
-    )
-    const { accessToken } = response.data
-    this.setAccessToken(accessToken)
-    return accessToken
-  }
+  const response = await axios.post<RefreshTokenResponse | string>(
+    `${this.axiosInstance.defaults.baseURL}/auth/refresh`,
+    {},
+    {
+      withCredentials: true,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  )
+
+  const accessToken =
+    typeof response.data === 'string'
+      ? response.data
+      : response.data.accessToken
+
+  this.setAccessToken(accessToken)
+
+  return accessToken
+}
 
   /* ---------- Tratamento de Erro de Auth ---------- */
 
