@@ -147,7 +147,7 @@ export default {
           isActive: true
         }
 
-        const response = await this.$api.post<User>('/funcionario', payload)
+        const response = await this.$api.post<User>('/users', payload)
         if (response.status === 201) {
           this.$router.push('/manager/employees')
         }

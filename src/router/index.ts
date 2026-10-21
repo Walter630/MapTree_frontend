@@ -139,42 +139,58 @@ router.beforeEach(async (to, _from, next) => {
   const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
   const store = useAppStore()
 
-  // 1. Rotas públicas: Lança direto
+  // 1. Rotas públicas: libera direto
   if (!requiresAuth) return next()
 
-  // 2. Verifica token
+  // 2. Sem token salvo => nem tenta chamar a API, manda pro login.
+  //    (evita requisições desnecessárias e flicker)
+  if (!apiConnect.isAuthenticated()) {
+    return next({ name: 'Login' })
+  }
+
+  // 3. Garante que temos o usuário no store.
+  //    Em recarregamento de página (F5) o store é zerado, então rebuscamos o perfil.
   try {
-    const { data: verifyData } = await apiConnect.get<{ valid: boolean }>('/auth/verify-token')
-    if (!verifyData.valid) {
+    if (!store.user) {
+      const { data: userData } = await apiConnect.get<User>('/users/me/profile')
+      store.setUser(userData)
+    }
+  } catch (error) {
+    const status = (error as { response?: { status?: number } }).response?.status
+
+    // Só desloga se o servidor disser explicitamente que a sessão é inválida (401/403).
+    // O interceptor do axios já tenta o refresh do token antes de chegar aqui.
+    if (status === 401 || status === 403) {
       store.logout()
       return next({ name: 'Login' })
     }
 
-    // 3. Garante que temos o usuário no Store
-    if (!store.user) {
-      const { data: userData } = await apiConnect.get<User>('users/me/profile')
-      store.getUser(userData)
-    }
-
-    const user = store.user
-    if (!user) return next({ name: 'Login' })
-
-    // 4. Verificação de Role REFORÇADA
-    // Percorre todos os níveis da rota (ex: /admin/managers) procurando restrições de role
-    const requiredRole = to.matched.find(record => record.meta.role)?.meta.role
-
-    if (requiredRole && user.role !== requiredRole) {
-      console.warn(`Acesso negado: Usuário ${user.role} tentou acessar rota de ${requiredRole}`)
-      store.logout() // Opcional: Desloga por segurança ou apenas redireciona
-      return next({ name: 'Login' }) 
-    }
-
-    next()
-  } catch (error) {
-    console.error('Erro de segurança no Router:', error)
-    store.logout()
-    next({ name: 'Login' })
+    // Erro de rede / servidor instável: NÃO desloga o usuário.
+    // Deixa seguir; se realmente não houver sessão, a própria tela tratará o 401.
+    console.error('Falha ao validar sessão (seguindo sem deslogar):', error)
+    return next()
   }
+
+  const user = store.user
+  if (!user) return next({ name: 'Login' })
+
+  // 4. Verificação de role: se a role não bate, NÃO desloga.
+  //    Apenas redireciona o usuário para a home da própria role.
+  const requiredRole = to.matched.find((record) => record.meta.role)?.meta.role
+
+  if (requiredRole && user.role !== requiredRole) {
+    console.warn(`Acesso negado: usuário ${user.role} tentou acessar rota de ${requiredRole}`)
+    const homePathByRole: Record<string, string> = {
+      ADMIN: '/admin',
+      MANAGER: '/manager',
+      USER: '/user',
+    }
+    const home = homePathByRole[user.role]
+    // Evita loop: se já não houver home mapeada, cai no login.
+    return home ? next(home) : next({ name: 'Login' })
+  }
+
+  next()
 })
 
 export default router

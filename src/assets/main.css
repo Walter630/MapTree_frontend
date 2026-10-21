@@ -14,6 +14,17 @@
   max-width: none;
 }
 
+/* Fundo cinza uniforme em toda a área da aplicação, para que as laterais
+   (fora do container centralizado) tenham a mesma cor da faixa de conteúdo,
+   sem aquela borda branca em volta do cinza. */
+.v-application {
+  background: #f5f5f5 !important;
+}
+
+.v-main {
+  background: #f5f5f5;
+}
+
 .v-container {
   max-width: none !important;
 }
@@ -31,9 +42,16 @@
    que renderizam dentro do <v-main> (abaixo do AppBar).
    Páginas de mapa são exceção (usam tela cheia).
    ===================================================== */
+/* Nota: a regra global ".v-container { max-width: none !important }" acima
+   sobrescreve qualquer max-width. Por isso usamos ".v-container.page-shell"
+   com !important aqui, para esta classe vencer em especificidade. */
+.v-container.page-shell,
 .page-shell {
   width: 100%;
-  max-width: 1400px;
+  /* Largura um pouco mais contida (antes 1400px), dando mais respiro
+     lateral em monitores grandes — inspirado no layout do LAPIS,
+     sem comprometer a densidade de informação do painel. */
+  max-width: 1440px !important;
   margin: 0 auto;
   /* 64px = altura do AppBar. Garante que toda página
      ocupe no mínimo a mesma área útil da viewport. */
@@ -42,6 +60,22 @@
   background: #f5f5f5;
 }
 
+/* Telas largas (desktop grande): aumenta o respiro lateral */
+@media (min-width: 1600px) {
+  .page-shell {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .page-shell {
+    padding: 20px 20px 40px;
+  }
+}
+
+/* Mobile */
 @media (max-width: 768px) {
   .page-shell {
     padding: 16px 16px 32px;

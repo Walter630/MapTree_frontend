@@ -227,6 +227,13 @@ export default defineComponent({
     let powerLinesLayer: L.LayerGroup | null = null
     let locationWatchId: number | null = null
     let refreshInterval: ReturnType<typeof setInterval> | null = null
+    // Timer do debounce de carregamento ao mover o mapa. Precisa ser acessível
+    // no onUnmounted para ser cancelado e não disparar após o componente morrer.
+    let tileLoadTimeout: ReturnType<typeof setTimeout> | null = null
+    // Flag que marca o componente como destruído. Callbacks assíncronos (timers,
+    // geolocalização, promises de fetch) checam isso antes de mexer em estado
+    // reativo/mapa, evitando o erro "vnode is null" ao sair da rota do mapa.
+    let isDestroyed = false
     let streetLayer: L.TileLayer | null = null
     let satelliteLayer: L.TileLayer | null = null
     let routingControl: any = null
@@ -1250,6 +1257,7 @@ export default defineComponent({
       if (!navigator.geolocation) return
       locationWatchId = navigator.geolocation.watchPosition(
         (pos) => {
+          if (isDestroyed || !map) return
           const { latitude, longitude, accuracy } = pos.coords
           userLat.value = latitude
           userLng.value = longitude
@@ -1591,7 +1599,7 @@ export default defineComponent({
       refreshInterval = setInterval(() => refreshData(false, true), 300000)
 
       // Carregamento dinâmico: Carrega tiles quando usuário navega/zoom
-      let tileLoadTimeout: ReturnType<typeof setTimeout> | null = null
+      // (tileLoadTimeout agora é declarado no escopo do setup)
 
       // Detecta quando usuário move o mapa manualmente (drag)
       map.on('dragstart', () => {
@@ -1621,6 +1629,9 @@ export default defineComponent({
         // Debounce para carregamento automático
         if (tileLoadTimeout) clearTimeout(tileLoadTimeout)
         tileLoadTimeout = setTimeout(() => {
+          // Aborta se o componente já foi desmontado (evita vnode null)
+          if (isDestroyed || !map) return
+
           const zoom = mapZoom.value
           const currentBounds = mapBounds.value
 
@@ -1632,6 +1643,8 @@ export default defineComponent({
 
             // Carrega área visível (com ou sem região selecionada)
             loadVisibleTiles(true).then((loaded) => {
+              // Promise pode resolver após sair da rota: não toca em nada
+              if (isDestroyed || !map) return
               if (loaded) {
                 lastLoadedBounds = currentBounds
                 lastLoadedZoom = zoom
@@ -1657,12 +1670,24 @@ export default defineComponent({
     })
 
     onUnmounted(() => {
+      // Marca como destruído ANTES de limpar, para que qualquer callback
+      // assíncrono pendente aborte em vez de mexer em estado/mapa destruído.
+      isDestroyed = true
+
       if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId)
       if (refreshInterval) clearInterval(refreshInterval)
       if (renderTimeout) clearTimeout(renderTimeout)
+      if (tileLoadTimeout) clearTimeout(tileLoadTimeout)
       window.removeEventListener('keydown', handleKeydown)
       window.removeEventListener('resize', handleResize)
-      map?.remove()
+
+      // Remove todos os listeners do Leaflet antes de destruir o mapa,
+      // para que eventos em voo (moveend etc.) não disparem após o unmount.
+      if (map) {
+        map.off()
+        map.remove()
+        map = null
+      }
     })
 
     return {
@@ -2142,7 +2167,7 @@ export default defineComponent({
                     </span>
                   </v-tooltip>
                 </div>
-                <v-switch v-model="autoLoadOnZoom" color="green" density="compact" hide-details size="small" />
+                <v-switch v-model="autoLoadOnZoom" color="green" density="compact" hide-details />
               </div>
               <div class="follow-control">
                 <div class="follow-control__text">
@@ -2159,7 +2184,6 @@ export default defineComponent({
                   color="blue"
                   density="compact"
                   hide-details
-                  size="small"
                   @update:model-value="setFollowUserPosition"
                 />
               </div>

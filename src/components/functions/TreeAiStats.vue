@@ -32,7 +32,7 @@
     <v-card-text class="card-body">
       <!-- ===== Alerta de IA ===== -->
       <v-alert
-        v-if="data.aiPrediction.alert"
+        v-if="data.aiPrediction?.alert"
         type="warning"
         variant="tonal"
         density="compact"
@@ -41,7 +41,7 @@
         rounded="lg"
         prominent
       >
-        <span class="font-weight-medium">{{ data.aiPrediction.alert }}</span>
+        <span class="font-weight-medium">{{ data.aiPrediction?.alert }}</span>
       </v-alert>
 
       <!-- ===== Progresso Altura vs Fio ===== -->
@@ -156,11 +156,11 @@
               </div>
               <div class="insight-main mt-3">
                 <div class="d-flex align-center justify-space-between mb-2">
-                  <h3 class="insight-value">{{ (data.aiPrediction.fibonacci_info.growth_modifier * 100).toFixed(0) }}%</h3>
+                  <h3 class="insight-value">{{ ((data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100).toFixed(0) }}%</h3>
                   <v-chip size="x-small" color="blue-lighten-4" variant="flat" class="text-blue-darken-4 font-weight-bold">Ajuste IA</v-chip>
                 </div>
                 <div class="modern-progress mb-2">
-                  <div class="modern-progress-fill" :style="{ width: (data.aiPrediction.fibonacci_info.growth_modifier * 100) + '%' }" />
+                  <div class="modern-progress-fill" :style="{ width: ((data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100) + '%' }" />
                 </div>
                 <p class="text-caption r-desc">
                   Este índice indica a precisão do modelo matemático para esta predição específica.
@@ -306,7 +306,7 @@ export default defineComponent({
       // OVERRIDE: Se estiver a 90% ou mais da fiação, é CRÍTICO independente do status da IA
       if (this.heightPercent >= 90) return 'critical'
 
-      const s = String(this.data.aiPrediction.risk_status || this.data.status).toUpperCase()
+      const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'normal',
         MODERATE: 'moderate',
@@ -321,7 +321,7 @@ export default defineComponent({
       if (this.heightPercent >= 100) return 'CONTATO COM FIAÇÃO'
       if (this.heightPercent >= 90) return 'RISCO IMINENTE'
 
-      const s = String(this.data.aiPrediction.risk_status || this.data.status).toUpperCase()
+      const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'Risco Normal',
         MODERATE: 'Risco Moderado',
@@ -333,7 +333,7 @@ export default defineComponent({
     },
 
     riskIcon(): string {
-      const s = String(this.data.aiPrediction.risk_status || this.data.status).toUpperCase()
+      const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'mdi-shield-check',
         MODERATE: 'mdi-shield-alert',

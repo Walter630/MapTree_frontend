@@ -2,7 +2,7 @@
   <v-container class="login-container" fluid>
     <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh">
       <!-- Coluna do formulário -->
-      <v-col class="form-section" cols="12" md="5" lg="4">
+      <v-col class="form-section" cols="12" md="6">
         <!-- Logo fixo no canto superior esquerdo -->
         <div class="logo-fixed">
           <img src="/icons/LogoMapTree.png" alt="Logo" class="logo-img" />
@@ -13,6 +13,20 @@
           <!-- Formulário -->
           <div class="form-area">
             <h2 class="title mb-8">Bem-vindo(a)!</h2>
+
+            <!-- Alerta inline integrado ao formulário -->
+            <v-expand-transition>
+              <div
+                v-if="feedback.show"
+                class="form-alert"
+                :class="feedback.type === 'success' ? 'form-alert--success' : 'form-alert--error'"
+              >
+                <v-icon size="18" class="form-alert__icon">
+                  {{ feedback.type === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}
+                </v-icon>
+                <span class="form-alert__text">{{ feedback.message }}</span>
+              </div>
+            </v-expand-transition>
 
             <v-form ref="form" v-model="valid" lazy-validation class="login-form">
               <div class="field-group mb-6">
@@ -55,6 +69,7 @@
                 color="#C6F513"
                 size="large"
                 append-icon="mdi-arrow-right"
+                :loading="loading"
                 @click="login"
               >
                 entrar
@@ -103,6 +118,8 @@
           </div>
         </div>
 
+
+
         <!-- Termos no rodapé -->
         <div class="terms-footer">
           <a href="#" @click.prevent="showTerms">Termos e Condições</a>
@@ -115,7 +132,7 @@
       <v-col
         class="info-section"
         cols="12"
-        md="8"
+        md="6"
         :style="isMobile ? 'display: none;' : 'padding: 20px; text-align: center;'"
       >
         <div class="info-text">
@@ -141,6 +158,12 @@ export default defineComponent({
       showPassword: false,
       valid: false,
       isMobile: false,
+      loading: false,
+      feedback: {
+        show: false,
+        message: '',
+        type: 'error' as 'error' | 'success',
+      },
     }
   },
   mounted() {
@@ -154,7 +177,22 @@ export default defineComponent({
     checkIsMobile() {
       this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
     },
+    notify(message: string, type: 'error' | 'success' = 'error') {
+      this.feedback.message = message
+      this.feedback.type = type
+      this.feedback.show = true
+    },
     async login() {
+      // Limpa feedback anterior
+      this.feedback.show = false
+
+      // Validação básica de campos vazios
+      if (!this.username || !this.password) {
+        this.notify('Preencha o e-mail e a senha para continuar.')
+        return
+      }
+
+      this.loading = true
       try {
         const response = await this.$api.post<LoginResponse>('/auth/login', {
           email: this.username,
@@ -163,16 +201,49 @@ export default defineComponent({
 
         if (response.data) {
           // Save access token (refresh token comes via HTTP-only cookie) and user info in the store
-          this.$api.setToken(response.data.accessToken);
+          this.$api.setToken(response.data.accessToken)
           // Save user info in the store
-          this.$store.setUser(response.data.user);
+          this.$store.setUser(response.data.user)
           // Redirect based on user role
           this.$router.push(`/${response.data.user.role.toLowerCase()}`)
         }
       } catch (error) {
         console.error('Login failed:', error)
-        throw error
+        this.notify(this.getLoginErrorMessage(error))
+      } finally {
+        this.loading = false
       }
+    },
+    getLoginErrorMessage(error: unknown): string {
+      const err = error as {
+        response?: { status?: number; data?: { message?: string | string[] } }
+        code?: string
+      }
+
+      // Sem resposta do servidor (offline / API fora do ar)
+      if (!err.response) {
+        return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
+      }
+
+      const status = err.response.status
+      const backendMsg = err.response.data?.message
+      const msgText = Array.isArray(backendMsg) ? backendMsg.join(', ') : backendMsg
+
+      // Mensagens mais amigáveis para os casos comuns
+      if (status === 401 || status === 400) {
+        return 'E-mail ou senha incorretos. Verifique seus dados e tente novamente.'
+      }
+      if (status === 404) {
+        return 'E-mail não cadastrado.'
+      }
+      if (status === 403) {
+        return msgText || 'Sua conta está inativa ou sem permissão de acesso.'
+      }
+      if (status && status >= 500) {
+        return 'Erro no servidor. Tente novamente em instantes.'
+      }
+
+      return msgText || 'Não foi possível fazer login. Tente novamente.'
     },
     loginWithGoogle() {
       // Lógica de login com Google aqui
@@ -235,14 +306,14 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   justify-content: center;
   padding: 80px 0 40px;
 }
 
 .form-area {
   width: 100%;
-  max-width: 400px;
+  max-width: 440px;
   margin: 0 auto;
 }
 
@@ -259,7 +330,7 @@ export default defineComponent({
 }
 
 .title {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
   text-align: center;
@@ -291,11 +362,11 @@ export default defineComponent({
   position: relative;
   align-items: center;
   padding: 20px;
-  width: 832px;
+  /* largura controlada pelo grid (md="6" = 50%) */
 }
 
 .info-text h1 {
-  font-size: 96px;
+  font-size: clamp(2.5rem, 6vw, 5rem);
   font-weight: bold;
   color: #000;
   font-family: 'K2D', sans-serif;
@@ -344,10 +415,17 @@ export default defineComponent({
 /* Labels dos campos */
 .field-label {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: #555;
   margin-bottom: 6px;
+}
+
+/* Botões um pouco maiores (aumento sutil) */
+.login-form .v-btn {
+  min-height: 52px;
+  font-size: 1rem;
+  letter-spacing: 0.3px;
 }
 
 /* Ajustes nos botões sociais */
@@ -368,6 +446,66 @@ export default defineComponent({
 
 /* Input fields */
 :deep(.v-field__input) {
-  font-size: 0.95rem;
+  font-size: 1rem;
+}
+
+/* Alerta inline integrado ao formulário */
+.form-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  line-height: 1.3;
+}
+
+.form-alert__icon {
+  flex-shrink: 0;
+}
+
+.form-alert__text {
+  flex: 1;
+}
+
+.form-alert--error {
+  background-color: #fdecec;
+  border-color: #f6c6c6;
+  color: #b3261e;
+}
+
+.form-alert--success {
+  background-color: #eef9e7;
+  border-color: #cfe9bb;
+  color: #3d7a1f;
+}
+
+/* Link "Cadastre-se" */
+.register-link {
+  color: #1976d2;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+/* Link "Esqueceu sua senha?" */
+.forgot-password {
+  color: #000;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
 }
 </style>

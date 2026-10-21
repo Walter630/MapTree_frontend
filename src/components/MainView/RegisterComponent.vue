@@ -12,6 +12,20 @@
         <div style="width: 347px; margin: 0 auto;">
           <h2 class="title">Bem-vindo(a)!</h2>
 
+          <!-- Alerta inline integrado ao formulário -->
+          <v-expand-transition>
+            <div
+              v-if="feedback.show"
+              class="form-alert"
+              :class="feedback.type === 'success' ? 'form-alert--success' : 'form-alert--error'"
+            >
+              <v-icon size="18" class="form-alert__icon">
+                {{ feedback.type === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}
+              </v-icon>
+              <span class="form-alert__text">{{ feedback.message }}</span>
+            </div>
+          </v-expand-transition>
+
           <v-form ref="form" v-model="valid" lazy-validation>
             <p>Nome</p>
             <v-text-field
@@ -89,6 +103,7 @@
               color="#C6F513"
               style="display: flex; align-items: center; flex-direction: row;"
               append-icon="mdi-arrow-right"
+              :loading="loading"
               @click="registrar"
             >
               Registrar
@@ -113,6 +128,7 @@
             Política de Privacidade
           </div>
         </div>
+
       </v-col>
 
       <!-- Coluna direita -->
@@ -149,6 +165,12 @@ export default {
       showPassword: false,
       valid: true,
       isMobile: window.innerWidth < 768,
+      loading: false,
+      feedback: {
+        show: false,
+        message: '',
+        type: 'error' as 'error' | 'success',
+      },
     }
   },
 
@@ -161,18 +183,75 @@ export default {
   },
 
   methods: {
+    notify(message: string, type: 'error' | 'success' = 'error') {
+      this.feedback.message = message
+      this.feedback.type = type
+      this.feedback.show = true
+    },
+    validateForm(): string | null {
+      const { name, cpf, phone, email, password } = this.formData
+      if (!name || !cpf || !phone || !email || !password) {
+        return 'Preencha todos os campos para se cadastrar.'
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        return 'Informe um e-mail válido.'
+      }
+      if (password.length < 6) {
+        return 'A senha deve ter pelo menos 6 caracteres.'
+      }
+      return null
+    },
     async registrar() {
+      this.feedback.show = false
+
+      const validationError = this.validateForm()
+      if (validationError) {
+        this.notify(validationError)
+        return
+      }
+
+      this.loading = true
       try {
-        const response = await this.$api.post<User>('/auth/register', this.formData);
-        if (response.status === 201) {
-          this.$router.push('/login')
+        const response = await this.$api.post<User>('/auth/register', this.formData)
+        if (response.status === 201 || response.status === 200) {
+          this.notify('Cadastro realizado com sucesso! Redirecionando para o login...', 'success')
+          setTimeout(() => this.$router.push('/login'), 1200)
         } else {
-          console.log('Erro no registro: ', response);
+          this.notify('Não foi possível concluir o cadastro. Tente novamente.')
         }
       } catch (error) {
-        console.error('Erro no registro: ', error);
-        alert('Erro no registro: ' + error)
+        console.error('Erro no registro: ', error)
+        this.notify(this.getRegisterErrorMessage(error))
+      } finally {
+        this.loading = false
       }
+    },
+    getRegisterErrorMessage(error: unknown): string {
+      const err = error as {
+        response?: { status?: number; data?: { message?: string | string[] } }
+      }
+
+      if (!err.response) {
+        return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
+      }
+
+      const status = err.response.status
+      const backendMsg = err.response.data?.message
+      const msgText = Array.isArray(backendMsg) ? backendMsg.join(', ') : backendMsg
+
+      // 409 (conflito) ou mensagem do backend mencionando duplicidade
+      if (status === 409 || (msgText && /já|exist|cadastrad|duplicat/i.test(msgText))) {
+        return msgText || 'E-mail ou CPF já cadastrado.'
+      }
+      if (status === 400) {
+        return msgText || 'Dados inválidos. Verifique os campos e tente novamente.'
+      }
+      if (status && status >= 500) {
+        return 'Erro no servidor. Tente novamente em instantes.'
+      }
+
+      return msgText || 'Não foi possível concluir o cadastro. Tente novamente.'
     },
     checkMobile() {
       this.isMobile = window.innerWidth < 768
@@ -275,5 +354,39 @@ export default {
   margin-top: 40px;
   color: gray;
   text-align: center;
+}
+
+/* Alerta inline integrado ao formulário */
+.form-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  line-height: 1.3;
+}
+
+.form-alert__icon {
+  flex-shrink: 0;
+}
+
+.form-alert__text {
+  flex: 1;
+}
+
+.form-alert--error {
+  background-color: #fdecec;
+  border-color: #f6c6c6;
+  color: #b3261e;
+}
+
+.form-alert--success {
+  background-color: #eef9e7;
+  border-color: #cfe9bb;
+  color: #3d7a1f;
 }
 </style>

@@ -208,7 +208,7 @@ export default defineComponent({
 
     async getAllUsers(): Promise<void> {
       try {
-        const response = await this.$api.get<Funcionario[]>('/funcionario')
+        const response = await this.$api.get<Funcionario[]>('/users')
         this.allUsers = response.data.map((user) => ({
           ...user,
           isActive: user.isActive ?? true,
@@ -225,16 +225,18 @@ export default defineComponent({
       if (!this.dialogEdit.item) return
       try {
         this.dialogEdit.loading = true
-        await this.$api.put(`/funcionario/${this.dialogEdit.item.id}`, {
+        // Obs.: não enviamos "role" aqui — o backend só permite que um ADMIN
+        // altere a role de um usuário (gestor recebe 403 se enviar role).
+        await this.$api.patch(`/users/${this.dialogEdit.item.id}`, {
           name: this.dialogEdit.item.name,
           email: this.dialogEdit.item.email,
           cpf: this.onlyDigits(this.dialogEdit.item.cpf),
           phone: this.onlyDigits(this.dialogEdit.item.phone),
-          role: this.dialogEdit.item.role,
         })
         this.notify('Funcionário atualizado!', 'success')
       } catch (error) {
         console.error('Erro ao editar:', error)
+        this.notify('Não foi possível atualizar o funcionário.', 'error')
       } finally {
         await this.getAllUsers()
         this.closeDialogEdit()
@@ -273,7 +275,7 @@ export default defineComponent({
       if (!this.dialogDelete.item) return
       try {
         this.dialogDelete.loading = true
-        await this.$api.delete(`/funcionario/${this.dialogDelete.item.id}`)
+        await this.$api.delete(`/users/${this.dialogDelete.item.id}`)
         this.notify('Usuário removido.', 'success')
       } catch (error) {
         console.error('Erro ao excluir:', error)
