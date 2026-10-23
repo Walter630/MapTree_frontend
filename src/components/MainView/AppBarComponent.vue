@@ -1,6 +1,6 @@
 <template>
   <!-- ===== Desktop AppBar ===== -->
-  <v-app-bar v-if="!isMobile" color="white" flat class="appbar-desktop">
+  <v-app-bar v-if="!isMobile" color="white" flat height="56" class="appbar-desktop">
     <!-- Logo -->
     <div class="logo-container" @click="goToHome()">
       <img
@@ -20,10 +20,10 @@
         :key="item.to"
         variant="text"
         class="mr-2"
-        :color="isActive(item.to) ? 'black' : 'grey-darken-2'"
+        :color="isActive(item.to) ? 'green-darken-2' : 'grey-darken-2'"
         @click="goTo(item.to)"
       >
-        <v-icon size="24" class="mr-1" :color="isActive(item.to) ? green : 'black'">
+        <v-icon size="24" class="mr-1 nav-icon-3d" :color="isActive(item.to) ? green : 'grey-darken-2'">
           {{ item.icon }}
         </v-icon>
         {{ item.title }}
@@ -35,11 +35,11 @@
     <!-- Notificações -->
     <v-btn
       icon
-      :color="isActive('/notifications') ? green : 'black'"
+      :color="isActive('/notifications') ? green : 'grey-darken-2'"
       class="notification-btn mr-5"
       @click="goToNotification()"
     >
-      <v-icon>mdi-bell-outline</v-icon>
+      <v-icon class="nav-icon-3d">mdi-bell-outline</v-icon>
     </v-btn>
 
     <!-- Menu do Usuário -->
@@ -315,12 +315,39 @@ export default {
   border-bottom: 1px solid #f0f0f0 !important;
 }
 
+/* Efeito de "volume/3D" nos ícones do menu — apenas sombra e profundidade
+   via CSS (sem WebGL, sem animação), então não pesa nada. Dá uma leve
+   elevação e relevo que faz o ícone parecer ter profundidade. */
+.nav-icon-3d {
+  filter:
+    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.18))
+    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.22));
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.nav-icon-3d:hover {
+  filter:
+    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.22))
+    drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
+  transform: translateY(-1px);
+}
+
+/* Alinha o conteúdo da barra (logo, menu, usuário) com a mesma largura
+   do conteúdo das páginas (page-shell = 1440px centralizado), para a barra
+   não parecer "mais larga" que o resto do dashboard. */
+.appbar-desktop :deep(.v-toolbar__content) {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
 .logo-container {
   height: 100%;
   display: flex;
   align-items: center;
   align-content: center;
-  padding-left: 20px;
   cursor: pointer;
 }
 

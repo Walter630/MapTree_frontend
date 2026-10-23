@@ -10,8 +10,28 @@
       ]"
     />
 
+    <!-- Resumo rápido -->
+    <div class="notif-summary mb-5">
+      <div class="notif-summary-item">
+        <span class="notif-summary-value">{{ notificacoes.length }}</span>
+        <span class="notif-summary-label">Total</span>
+      </div>
+      <div class="notif-summary-item notif-summary-item--danger">
+        <span class="notif-summary-value">{{ countByPriority('ALTA') }}</span>
+        <span class="notif-summary-label">Urgentes</span>
+      </div>
+      <div class="notif-summary-item notif-summary-item--warn">
+        <span class="notif-summary-value">{{ countByType('SCHEDULE') }}</span>
+        <span class="notif-summary-label">Agendamentos</span>
+      </div>
+      <div class="notif-summary-item notif-summary-item--ok">
+        <span class="notif-summary-value">{{ countByType('PRUNING') }}</span>
+        <span class="notif-summary-label">Relatórios</span>
+      </div>
+    </div>
+
     <!-- Abas -->
-    <v-tabs v-model="tab" density="comfortable" class="mb-4 tabs-container" grow>
+    <v-tabs v-model="tab" density="comfortable" class="mb-4 tabs-container" show-arrows>
       <v-tab value="todas">Todas</v-tab>
       <v-tab value="urgentes">Urgentes</v-tab>
       <v-tab value="agendamentos">Agendamentos</v-tab>
@@ -31,9 +51,9 @@
           <v-col v-for="notificacao in filteredNotifications" :key="notificacao.id" cols="12">
             <v-card
               flat
-              class="notification-card pa-5 mb-4 rounded-xl elevation-2"
+              class="notification-card pa-5 mb-4 rounded-xl"
               :class="{ 'notification-card-clickable': notificacao.link }"
-              border
+              :style="{ borderLeft: `4px solid ${prioColor(notificacao.prioridade)}` }"
               @click="goToNotificationLink(notificacao.link)"
             >
               <div class="d-flex justify-space-between align-start mb-2">
@@ -141,6 +161,23 @@ export default defineComponent({
   },
 
   methods: {
+    prioColor(prioridade: string): string {
+      const map: Record<string, string> = {
+        ALTA: '#e53935',
+        MEDIA: '#fb8c00',
+        BAIXA: '#2e7d32',
+      }
+      return map[prioridade] || '#cfcfcf'
+    },
+
+    countByPriority(p: string): number {
+      return this.notificacoes.filter((n) => n.prioridade === p).length
+    },
+
+    countByType(t: string): number {
+      return this.notificacoes.filter((n) => n.type === t).length
+    },
+
     getNotificationsByTab(tab: string) {
       if (tab === 'todas') return this.notificacoes
       if (tab === 'urgentes') return this.notificacoes.filter(n => n.prioridade === 'ALTA')
@@ -252,9 +289,53 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Resumo rápido de notificações */
+.notif-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.notif-summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  border-left: 4px solid #cfcfcf;
+}
+
+.notif-summary-item--danger { border-left-color: #e53935; }
+.notif-summary-item--warn { border-left-color: #fb8c00; }
+.notif-summary-item--ok { border-left-color: #2e7d32; }
+
+.notif-summary-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #2c3e2c;
+  line-height: 1;
+}
+
+.notif-summary-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #9a9a9a;
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .notif-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .tabs-container {
   box-shadow: none;
   background-color: #f6f6f6;
+  border-radius: 12px;
 }
 
 .notification-card {

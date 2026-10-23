@@ -8,8 +8,8 @@
 
     <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh;">
       <!-- Coluna do formulário -->
-      <v-col class="form-section" >
-        <div style="width: 347px; margin: 0 auto;">
+      <v-col class="form-section" cols="12" md="6">
+        <div class="form-area">
           <h2 class="title">Bem-vindo(a)!</h2>
 
           <!-- Alerta inline integrado ao formulário -->
@@ -27,66 +27,61 @@
           </v-expand-transition>
 
           <v-form ref="form" v-model="valid" lazy-validation>
-            <p>Nome</p>
+            <p class="field-label">Nome</p>
             <v-text-field
               v-model="formData.name"
               color="green"
-              class="mb-2"
-              dense
+              class="mb-3"
               hide-details
               variant="outlined"
               placeholder="Digite seu nome"
               required
-              density="compact"
+              density="comfortable"
             ></v-text-field>
 
-            <p>CPF</p>
+            <p class="field-label">CPF</p>
             <v-text-field
               v-model="formData.cpf"
               color="green"
-              class="mb-2"
-              dense
+              class="mb-3"
               hide-details
-              density="compact"
+              density="comfortable"
               variant="outlined"
               placeholder="Digite seu CPF"
               required
             ></v-text-field>
 
-            <p>Telefone</p>
+            <p class="field-label">Telefone</p>
             <v-text-field
               v-model="formData.phone"
               color="green"
-              class="mb-2"
-              dense
+              class="mb-3"
               hide-details
-              density="compact"
+              density="comfortable"
               variant="outlined"
               placeholder="Digite seu telefone"
               required
             ></v-text-field>
 
-            <p>Email</p>
+            <p class="field-label">Email</p>
             <v-text-field
               v-model="formData.email"
-              class="mb-2"
+              class="mb-3"
               color="green"
-              dense
               hide-details
-              density="compact"
+              density="comfortable"
               variant="outlined"
               placeholder="Digite seu email"
               required
             />
 
-            <p>Senha</p>
+            <p class="field-label">Senha</p>
             <v-text-field
               v-model="formData.password"
-              class="mb-2"
+              class="mb-3"
               color="green"
-              dense
               hide-details
-              density="compact"
+              density="comfortable"
               variant="outlined"
               placeholder="Digite sua senha"
               required
@@ -99,8 +94,9 @@
 
             <v-btn
               block
-              class="mb-4"
+              class="mb-4 register-btn"
               color="#C6F513"
+              size="large"
               style="display: flex; align-items: center; flex-direction: row;"
               append-icon="mdi-arrow-right"
               :loading="loading"
@@ -135,7 +131,7 @@
       <v-col
         class="info-section"
         cols="12"
-        md="8"
+        md="6"
         :style="isMobile ? 'display: none;' : 'padding: 20px; text-align: center;'"
       >
         <div class="info-text">
@@ -299,14 +295,41 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 608px;
+  min-height: 100vh;
+}
+
+/* Área do formulário (largura controlada, centralizada) */
+.form-area {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
 }
 
 /* Títulos */
 .title {
-  font-size: 24px;
+  font-size: 32px;
   font-weight: bold;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+}
+
+/* Labels dos campos */
+.field-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+/* Botão um pouco maior (aumento sutil) */
+.register-btn {
+  min-height: 52px;
+  font-size: 1rem;
+  letter-spacing: 0.3px;
+}
+
+/* Inputs com um pouco mais de presença */
+:deep(.v-field__input) {
+  font-size: 1rem;
 }
 
 /* Links */
@@ -327,11 +350,11 @@ export default {
   position: relative;
   align-items: center;
   padding: 20px;
-  width: 832px;
+  /* largura controlada pelo grid (md="6" = 50%) */
 }
 
 .info-text h1 {
-  font-size: 96px;
+  font-size: clamp(2.5rem, 6vw, 5rem);
   font-weight: bold;
   color: #000;
   font-family: 'K2D', sans-serif;

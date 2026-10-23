@@ -1,7 +1,7 @@
 <template>
   <v-container fluid class="page-shell">
     <!-- ===== Cabeçalho ===== -->
-    <v-row align="center" class="mb-8">
+    <v-row align="center" class="mb-3">
       <v-col cols="12">
         <p class="text-caption text-grey-darken-1 mb-1">Meu Painel</p>
         <p class="text-h6 font-weight-regular mb-0">
@@ -11,12 +11,12 @@
     </v-row>
 
     <!-- ===== Cards de Resumo Modernos ===== -->
-    <v-row class="mt-6" dense>
+    <v-row dense>
       <v-col cols="6" md="3">
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
             <span class="kpi-label">Árvores</span>
-            <v-icon size="20" color="green-darken-2">mdi-tree</v-icon>
+            <AnimatedKpiIcon type="tree" color="#2e7d32" />
           </div>
           <div class="kpi-value">{{ countTrees }}</div>
           <div class="kpi-subtitle">Cadastradas</div>
@@ -27,7 +27,7 @@
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
             <span class="kpi-label">Podas</span>
-            <v-icon size="20" color="blue-darken-2">mdi-content-cut</v-icon>
+            <AnimatedKpiIcon type="prune" color="#1565c0" />
           </div>
           <div class="kpi-value">{{ countPrunings }}</div>
           <div class="kpi-subtitle">Realizadas</div>
@@ -38,7 +38,7 @@
         <v-card class="kpi-card" :class="{ 'kpi-card--danger': countCritical > 0 }" flat>
           <div class="kpi-header">
             <span class="kpi-label">Áreas Críticas</span>
-            <v-icon size="20" :color="countCritical > 0 ? 'error' : 'grey'">mdi-alert</v-icon>
+            <AnimatedKpiIcon type="alert" :color="countCritical > 0 ? '#d32f2f' : '#9e9e9e'" />
           </div>
           <div class="kpi-value" :class="{ 'text-error': countCritical > 0 }">{{ countCritical }}</div>
           <div class="kpi-subtitle">Em risco</div>
@@ -49,7 +49,7 @@
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
             <span class="kpi-label">Espécies</span>
-            <v-icon size="20" color="orange-darken-2">mdi-sprout</v-icon>
+            <AnimatedKpiIcon type="sprout" color="#ef6c00" />
           </div>
           <div class="kpi-value">{{ countSpecies }}</div>
           <div class="kpi-subtitle">Catalogadas</div>
@@ -58,7 +58,7 @@
     </v-row>
 
     <!-- ===== Seção: Mapa + Gráfico + Alertas ===== -->
-    <v-row class="mb-6 mt-10" dense>
+    <v-row class="mb-6 mt-6" dense>
       <!-- Mapa de Risco - Design Premium -->
       <v-col cols="12" md="5">
         <v-card class="risk-map-card" flat>
@@ -88,7 +88,7 @@
             <MiniMap
               ref="miniMapRef"
               filter-status="TO_PRUNE"
-              style="height: 260px; width: 100%;"
+              style="height: 100%; width: 100%;"
             />
             <div class="risk-overlay-badge">
               <v-chip color="error" size="small" variant="flat" class="font-weight-bold">
@@ -121,26 +121,61 @@
               </div>
               <div>
                 <p class="risk-list-title mb-0">Lista de Alertas</p>
-                <p class="risk-list-subtitle mb-0">{{ filteredTrees.length }} árvores pendentes</p>
+                <p class="risk-list-subtitle mb-0">{{ alertTrees.length }} de {{ filteredTrees.length }} árvores</p>
               </div>
+            </div>
+          </div>
+
+          <!-- Busca + filtros para localizar uma árvore específica -->
+          <div class="risk-list-tools">
+            <v-text-field
+              v-model="alertSearch"
+              placeholder="Buscar por código ou coordenada"
+              prepend-inner-icon="mdi-magnify"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+            <div class="risk-filter-chips mt-2">
+              <v-chip
+                v-for="opt in alertFilters"
+                :key="opt.value"
+                :color="alertFilter === opt.value ? 'green-darken-1' : undefined"
+                :variant="alertFilter === opt.value ? 'flat' : 'tonal'"
+                size="small"
+                class="font-weight-bold"
+                @click="alertFilter = opt.value"
+              >
+                {{ opt.label }}
+              </v-chip>
             </div>
           </div>
 
           <div class="risk-list-container">
             <v-card
-              v-for="tree in filteredTrees"
+              v-for="tree in alertTrees"
               :key="tree.id"
               class="risk-item mb-2"
               flat
               @click="focusOnTree(tree)"
             >
               <div class="d-flex align-center">
-                <div class="risk-indicator mr-3">
-                  <v-icon size="18" color="error">mdi-alert-circle</v-icon>
+                <div
+                  class="risk-indicator mr-3"
+                  :class="tree.status === 'TO_PRUNE' ? 'risk-indicator--warn' : 'risk-indicator--crit'"
+                >
+                  <v-icon size="18" :color="tree.status === 'TO_PRUNE' ? 'orange-darken-2' : 'error'">
+                    {{ tree.status === 'TO_PRUNE' ? 'mdi-content-cut' : 'mdi-alert-circle' }}
+                  </v-icon>
                 </div>
                 <div class="flex-grow-1">
-                  <p class="risk-item-title mb-0">{{ tree.status === 'TO_PRUNE' ? 'Poda Urgente' : 'Risco Crítico' }}</p>
+                  <div class="d-flex align-center" style="gap: 6px;">
+                    <span class="risk-item-code">#{{ treeCode(tree) }}</span>
+                    <span class="risk-item-title">{{ tree.status === 'TO_PRUNE' ? 'Poda Urgente' : 'Risco Crítico' }}</span>
+                  </div>
                   <p class="risk-item-coords mb-0">
+                    <v-icon size="11" class="mr-1">mdi-map-marker</v-icon>
                     {{ (tree.lat || tree.latitude || 0).toFixed(4) }}, {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
                   </p>
                 </div>
@@ -148,7 +183,11 @@
               </div>
             </v-card>
 
-            <div v-if="filteredTrees.length === 0" class="text-center py-6 empty-state">
+            <div v-if="alertTrees.length === 0 && filteredTrees.length > 0" class="text-center py-6 empty-state">
+              <v-icon size="40" color="grey-lighten-1">mdi-magnify-close</v-icon>
+              <p class="text-body-2 text-grey mt-2">Nenhuma árvore encontrada para esta busca</p>
+            </div>
+            <div v-else-if="filteredTrees.length === 0" class="text-center py-6 empty-state">
               <v-icon size="40" color="success-lighten-2">mdi-shield-check</v-icon>
               <p class="text-body-2 text-grey mt-2">Sem alertas pendentes</p>
             </div>
@@ -167,18 +206,24 @@
             Espécies por localidade
           </p>
           <div class="species-list-container" style="max-height: 300px; overflow-y: auto;">
-            <div v-for="spec in topSpecies" :key="spec.id" class="mb-4 pr-2">
-              <div class="d-flex justify-space-between align-center mb-1">
-                <span class="text-body-2 font-weight-bold">{{ spec.commonName || spec.scientificName }}</span>
-                <span class="text-caption text-grey-darken-1">{{ spec._count?.trees || 0 }} árvores</span>
+            <div
+              v-for="spec in topSpecies"
+              :key="spec.id"
+              class="species-item"
+            >
+              <div class="species-icon">
+                <v-icon color="green-darken-1" size="22">mdi-tree</v-icon>
               </div>
-              <v-progress-linear
-                :model-value="(spec._count?.trees / (countTrees || 1)) * 100"
-                color="green-darken-1"
-                height="8"
-                rounded
-                striped
-              />
+              <div class="species-info">
+                <span class="species-name">{{ spec.commonName || spec.scientificName }}</span>
+                <span v-if="spec.scientificName && spec.commonName" class="species-sci">
+                  {{ spec.scientificName }}
+                </span>
+              </div>
+              <div class="species-count">
+                <span class="species-count-value">{{ spec._count?.trees || 0 }}</span>
+                <span class="species-count-label">árvores</span>
+              </div>
             </div>
             <div v-if="topSpecies.length === 0" class="text-center py-8">
               <v-icon color="grey-lighten-2" size="48">mdi-leaf-off</v-icon>
@@ -325,6 +370,7 @@
 import { defineComponent } from 'vue'
 import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
 import PruningChart from '@/components/functions/GraficosView/PruningChart.vue'
+import AnimatedKpiIcon from '@/components/shared/AnimatedKpiIcon.vue'
 import { useAuth } from '@/hooks/useAuth'
 
 /* ===================================
@@ -379,7 +425,7 @@ interface ReportHeader {
 export default defineComponent({
   name: 'ManagerHomeView',
 
-  components: { MiniMap, PruningChart },
+  components: { MiniMap, PruningChart, AnimatedKpiIcon },
 
   data() {
     return {
@@ -402,6 +448,15 @@ export default defineComponent({
       showAllReports: false,
       selectedReport: null as any,
 
+      // Lista de alertas: busca e filtro
+      alertSearch: '',
+      alertFilter: 'ALL' as 'ALL' | 'TO_PRUNE' | 'CRITICAL',
+      alertFilters: [
+        { label: 'Todas', value: 'ALL' },
+        { label: 'Poda Urgente', value: 'TO_PRUNE' },
+        { label: 'Crítico', value: 'CRITICAL' },
+      ] as { label: string; value: 'ALL' | 'TO_PRUNE' | 'CRITICAL' }[],
+
       reportHeaders: [
         { title: 'Localização', key: 'localizacao' },
         { title: 'Status', key: 'status' },
@@ -417,7 +472,45 @@ export default defineComponent({
     this.getPrunings()
   },
 
+  computed: {
+    /** Lista de alertas após aplicar filtro de tipo + busca por código/coordenada */
+    alertTrees(): Tree[] {
+      let list = this.filteredTrees
+
+      // Filtro por tipo
+      if (this.alertFilter === 'TO_PRUNE') {
+        list = list.filter((t) => t.status === 'TO_PRUNE')
+      } else if (this.alertFilter === 'CRITICAL') {
+        list = list.filter((t) => t.status !== 'TO_PRUNE')
+      }
+
+      // Busca por código ou coordenada (texto livre)
+      const q = this.alertSearch?.trim().toLowerCase()
+      if (q) {
+        list = list.filter((t) => {
+          const code = this.treeCode(t).toLowerCase()
+          const lat = (t.lat || t.latitude || 0).toFixed(4)
+          const lng = (t.lng || t.longitude || 0).toFixed(4)
+          return (
+            code.includes(q) ||
+            lat.includes(q) ||
+            lng.includes(q) ||
+            `${lat}, ${lng}`.includes(q)
+          )
+        })
+      }
+
+      return list
+    },
+  },
+
   methods: {
+    /** Código curto e amigável da árvore (ex.: usa o fim do id) */
+    treeCode(tree: Tree): string {
+      const id = String(tree.id ?? '')
+      return id ? id.slice(-4).toUpperCase() : '----'
+    },
+
     goToMap() {
       this.$router.push('/manager/map')
     },
@@ -522,7 +615,12 @@ export default defineComponent({
   border: 1px solid #e0e0e0;
   border-radius: 12px;
   padding: 16px;
-  height: 100%;
+  /* Altura fixa para todos os cards ficarem idênticos,
+     independente do tamanho do número ou do conteúdo. */
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   transition: all 0.2s ease;
 }
 
@@ -540,7 +638,6 @@ export default defineComponent({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
 }
 
 .kpi-label {
@@ -573,6 +670,11 @@ export default defineComponent({
   border: 1px solid #cdcdcd;
   background-color: white;
   border-radius: 12px;
+  /* Altura padronizada com os outros cards da linha */
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .section-title {
@@ -581,6 +683,82 @@ export default defineComponent({
   margin-bottom: 12px;
   display: flex;
   align-items: center;
+}
+
+/* ===== Lista de Espécies (cards) ===== */
+.species-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  transition: all 0.18s ease;
+}
+
+.species-item:hover {
+  border-color: #c6e6c0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+.species-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaf6e6;
+  border-radius: 10px;
+}
+
+.species-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.species-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2c3e2c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.species-sci {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: #9a9a9a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.species-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  line-height: 1.1;
+}
+
+.species-count-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.species-count-label {
+  font-size: 0.68rem;
+  color: #9a9a9a;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 /* ===== Alertas ===== */
@@ -621,6 +799,10 @@ export default defineComponent({
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid #e0e0e0;
+  /* Altura padronizada com os outros cards da linha */
+  height: 400px;
+  display: flex;
+  flex-direction: column;
 }
 
 .risk-map-header {
@@ -663,7 +845,8 @@ export default defineComponent({
 
 .risk-map-container {
   position: relative;
-  height: 260px;
+  flex: 1;
+  min-height: 0;
 }
 
 .risk-overlay-badge {
@@ -679,8 +862,8 @@ export default defineComponent({
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid #e0e0e0;
-  height: 100%;
-  max-height: 400px;
+  /* Altura padronizada com os outros cards da linha */
+  height: 400px;
   display: flex;
   flex-direction: column;
 }
@@ -717,7 +900,7 @@ export default defineComponent({
   flex: 1;
   overflow-y: auto;
   padding: 12px;
-  max-height: 320px;
+  min-height: 0;
 }
 
 .risk-list-container::-webkit-scrollbar {
@@ -765,6 +948,45 @@ export default defineComponent({
   font-size: 0.75rem;
   color: #888;
   font-family: monospace;
+  display: flex;
+  align-items: center;
+}
+
+/* Ferramentas de busca/filtro da lista de alertas */
+.risk-list-tools {
+  padding: 12px 16px 4px;
+  border-bottom: 1px solid #f3f3f3;
+}
+
+.risk-filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Código curto da árvore (ex.: #1054) */
+.risk-item-code {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2e7d32;
+  background: #eaf6e6;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-family: monospace;
+}
+
+/* Variações de cor do indicador por tipo */
+.risk-indicator--warn {
+  background: rgba(230, 126, 0, 0.12);
+}
+
+.risk-indicator--crit {
+  background: rgba(200, 12, 52, 0.1);
+}
+
+/* Hover muda a cor conforme o tipo seria ideal, mas mantemos neutro */
+.risk-item:hover .risk-indicator--warn {
+  background: rgba(230, 126, 0, 0.18);
 }
 
 .empty-state {

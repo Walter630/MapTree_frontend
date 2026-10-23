@@ -44,6 +44,17 @@
         <span class="font-weight-medium">{{ data.aiPrediction?.alert }}</span>
       </v-alert>
 
+      <!-- ===== Resumo em linguagem simples (para qualquer usuário) ===== -->
+      <div class="plain-summary mb-6" :class="`plain-summary--${riskClass}`">
+        <div class="plain-summary-icon">
+          <v-icon size="26" color="white">{{ riskIcon }}</v-icon>
+        </div>
+        <div class="plain-summary-text">
+          <p class="plain-summary-title mb-1">{{ plainSummary.title }}</p>
+          <p class="plain-summary-desc mb-0">{{ plainSummary.description }}</p>
+        </div>
+      </div>
+
       <!-- ===== Progresso Altura vs Fio ===== -->
       <div class="section-block mb-6">
         <div class="section-header">
@@ -122,7 +133,7 @@
       <div class="section-block mb-6">
         <div class="section-header mb-4">
           <v-icon size="22" class="mr-2" color="green-darken-1">mdi-brain</v-icon>
-          <span class="section-title">Análise de Redes Neurais</span>
+          <span class="section-title">Análise da Inteligência Artificial</span>
         </div>
 
         <v-row dense>
@@ -152,7 +163,7 @@
                 <div class="insight-badge r-badge">
                   <v-icon size="20" color="white">mdi-chart-bell-curve-cumulative</v-icon>
                 </div>
-                <span class="insight-label">R (Confiabilidade)</span>
+                <span class="insight-label">Confiança da Previsão</span>
               </div>
               <div class="insight-main mt-3">
                 <div class="d-flex align-center justify-space-between mb-2">
@@ -163,7 +174,7 @@
                   <div class="modern-progress-fill" :style="{ width: ((data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100) + '%' }" />
                 </div>
                 <p class="text-caption r-desc">
-                  Este índice indica a precisão do modelo matemático para esta predição específica.
+                  O quanto a IA está confiante nesta previsão. Quanto maior, mais precisa é a estimativa.
                 </p>
               </div>
             </div>
@@ -342,6 +353,36 @@ export default defineComponent({
         UNDER_OBSERVATION: 'mdi-eye-outline',
       }
       return map[s] || 'mdi-shield-check'
+    },
+
+    /* ---------- Resumo em linguagem simples (para leigos) ---------- */
+    plainSummary(): { title: string; description: string } {
+      const pct = this.heightPercent
+      const faltam = this.remainingMeters
+      const meses = this.data.aiPrediction?.months_to_wire
+
+      // Texto sobre o tempo, quando disponível e relevante
+      const tempoTxt =
+        meses && meses > 0 && pct < 100
+          ? ` No ritmo de crescimento estimado, levará cerca de ${Math.round(meses)} ${Math.round(meses) === 1 ? 'mês' : 'meses'} para se aproximar da fiação.`
+          : ''
+
+      if (pct >= 90) {
+        return {
+          title: 'Situação: Crítica — poda urgente',
+          description: `Esta árvore já está muito próxima da fiação elétrica (faltam cerca de ${faltam}m). Há risco de contato com os fios. Recomendamos agendar uma poda com prioridade.`,
+        }
+      }
+      if (pct >= 70) {
+        return {
+          title: 'Situação: Atenção',
+          description: `Esta árvore está se aproximando da fiação (faltam cerca de ${faltam}m).${tempoTxt} Vale manter sob observação e planejar uma poda.`,
+        }
+      }
+      return {
+        title: 'Situação: Segura',
+        description: `Esta árvore está a uma distância segura da fiação (faltam cerca de ${faltam}m).${tempoTxt} Nenhuma ação urgente é necessária no momento.`,
+      }
     },
 
     /* ---------- Altura ---------- */
@@ -591,6 +632,71 @@ export default defineComponent({
 /* ============ BODY ============ */
 .card-body {
   padding: 24px !important;
+}
+
+/* ============ RESUMO EM LINGUAGEM SIMPLES ============ */
+.plain-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+}
+
+.plain-summary-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plain-summary-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #263238;
+}
+
+.plain-summary-desc {
+  font-size: 0.875rem;
+  color: #455a64;
+  line-height: 1.45;
+}
+
+/* Variações por nível de risco */
+.plain-summary--normal {
+  background: #edf7ee;
+  border-color: #c8e6c9;
+}
+.plain-summary--normal .plain-summary-icon {
+  background: #43a047;
+}
+
+.plain-summary--observation {
+  background: #fff8e1;
+  border-color: #ffe082;
+}
+.plain-summary--observation .plain-summary-icon {
+  background: #f9a825;
+}
+
+.plain-summary--moderate {
+  background: #fff3e0;
+  border-color: #ffcc80;
+}
+.plain-summary--moderate .plain-summary-icon {
+  background: #fb8c00;
+}
+
+.plain-summary--critical {
+  background: #fdecec;
+  border-color: #f6c6c6;
+}
+.plain-summary--critical .plain-summary-icon {
+  background: #e53935;
 }
 
 /* ============ AI ALERT ============ */

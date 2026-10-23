@@ -25,37 +25,87 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-12" style="background-color: #f6f6f6; border-radius: 8px">
-      <v-col cols="12" class="pa-0">
-        <p class="table-title-text mb-4" style="font-size: 20px">Gestores Cadastradas</p>
-        <v-data-table
-          :headers="headers"
-          :items="users"
-          :search="search"
-          :loading="loading"
-          class="elevation-0 modern-table"
-        >
-          <template #[`item.name`]="{ item }">
-            <span class="font-weight-bold">{{ item.name }}</span>
-          </template>
+    <v-card flat class="employees-card mt-6">
+      <!-- Cabeçalho do card: título + busca -->
+      <div class="employees-card-header">
+        <div class="d-flex align-center">
+          <v-icon color="green-darken-1" class="mr-2">mdi-account-group</v-icon>
+          <div>
+            <p class="employees-card-title mb-0">Funcionários cadastrados</p>
+            <p class="employees-card-subtitle mb-0">
+              {{ users.length }} {{ users.length === 1 ? 'registro' : 'registros' }}
+            </p>
+          </div>
+        </div>
+        <v-text-field
+          v-model="search"
+          placeholder="Buscar por nome, e-mail ou CPF"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
+          class="employees-search"
+        />
+      </div>
 
-          <template #[`item.isActive`]="{ item }">
-            <v-chip :color="item.isActive ? 'green-darken-1' : 'red-darken-1'" size="x-small" variant="flat" class="font-weight-bold">
-              {{ item.isActive ? 'ATIVO' : 'INATIVO' }}
-            </v-chip>
-          </template>
+      <v-divider />
 
-          <template #[`item.acoes`]="{ item }">
-             <v-btn icon size="x-small" variant="text" color="blue-grey-darken-2" @click="openDialogEdit(item)">
-                <v-icon>mdi-pencil-outline</v-icon>
-             </v-btn>
-             <v-btn icon size="x-small" variant="text" color="red-darken-2" @click="openDialogDelete(item)">
-                <v-icon>mdi-trash-can-outline</v-icon>
-             </v-btn>
-          </template>
-        </v-data-table>
-      </v-col>
-    </v-row>
+      <v-data-table
+        :headers="headers"
+        :items="users"
+        :search="search"
+        :loading="loading"
+        class="elevation-0 modern-table"
+        hover
+      >
+        <template #[`item.name`]="{ item }">
+          <div class="d-flex align-center py-1">
+            <v-avatar size="34" color="green-lighten-5" class="mr-3">
+              <span class="text-green-darken-2 font-weight-bold">{{ getInitials(item.name) }}</span>
+            </v-avatar>
+            <div class="d-flex flex-column">
+              <span class="font-weight-bold text-body-2">{{ item.name }}</span>
+              <span class="text-caption text-grey-darken-1">{{ item.email }}</span>
+            </div>
+          </div>
+        </template>
+
+        <template #[`item.cpf`]="{ item }">
+          <span class="text-body-2 text-grey-darken-2">{{ formatCpf(item.cpf) }}</span>
+        </template>
+
+        <template #[`item.isActive`]="{ item }">
+          <v-chip
+            :color="item.isActive ? 'green-darken-1' : 'red-darken-1'"
+            size="small"
+            variant="tonal"
+            class="font-weight-bold"
+          >
+            <v-icon start size="14">{{ item.isActive ? 'mdi-check-circle' : 'mdi-close-circle' }}</v-icon>
+            {{ item.isActive ? 'Ativo' : 'Inativo' }}
+          </v-chip>
+        </template>
+
+        <template #[`item.acoes`]="{ item }">
+          <v-btn icon size="small" variant="text" color="blue-grey-darken-2" @click="openDialogEdit(item)">
+            <v-icon>mdi-pencil-outline</v-icon>
+            <v-tooltip activator="parent" location="top">Editar</v-tooltip>
+          </v-btn>
+          <v-btn icon size="small" variant="text" color="red-darken-2" @click="openDialogDelete(item)">
+            <v-icon>mdi-trash-can-outline</v-icon>
+            <v-tooltip activator="parent" location="top">Excluir</v-tooltip>
+          </v-btn>
+        </template>
+
+        <template #no-data>
+          <div class="text-center py-10">
+            <v-icon size="48" color="grey-lighten-1">mdi-account-off-outline</v-icon>
+            <p class="text-body-2 text-grey mt-2">Nenhum funcionário encontrado</p>
+          </div>
+        </template>
+      </v-data-table>
+    </v-card>
     
     <v-dialog v-model="dialogEdit.active" max-width="500px">
       <v-card v-if="dialogEdit.item" class="rounded-xl pa-4">
@@ -261,6 +311,22 @@ export default defineComponent({
       return value?.replace(/\D/g, '') ?? ''
     },
 
+    /** Iniciais do nome para o avatar (ex.: "João Silva" -> "JS") */
+    getInitials(name: string): string {
+      if (!name) return '?'
+      const parts = name.trim().split(/\s+/)
+      const first = parts[0]?.[0] ?? ''
+      const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : ''
+      return (first + last).toUpperCase()
+    },
+
+    /** Formata CPF para 000.000.000-00 (apenas visual) */
+    formatCpf(cpf: string): string {
+      const digits = this.onlyDigits(cpf)
+      if (digits.length !== 11) return cpf || '—'
+      return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+    },
+
     /** 🔹 Usuário logado */
     getCurrentUser() {
       return this.$api?.isAuthenticated() ?? {}
@@ -316,20 +382,64 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.v-select.ml-2 :deep(.v-field__input) {
-  padding-top: 5px;
-  padding-bottom: 5px;
-}
 .new-funcionario-btn {
-  height: 42px !important;
+  height: 44px !important;
   background: #c6f513 !important;
-  border-radius: 8px;
-  margin-top: 10px !important;
-  margin-bottom: 10px !important;
+  border-radius: 10px;
 }
-.table-title-text {
-  font-size: 15px;
-  margin-bottom: 8px !important;
-  padding: 10px !important;
+
+/* Card que envolve a tabela */
+.employees-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.employees-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  flex-wrap: wrap;
+}
+
+.employees-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2c3e2c;
+}
+
+.employees-card-subtitle {
+  font-size: 0.78rem;
+  color: #9a9a9a;
+}
+
+.employees-search {
+  max-width: 320px;
+  flex: 1 1 240px;
+}
+
+/* Tabela */
+.modern-table {
+  background: transparent;
+}
+
+.modern-table :deep(thead th) {
+  font-weight: 700 !important;
+  color: #556 !important;
+  text-transform: uppercase;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.4px;
+  background: #fafafa;
+}
+
+.modern-table :deep(tbody tr:hover) {
+  background: #f6faf4 !important;
+}
+
+.modern-table :deep(td) {
+  border-bottom: 1px solid #f0f0f0 !important;
 }
 </style>

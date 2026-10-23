@@ -1082,7 +1082,7 @@ export default defineComponent({
         const marker = L.marker([t.latitude, t.longitude], { icon })
         const cfg = getStatusCfg(t.status, t.nearPowerLine)
 
-        marker.bindPopup(`
+        const popupHtml = `
           <div style="width:240px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
             <div style="background:${cfg.bg}; color:#fff; padding:14px; text-align:center;">
               <div style="font-size:17px; font-weight:800;">${cfg.emoji} ${t.speciesName}</div>
@@ -1147,7 +1147,11 @@ export default defineComponent({
               </div>
             </div>
           </div>
-        `, { maxWidth: 280, className: 'tree-popup' })
+        `
+
+        // Popup vinculado SEM abertura automática no clique
+        // (autoClose/closeOnClick não importam porque não chamamos openPopup no click).
+        marker.bindPopup(popupHtml, { maxWidth: 280, className: 'tree-popup' })
 
         marker.on('popupopen', () => {
           const btnRoute = document.getElementById(`btn-route-${t.id}`)
@@ -1160,7 +1164,20 @@ export default defineComponent({
           }
         })
 
-        marker.on('click', () => { selectedTree.value = t })
+        // Clique ESQUERDO abre a análise da IA DIRETO (1 clique), em vez de
+        // exigir abrir o popup e depois clicar em "Ver IA".
+        // O Leaflet abriria o popup no clique por padrão; como queremos o
+        // drawer, fechamos qualquer popup e abrimos a IA.
+        marker.off('click')
+        marker.on('click', () => {
+          selectedTree.value = t
+          marker.closePopup()
+          openAiDrawer(t)
+        })
+
+        // Clique DIREITO (contextmenu) mostra o popup detalhado com Rota/preview.
+        marker.on('contextmenu', () => { marker.openPopup() })
+
         markersArray.push(marker)
       })
       treeClusterGroup!.addLayers(markersArray)
@@ -1818,58 +1835,69 @@ export default defineComponent({
 
     <!-- ============ BOTÕES FLUTUANTES DIREITA ============ -->
     <div class="floating-actions-right">
-      <v-tooltip text="Minha localização" location="left">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon color="primary" :size="isMobile ? 'default' : 'large'" elevation="4" :loading="locating" @click="goToUserLocation" class="mb-2">
-            <v-icon>mdi-crosshairs-gps</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
+      <!-- Painel agrupado (estilo mapas modernos) -->
+      <div class="map-tools-panel">
+        <v-tooltip text="Minha localização" location="left">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" icon variant="text" class="map-tool-btn" :color="locating ? 'primary' : 'grey-darken-3'" :loading="locating" @click="goToUserLocation">
+              <v-icon>mdi-crosshairs-gps</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
 
-      <v-tooltip text="Definir minha posição" location="left">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon :color="isSimulationMode ? 'amber-darken-3' : 'blue-grey-darken-1'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleSimulationMode" class="mb-2">
-            <v-icon>{{ isSimulationMode ? 'mdi-map-marker-question' : 'mdi-map-marker-account' }}</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
+        <div class="map-tool-divider" />
 
-      <v-tooltip :text="mapStyle === 'street' ? 'Satélite' : 'Mapa'" location="left">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon color="blue-grey-darken-2" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleMapStyle" class="mb-2">
-            <v-icon>{{ mapStyle === 'street' ? 'mdi-satellite-variant' : 'mdi-map-outline' }}</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
+        <v-tooltip text="Definir minha posição" location="left">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" icon variant="text" class="map-tool-btn" :color="isSimulationMode ? 'amber-darken-3' : 'grey-darken-3'" @click="toggleSimulationMode">
+              <v-icon>{{ isSimulationMode ? 'mdi-map-marker-question' : 'mdi-map-marker-account' }}</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
 
-      <v-tooltip text="Camada de Solo" location="left">
-        <template #activator="{ props }">
-          <v-btn
-            v-bind="props"
-            icon
-            :color="showSoilLayer ? 'brown-darken-2' : 'blue-grey-darken-1'"
-            :size="isMobile ? 'default' : 'large'"
-            elevation="4"
-            :loading="loadingSoil"
-            @click="toggleSoilLayer"
-            class="mb-2"
-          >
-            <v-icon>{{ showSoilLayer ? 'mdi-layers' : 'mdi-layers-outline' }}</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
+        <div class="map-tool-divider" />
 
-      <v-tooltip :text="markMode ? 'Parar marcação' : 'Marcar no mapa'" location="left">
-        <template #activator="{ props }">
-          <v-btn v-bind="props" icon :color="markMode ? 'warning' : 'purple'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleMarkMode" class="mb-2">
-            <v-icon>{{ markMode ? 'mdi-map-marker-check' : 'mdi-map-marker-plus' }}</v-icon>
-          </v-btn>
-        </template>
-      </v-tooltip>
+        <v-tooltip :text="mapStyle === 'street' ? 'Satélite' : 'Mapa'" location="left">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" icon variant="text" class="map-tool-btn" color="grey-darken-3" @click="toggleMapStyle">
+              <v-icon>{{ mapStyle === 'street' ? 'mdi-satellite-variant' : 'mdi-map-outline' }}</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
 
+        <div class="map-tool-divider" />
+
+        <v-tooltip text="Camada de Solo" location="left">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon
+              variant="text"
+              class="map-tool-btn"
+              :color="showSoilLayer ? 'brown-darken-2' : 'grey-darken-3'"
+              :loading="loadingSoil"
+              @click="toggleSoilLayer"
+            >
+              <v-icon>{{ showSoilLayer ? 'mdi-layers' : 'mdi-layers-outline' }}</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
+
+        <div class="map-tool-divider" />
+
+        <v-tooltip :text="markMode ? 'Parar marcação' : 'Marcar no mapa'" location="left">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" icon variant="text" class="map-tool-btn" :color="markMode ? 'warning' : 'grey-darken-3'" @click="toggleMarkMode">
+              <v-icon>{{ markMode ? 'mdi-map-marker-check' : 'mdi-map-marker-plus' }}</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
+      </div>
+
+      <!-- Botão de expandir, separado (ação de layout) -->
       <v-tooltip :text="isExpanded ? 'Reduzir (ESC)' : 'Expandir'" location="left">
         <template #activator="{ props }">
-          <v-btn v-bind="props" icon :color="isExpanded ? 'red' : 'blue-grey'" :size="isMobile ? 'default' : 'large'" elevation="4" @click="toggleExpand">
+          <v-btn v-bind="props" icon variant="flat" color="white" class="map-tools-panel map-tools-panel--single" :class="{ 'text-red': isExpanded }" @click="toggleExpand">
             <v-icon>{{ isExpanded ? 'mdi-fullscreen-exit' : 'mdi-fullscreen' }}</v-icon>
           </v-btn>
         </template>
@@ -2631,6 +2659,44 @@ export default defineComponent({
   z-index: 1001;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Painel agrupado dos controles do mapa (estilo Google Maps/Mapbox) */
+.map-tools-panel {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.map-tools-panel--single {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+}
+
+.map-tool-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+}
+
+.map-tool-btn:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Divisória sutil entre os botões */
+.map-tool-divider {
+  width: 22px;
+  height: 1px;
+  background: #ececec;
+  margin: 1px 0;
 }
 
 /* ============ SIDEBAR ============ */
