@@ -7,7 +7,10 @@
         <div class="d-flex align-center justify-space-between">
           <div>
             <p class="text-overline hero-label">Análise de IA</p>
-            <h2 class="hero-title">{{ data.commonName }}</h2>
+            <p class="hero-height mt-2 mb-0">
+              <v-icon size="15" class="mr-1">mdi-arrow-expand-vertical</v-icon>
+              {{ heightLabel }} <span>altura atual</span><span class="mx-1">·</span>{{ wireHeightLabel }} <span>fiação</span>
+            </p>
           </div>
           <div class="d-flex flex-column align-end">
             <div class="risk-badge mb-2" :class="`risk-${riskClass}`">
@@ -45,16 +48,28 @@
       </v-alert>
 
       <!-- ===== Resumo em linguagem simples (para qualquer usuário) ===== -->
-      <div class="plain-summary mb-6" :class="`plain-summary--${riskClass}`">
+      <div class="plain-summary mb-4" :class="`plain-summary--${riskClass}`">
         <div class="plain-summary-icon">
           <v-icon size="26" color="white">{{ riskIcon }}</v-icon>
         </div>
         <div class="plain-summary-text">
-          <p class="plain-summary-title mb-1">{{ plainSummary.title }}</p>
+          <p class="plain-summary-title mb-1">Decisão da operação: {{ plainSummary.title }}</p>
           <p class="plain-summary-desc mb-0">{{ plainSummary.description }}</p>
         </div>
       </div>
 
+      <v-btn
+        block
+        variant="tonal"
+        color="grey-darken-2"
+        class="mb-5 text-none"
+        :prepend-icon="showDetails ? 'mdi-chevron-up' : 'mdi-information-outline'"
+        @click="showDetails = !showDetails"
+      >
+        {{ showDetails ? 'Ocultar detalhes técnicos' : 'Ver detalhes técnicos da análise' }}
+      </v-btn>
+
+      <div v-if="showDetails" class="technical-details">
       <!-- ===== Progresso Altura vs Fio ===== -->
       <div class="section-block mb-6">
         <div class="section-header">
@@ -292,6 +307,7 @@
           </v-row>
         </div>
       </template>
+      </div>
     </v-card-text>
   </v-card>
 </template>
@@ -309,6 +325,12 @@ export default defineComponent({
       type: Object as PropType<TreeWithAi>,
       required: true,
     },
+  },
+
+  data() {
+    return {
+      showDetails: false,
+    }
   },
 
   computed: {
@@ -383,6 +405,16 @@ export default defineComponent({
         title: 'Situação: Segura',
         description: `Esta árvore está a uma distância segura da fiação (faltam cerca de ${faltam}m).${tempoTxt} Nenhuma ação urgente é necessária no momento.`,
       }
+    },
+
+    heightLabel(): string {
+      const value = Number(this.data.aiPrediction?.estimated_height_m)
+      return Number.isFinite(value) && value > 0 ? `${value.toFixed(1)} m` : 'Não informada'
+    },
+
+    wireHeightLabel(): string {
+      const value = Number(this.data.aiPrediction?.wire_height_m)
+      return Number.isFinite(value) && value > 0 ? `${value.toFixed(1)} m` : 'Não informada'
     },
 
     /* ---------- Altura ---------- */
@@ -535,6 +567,13 @@ export default defineComponent({
 .tree-ai-card:hover {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08) !important;
 }
+
+.hero-height {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.hero-height span { color: rgba(255, 255, 255, 0.68); font-weight: 500; }
 
 /* ============ HERO HEADER ============ */
 .card-hero {

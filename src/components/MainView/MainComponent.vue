@@ -87,7 +87,7 @@
           <div class="risk-map-container">
             <MiniMap
               ref="miniMapRef"
-              filter-status="TO_PRUNE"
+              filter-status="PRIORITY"
               style="height: 260px; width: 100%;"
             />
             <div class="risk-overlay-badge">
@@ -310,6 +310,7 @@
 import { defineComponent } from 'vue'
 import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
 import { useAuth } from '@/hooks/useAuth'
+import { isTreeForPruning, prioritizeTrees } from '@/utils/treePriority'
 
 /* ===================================
    TIPOS
@@ -588,9 +589,8 @@ export default defineComponent({
         const response = await this.$api.get<TreeApi[]>('/trees')
         this.trees = response.data.map((t) => this.normalizeTree(t))
         this.countTrees = this.trees.length
-        this.filteredTrees = this.trees.filter(
-          (t) => t.status === 'TO_PRUNE' || t.status === 'UNDER_OBSERVATION',
-        )
+        const prioritized = prioritizeTrees(this.trees).filter((item) => isTreeForPruning(item.tree))
+        this.filteredTrees = prioritized.map((item) => item.tree)
         this.countCritical = this.filteredTrees.length
       } catch (error) {
         console.error('Erro ao buscar árvores:', error)
@@ -623,14 +623,12 @@ export default defineComponent({
     },
 
     focusTree(tree: Tree) {
-      // Centraliza o mapa na árvore selecionada
-      if (this.$refs.miniMapRef) {
-        const mapRef = this.$refs.miniMapRef as any
-        if (mapRef.map && tree.latitude && tree.longitude) {
-          mapRef.map.flyTo([tree.latitude, tree.longitude], 17, { duration: 1.5 })
-        }
+      const mapRef = this.$refs.miniMapRef as { focusOn?: (lat: number, lng: number) => void } | undefined
+      const latitude = Number(tree.latitude)
+      const longitude = Number(tree.longitude)
+      if (mapRef?.focusOn && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+        mapRef.focusOn(latitude, longitude)
       }
-      console.log('Focar na árvore:', tree)
     },
 
     /* ---------- Helpers ---------- */

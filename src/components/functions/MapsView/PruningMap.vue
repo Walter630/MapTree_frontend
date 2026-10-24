@@ -1,5 +1,6 @@
 <script lang="ts">
 import { defineComponent, onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
@@ -8,6 +9,11 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { apiConnect, type TreeWithAi } from '@/plugins/apiConnect'
 import TreeAiStats from '@/components/functions/TreeAiStats.vue'
 import { SOIL_TYPES, getSoilInfo } from '@/utils/soilData'
+import { readDailyRouteSnapshot, type DailyRouteStopSnapshot } from '@/utils/dailyRouteStorage'
+import {
+  isTreeForPruning,
+  prioritizeTrees,
+} from '@/utils/treePriority'
 import 'leaflet-routing-machine'
 import {
   CEARA_REGIONS,
@@ -173,6 +179,15 @@ const DEFAULT_LAT = -3.7319
 const DEFAULT_LNG = -38.5267
 const DEFAULT_ZOOM = 15
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 interface StatusInfo {
   label: string
   emoji: string
@@ -218,6 +233,8 @@ export default defineComponent({
   components: { TreeAiStats },
 
   setup() {
+    const currentRoute = useRoute()
+
     /* ---------- Map refs ---------- */
     let map: L.Map | null = null
     let treeClusterGroup: L.MarkerClusterGroup | null = null
@@ -237,6 +254,8 @@ export default defineComponent({
     let streetLayer: L.TileLayer | null = null
     let satelliteLayer: L.TileLayer | null = null
     let routingControl: any = null
+    let dailyRoadRoutingControl: any = null
+    let dailyRouteLayer: L.LayerGroup | null = null
 
     /* ---------- Estado Reativo ---------- */
     const trees = ref<TreeOnMap[]>([])
@@ -254,7 +273,7 @@ export default defineComponent({
     const searching = ref(false)
     const isMobile = ref(window.innerWidth < 768)
     const sidebarOpen = ref(!isMobile.value)
-    const activeFilter = ref<string>('ALL')
+    const activeFilter = ref<string>('PRIORITY')
     const mapStyle = ref<'street' | 'satellite'>('street')
     const snackbar = ref(false)
     const snackbarText = ref('')
@@ -264,6 +283,13 @@ export default defineComponent({
     const isSimulationMode = ref(false)
     const loadingRoute = ref(false)
     const currentRouteDest = ref<{ lat: number; lng: number } | null>(null)
+    const dailyRouteDate = computed(() => {
+      const value = currentRoute.query.routeDate
+      return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
+    })
+    const dailyRouteStops = ref<DailyRouteStopSnapshot[]>([])
+    const dailyRouteVisible = computed(() => Boolean(dailyRouteDate.value && dailyRouteStops.value.length))
+    const nextDailyRouteStop = computed(() => dailyRouteStops.value[0] || null)
     let lastPosition: L.LatLng | null = null
 
     /* ---------- Carregamento Progressivo ---------- */
@@ -343,16 +369,25 @@ export default defineComponent({
 
     /* ---------- Computed ---------- */
     const filteredTrees = computed(() => {
+      if (dailyRouteVisible.value) {
+        const routeIds = new Set(dailyRouteStops.value.map((stop) => stop.id))
+        return trees.value.filter((tree) => routeIds.has(tree.id))
+      }
+      if (activeFilter.value === 'PRIORITY') {
+        return prioritizeTrees(trees.value).filter((item) => isTreeForPruning(item.tree)).map((item) => item.tree)
+      }
       if (activeFilter.value === 'ALL') return trees.value
       if (activeFilter.value === 'CRITICAL') {
-        return trees.value.filter(t => t.nearPowerLine || t.status === 'CRITICAL' || t.status === 'TO_PRUNE')
+        return prioritizeTrees(trees.value)
+          .filter((item) => item.urgency === 'CRITICAL')
+          .map((item) => item.tree)
       }
       return trees.value.filter(t => t.status === activeFilter.value)
     })
 
     const treeCount = computed(() => trees.value.length)
     const dangerCount = computed(() => trees.value.filter(t => t.nearPowerLine).length)
-    const criticalCount = computed(() => trees.value.filter(t => t.nearPowerLine || t.status === 'CRITICAL' || t.status === 'TO_PRUNE').length)
+    const criticalCount = computed(() => prioritizeTrees(trees.value).filter((item) => isTreeForPruning(item.tree)).length)
     const markedCount = computed(() => markedLocations.value.length)
     const statusCounts = computed(() => {
       const counts: Record<string, number> = { NORMAL: 0, TO_PRUNE: 0, UNDER_OBSERVATION: 0, PRUNED: 0, CRITICAL: 0 }
@@ -369,7 +404,7 @@ export default defineComponent({
     // no 'moveend', não a cada frame). Conta com loop simples, sem alocar
     // array intermediário, para suportar volumes grandes sem travar.
     const visibleTreeCount = computed(() => {
-      const list = trees.value
+      const list = dailyRouteVisible.value ? filteredTrees.value : trees.value
       const bounds = mapBounds.value
       if (!map || !bounds) return list.length
       let count = 0
@@ -386,6 +421,89 @@ export default defineComponent({
       snackbarColor.value = color
       snackbar.value = true
     }
+
+    const routeStopIcon = (order: number): L.DivIcon => L.divIcon({
+      html: `<div class="daily-route-stop-icon"><span>${order}</span></div>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      className: 'daily-route-marker',
+    })
+
+    const renderDailyRoute = () => {
+      if (!dailyRouteLayer || !map) return
+      dailyRouteLayer.clearLayers()
+      if (dailyRoadRoutingControl && map) {
+        map.removeControl(dailyRoadRoutingControl)
+        dailyRoadRoutingControl = null
+      }
+      if (!dailyRouteStops.value.length) return
+
+      const points = dailyRouteStops.value.map((stop) => L.latLng(stop.latitude, stop.longitude))
+
+      if (points.length > 1) {
+        // Linha de referência imediata enquanto o provedor calcula o trajeto por ruas.
+        L.polyline(points, {
+          color: '#2563EB',
+          weight: 4,
+          opacity: 0.28,
+          dashArray: '8 8',
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(dailyRouteLayer)
+
+        // O Routing Machine transforma os waypoints em um trajeto viário real.
+        dailyRoadRoutingControl = L.Routing.control({
+          waypoints: points,
+          lineOptions: {
+            extendToWaypoints: false,
+            missingRouteTolerance: 0,
+            styles: [
+              { color: '#0F2F5F', opacity: 0.18, weight: 11 },
+              { color: '#2563EB', opacity: 0.92, weight: 6 },
+            ],
+          },
+          addWaypoints: false,
+          fitSelectedRoutes: true,
+          showAlternatives: false,
+          show: false,
+        }).addTo(map)
+
+        dailyRoadRoutingControl.on('routingerror', () => {
+          notify('Não foi possível calcular o trajeto pelas ruas. A sequência das paradas continua disponível.', 'warning')
+        })
+      }
+
+      dailyRouteStops.value.forEach((stop) => {
+        const marker = L.marker([stop.latitude, stop.longitude], { icon: routeStopIcon(stop.order), zIndexOffset: 1200 })
+        marker.bindTooltip(`Parada ${stop.order}`, { direction: 'top', offset: [0, -15], className: 'daily-route-tooltip' })
+        marker.bindPopup(`
+          <div style="min-width:180px;font-family:system-ui,sans-serif;">
+            <strong style="color:#2E7D32;">Parada ${stop.order}</strong>
+            <p style="margin:6px 0 2px;font-weight:700;">${escapeHtml(stop.label || `Árvore #${stop.id.slice(-6)}`)}</p>
+            <p style="margin:0;color:#64748b;font-size:12px;">${stop.latitude.toFixed(5)}, ${stop.longitude.toFixed(5)}</p>
+          </div>
+        `)
+        dailyRouteLayer!.addLayer(marker)
+      })
+
+      if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [80, 80], maxZoom: 16 })
+      else map.setView(points[0]!, 17)
+    }
+
+    const loadDailyRoute = () => {
+      dailyRouteStops.value = dailyRouteDate.value
+        ? readDailyRouteSnapshot(dailyRouteDate.value)?.stops || []
+        : []
+      renderDailyRoute()
+    }
+
+    const openExternalNavigation = (stop: DailyRouteStopSnapshot | null) => {
+      if (!stop) return
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${stop.latitude},${stop.longitude}`)}&travelmode=driving`
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+
+    watch(dailyRouteDate, loadDailyRoute)
 
     /* ---------- Ícones ---------- */
     const createTreeIcon = (status: string, danger: boolean): L.DivIcon => {
@@ -1081,20 +1199,21 @@ export default defineComponent({
         const icon = createTreeIcon(t.status, t.nearPowerLine)
         const marker = L.marker([t.latitude, t.longitude], { icon })
         const cfg = getStatusCfg(t.status, t.nearPowerLine)
+        const popupTreeId = encodeURIComponent(String(t.id)).replace(/[^a-zA-Z0-9_-]/g, '_')
 
         const popupHtml = `
           <div style="width:240px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
             <div style="background:${cfg.bg}; color:#fff; padding:14px; text-align:center;">
-              <div style="font-size:17px; font-weight:800;">${cfg.emoji} ${t.speciesName}</div>
-              <div style="font-size:11px; opacity:0.8; margin-top:2px;">${t.scientificName}</div>
+              <div style="font-size:17px; font-weight:800;">${cfg.emoji} ${escapeHtml(t.speciesName)}</div>
+              <div style="font-size:11px; opacity:0.8; margin-top:2px;">${escapeHtml(t.scientificName)}</div>
             </div>
             <div style="padding:16px;">
               <div style="display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
                 <div style="flex:1;">
-                  <h3 style="margin:0; font-size:18px; color:#333;">${t.speciesName}</h3>
-                  <p style="margin:0; font-size:12px; color:#666; font-style:italic;">${t.scientificName}</p>
+                  <h3 style="margin:0; font-size:18px; color:#333;">${escapeHtml(t.speciesName)}</h3>
+                  <p style="margin:0; font-size:12px; color:#666; font-style:italic;">${escapeHtml(t.scientificName)}</p>
                   <p style="margin:4px 0 0; font-size:10px; color:${t.vigor === 'EXCELLENT' ? '#22c55e' : t.vigor === 'GOOD' ? '#84cc16' : t.vigor === 'POOR' ? '#f59e0b' : '#ef4444'}; font-weight:800; border:1px solid currentColor; display:inline-block; padding:0 6px; border-radius:4px;">
-                    HEALTH: ${t.vigor}
+                    HEALTH: ${escapeHtml(t.vigor)}
                   </p>
                 </div>
                 <div style="text-align:right;">
@@ -1128,7 +1247,7 @@ export default defineComponent({
 
               <p style="margin:0; font-size:11px; color:#888; text-align:center;">Coordenadas: ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</p>
               <div style="display:flex; gap:8px; margin-top:16px;">
-                <button id="btn-route-${t.id}" style="
+                <button id="btn-route-${popupTreeId}" style="
                   flex:1; background:#007bff; color:#fff; border:none; 
                   padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
                   font-size:12px; text-transform:uppercase;
@@ -1136,7 +1255,7 @@ export default defineComponent({
                 " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                   🚀 ROTA
                 </button>
-                <button id="btn-ai-${t.id}" style="
+                <button id="btn-ai-${popupTreeId}" style="
                   flex:1; background:linear-gradient(135deg,#7B1FA2,#AB47BC); color:#fff; border:none;
                   padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
                   font-size:12px; text-transform:uppercase;
@@ -1154,11 +1273,11 @@ export default defineComponent({
         marker.bindPopup(popupHtml, { maxWidth: 280, className: 'tree-popup' })
 
         marker.on('popupopen', () => {
-          const btnRoute = document.getElementById(`btn-route-${t.id}`)
+          const btnRoute = document.getElementById(`btn-route-${popupTreeId}`)
           if (btnRoute) {
             btnRoute.onclick = () => startRouting(t.latitude, t.longitude, t.speciesName)
           }
-          const btnAi = document.getElementById(`btn-ai-${t.id}`)
+          const btnAi = document.getElementById(`btn-ai-${popupTreeId}`)
           if (btnAi) {
             btnAi.onclick = () => openAiDrawer(t)
           }
@@ -1548,6 +1667,8 @@ export default defineComponent({
         },
       })
       map.addLayer(treeClusterGroup)
+      dailyRouteLayer = L.layerGroup().addTo(map)
+      loadDailyRoute()
 
       markedMarkersLayer = L.layerGroup().addTo(map)
       powerLinesLayer = L.layerGroup().addTo(map)
@@ -1585,7 +1706,7 @@ export default defineComponent({
         marker.bindPopup(`
           <div style="min-width:160px;font-family:system-ui;">
             <div style="font-weight:700;color:#7B1FA2;margin-bottom:4px;">📌 Marcação</div>
-            <p style="margin:2px 0;font-size:13px;">${notes || 'Sem nota'}</p>
+            <p style="margin:2px 0;font-size:13px;">${escapeHtml(notes || 'Sem nota')}</p>
             <p style="margin:2px 0;font-size:11px;color:#888;">${ev.latlng.lat.toFixed(6)}, ${ev.latlng.lng.toFixed(6)}</p>
           </div>
         `)
@@ -1701,10 +1822,13 @@ export default defineComponent({
       // Remove todos os listeners do Leaflet antes de destruir o mapa,
       // para que eventos em voo (moveend etc.) não disparem após o unmount.
       if (map) {
+        if (dailyRoadRoutingControl) map.removeControl(dailyRoadRoutingControl)
         map.off()
         map.remove()
         map = null
       }
+      dailyRoadRoutingControl = null
+      dailyRouteLayer = null
     })
 
     return {
@@ -1716,6 +1840,7 @@ export default defineComponent({
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
       loadingRoute,
+      dailyRouteDate, dailyRouteStops, dailyRouteVisible, nextDailyRouteStop, openExternalNavigation,
       aiDrawerOpen, aiTreeData, loadingAiData, openAiDrawer, closeAiDrawer,
       showSoilLayer, loadingSoil, toggleSoilLayer, getSoilInfo, SOIL_TYPES,
       importingIA, syncIA, importCsvMode, csvPath, syncCsvIA,
@@ -1782,11 +1907,23 @@ export default defineComponent({
       </div>
     </Transition>
 
-    <!-- =====================================================
-         SEÇÃO 3: BARRA DE BUSCA DE ENDEREÇO (Nominatim)
-         - Busca endereços no Brasil via API Nominatim
-         - Centraliza o mapa no resultado encontrado
-         ===================================================== -->
+    <!-- ============ ROTA DIÁRIA ============ -->
+    <v-card v-if="dailyRouteVisible" class="daily-route-map-card" elevation="8">
+      <div class="d-flex align-center mb-2">
+        <v-avatar color="green-darken-2" size="34" class="mr-2"><v-icon color="white" size="19">mdi-map-marker-path</v-icon></v-avatar>
+        <div class="flex-grow-1">
+          <p class="text-subtitle-2 font-weight-bold mb-0">Rota do dia</p>
+          <p class="text-caption text-grey-darken-1 mb-0">{{ dailyRouteDate.split('-').reverse().join('/') }} · {{ dailyRouteStops.length }} paradas</p>
+        </div>
+      </div>
+      <div class="daily-route-next mb-3">
+        <span class="text-caption text-grey-darken-1">Próxima parada</span>
+        <strong>Parada {{ nextDailyRouteStop?.order }} · {{ nextDailyRouteStop?.label || 'Árvore' }}</strong>
+      </div>
+      <v-btn block color="blue-darken-2" variant="flat" class="text-none" prepend-icon="mdi-navigation-variant" @click="openExternalNavigation(nextDailyRouteStop)">Navegar até a próxima</v-btn>
+    </v-card>
+
+    <!-- ============ BARRA DE BUSCA DE ENDEREÇO (Nominatim) ============ -->
     <div class="top-search-bar">
       <v-text-field
         v-model="searchQuery"
@@ -1818,6 +1955,10 @@ export default defineComponent({
         rounded="pill"
         class="filter-toggle"
       >
+        <v-btn value="PRIORITY" class="toggle-btn">
+          <v-icon start color="orange-darken-2">mdi-content-cut</v-icon>
+          Pendentes ({{ criticalCount }})
+        </v-btn>
         <v-btn value="ALL" class="toggle-btn">
           <v-icon start>mdi-tree</v-icon>
           Todas ({{ treeCount }})
@@ -2225,8 +2366,17 @@ export default defineComponent({
 
             <!-- Filtros Rápidos -->
             <div class="filter-section mb-3">
-              <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">Filtrar por status:</p>
+              <p class="text-caption font-weight-bold text-grey-darken-1 mb-2">Comece pelo que precisa de poda:</p>
               <div class="filter-chips-scroll">
+                <v-chip
+                  size="small"
+                  :variant="activeFilter === 'PRIORITY' ? 'flat' : 'outlined'"
+                  :color="activeFilter === 'PRIORITY' ? 'error' : 'grey'"
+                  @click="activeFilter = 'PRIORITY'"
+                  class="mr-1 mb-1"
+                >
+                  ✂️ Precisa de poda ({{ criticalCount }})
+                </v-chip>
                 <v-chip
                   size="small"
                   :variant="activeFilter === 'ALL' ? 'flat' : 'outlined'"
@@ -2577,6 +2727,43 @@ export default defineComponent({
   height: 100%;
   z-index: 1;
 }
+
+.daily-route-map-card {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  width: min(360px, calc(100% - 32px));
+  padding: 14px;
+  border: 1px solid #dcebb0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+.daily-route-next {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f4f8e7;
+}
+:global(.daily-route-stop-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #2e7d32;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+:global(.daily-route-stop-icon span) { transform: rotate(45deg); font-size: 13px; font-weight: 800; }
+:global(.daily-route-tooltip) { border: 0; border-radius: 8px; color: #1b5e20; font-weight: 700; }
 
 /* ============ OVERLAY LOADING ============ */
 .locating-overlay {

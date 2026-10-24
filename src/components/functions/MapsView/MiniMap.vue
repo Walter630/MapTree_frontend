@@ -14,8 +14,10 @@ import { apiConnect } from '@/plugins/apiConnect'
 interface ApiTree {
   id: string
   age: string
-  latitude: number
-  longitude: number
+  latitude?: number
+  longitude?: number
+  lat?: number
+  lng?: number
   status: string
   species?: {
     id: string
@@ -55,13 +57,18 @@ const DEFAULT_LAT = -3.7319
 const DEFAULT_LNG = -38.5267
 const DEFAULT_ZOOM = 15
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 const SIMULATED_POWER_LINES: [number, number][][] = [
   [[-3.7327, -38.5270], [-3.7335, -38.5255], [-3.7342, -38.5240], [-3.7350, -38.5225]],
   [[-3.7310, -38.5280], [-3.7320, -38.5260], [-3.7330, -38.5245]],
-]
-
-const PRESENTATION_SPECIES = [
-  'Mangueira', 'Ipê Amarelo', 'Oiti', 'Castanhola', 'Palmeira Imperial', 'Flamboyant'
 ]
 
 /* ===================================
@@ -153,35 +160,15 @@ export default defineComponent({
         const res = await apiConnect.get<ApiTree[]>('/trees')
         const apiTrees = res.data || []
         const parsedTrees: TreeOnMap[] = apiTrees
-          .filter((t: ApiTree) => t.latitude != null && t.longitude != null)
+          .filter((t: ApiTree) => (t.latitude ?? t.lat) != null && (t.longitude ?? t.lng) != null)
           .map((t: ApiTree) => ({
             id: t.id,
-            latitude: Number(t.latitude),
-            longitude: Number(t.longitude),
+            latitude: Number(t.latitude ?? t.lat),
+            longitude: Number(t.longitude ?? t.lng),
             status: t.status || 'NORMAL',
             speciesName: t.species?.commonName || 'Espécie desconhecida',
             nearPowerLine: checkNearPowerLine(Number(t.latitude), Number(t.longitude)),
           }))
-
-        // SE TIVER POUCAS ÁRVORES, GERA SIMULADAS PARA APRESENTAÇÃO
-        if (parsedTrees.length < 30) {
-          const extraCount = 50 - parsedTrees.length
-          for (let i = 0; i < extraCount; i++) {
-            const lat = DEFAULT_LAT + (Math.random() - 0.5) * 0.02
-            const lng = DEFAULT_LNG + (Math.random() - 0.5) * 0.02
-            const statusRoll = Math.random()
-            const status = statusRoll > 0.8 ? 'TO_PRUNE' : statusRoll > 0.6 ? 'UNDER_OBSERVATION' : 'NORMAL'
-            
-            parsedTrees.push({
-              id: `sim-${i}`,
-              latitude: lat,
-              longitude: lng,
-              status: status,
-              speciesName: PRESENTATION_SPECIES[Math.floor(Math.random() * PRESENTATION_SPECIES.length)] as string,
-              nearPowerLine: checkNearPowerLine(lat, lng)
-            })
-          }
-        }
 
         trees.value = parsedTrees
         const dangerCount = trees.value.filter(t => t.nearPowerLine).length
@@ -202,23 +189,26 @@ export default defineComponent({
 
       const filtered = props.filterStatus === 'ALL'
         ? trees.value
-        : props.filterStatus === 'DANGER'
-          ? trees.value.filter(t => t.nearPowerLine)
-          : trees.value.filter(t => t.status === props.filterStatus)
+        : props.filterStatus === 'PRIORITY'
+          ? trees.value.filter(t => t.status === 'TO_PRUNE' || t.status === 'CRITICAL' || t.nearPowerLine)
+          : props.filterStatus === 'DANGER'
+            ? trees.value.filter(t => t.nearPowerLine)
+            : trees.value.filter(t => t.status === props.filterStatus)
 
       filtered.forEach((t) => {
         if (isNaN(t.latitude) || isNaN(t.longitude)) return
         const icon = createTreeIcon(t.status, t.nearPowerLine)
         const marker = L.marker([t.latitude, t.longitude], { icon })
         const cfg = getCfg(t.status, t.nearPowerLine)
+        const popupTreeId = encodeURIComponent(String(t.id)).replace(/[^a-zA-Z0-9_-]/g, '_')
 
         marker.bindPopup(`
-          <div id="popup-${t.id}" style="min-width:180px;font-family:system-ui,sans-serif;font-size:12px;">
+          <div id="popup-${popupTreeId}" style="min-width:180px;font-family:system-ui,sans-serif;font-size:12px;">
             <div style="background:${cfg.color};color:#fff;padding:8px 10px;border-radius:8px 8px 0 0;margin:-16px -16px 8px -16px;">
-              <div style="font-size:14px;font-weight:700;">${cfg.emoji} ${t.speciesName}</div>
+              <div style="font-size:14px;font-weight:700;">${cfg.emoji} ${escapeHtml(t.speciesName)}</div>
             </div>
             <div style="padding:0 2px 4px;">
-              <p style="margin:3px 0;"><b>Status:</b> ${cfg.label || t.status}</p>
+              <p style="margin:3px 0;"><b>Status:</b> ${cfg.label || escapeHtml(t.status)}</p>
               <p style="margin:3px 0;"><b>Fiação:</b> ${t.nearPowerLine ? '<span style="color:#D32F2F;font-weight:700;">PRÓXIMO ⚠️</span>' : '<span style="color:#4CAF50">Seguro</span>'}</p>
             </div>
           </div>
@@ -254,7 +244,7 @@ export default defineComponent({
       
       // Tenta encontrar o marcador para abrir o popup
       if (treeClusterGroup) {
-        treeClusterGroup.eachLayer((layer: any) => {
+        treeClusterGroup.eachLayer((layer: L.Layer) => {
           if (layer instanceof L.Marker) {
             const pos = layer.getLatLng()
             if (Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lng) < 0.0001) {

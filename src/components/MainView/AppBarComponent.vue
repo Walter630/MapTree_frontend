@@ -1,75 +1,73 @@
 <template>
   <!-- ===== Desktop AppBar ===== -->
-  <v-app-bar v-if="!isMobile" color="white" flat height="56" class="appbar-desktop">
-    <!-- Logo -->
-    <div class="logo-container" @click="goToHome()">
-      <img
-        :src="logoSrc"
-        alt="Logo MapTree"
-        class="logo-img"
-        @error="onLogoError"
-      />
+  <v-app-bar v-if="!isMobile" color="white" flat height="68" class="appbar-desktop">
+    <div class="appbar-content">
+      <button type="button" class="logo-container" aria-label="Ir para o painel inicial" @click="goToHome()">
+        <img :src="logoSrc" alt="Logo MapTree" class="logo-img" @error="onLogoError" />
+      </button>
+
+      <nav class="desktop-nav" aria-label="Navegação principal">
+        <v-tooltip v-for="item in currentMenu" :key="item.to" location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              variant="text"
+              class="nav-item text-none"
+              :class="{ 'nav-item--active': isActive(item.to) }"
+              :color="isActive(item.to) ? 'green-darken-2' : 'grey-darken-2'"
+              :aria-current="isActive(item.to) ? 'page' : undefined"
+              @click="goTo(item.to)"
+            >
+              <v-icon size="21" class="nav-icon-3d" :color="isActive(item.to) ? green : 'grey-darken-2'">{{ item.icon }}</v-icon>
+              <span class="nav-label">{{ item.title }}</span>
+            </v-btn>
+          </template>
+          <span>{{ item.title }}</span>
+        </v-tooltip>
+      </nav>
+
+      <div class="appbar-actions">
+        <v-tooltip text="Notificações" location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon
+              variant="text"
+              :color="isNotificationActive ? green : 'grey-darken-2'"
+              aria-label="Abrir notificações"
+              @click="goToNotification()"
+            >
+              <v-icon class="nav-icon-3d">mdi-bell-outline</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
+
+        <v-menu min-width="230px">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" variant="text" class="user-menu-trigger text-none" aria-label="Abrir menu do usuário">
+              <v-avatar size="36" class="user-avatar">
+                <img src="@/assets/Logomaptreeverde.png" alt="" class="avatar-img" />
+              </v-avatar>
+              <span class="user-name">{{ user?.name || 'Usuário' }}</span>
+              <v-icon size="18">mdi-chevron-down</v-icon>
+            </v-btn>
+          </template>
+
+          <v-card>
+            <v-card-text class="text-center pa-4">
+              <v-avatar size="44" class="user-avatar mb-2">
+                <img src="@/assets/Logomaptreeverde.png" alt="" class="avatar-img" />
+              </v-avatar>
+              <p class="text-subtitle-2 font-weight-bold mb-0">{{ user?.name || 'Usuário' }}</p>
+              <p class="text-caption mt-1 mb-3">{{ user?.email }}</p>
+              <v-divider class="mb-2" />
+              <v-btn block variant="text" prepend-icon="mdi-account-edit" class="text-none" @click="editAccount">Editar perfil</v-btn>
+              <v-btn block variant="text" color="error" prepend-icon="mdi-logout" class="text-none" @click="logout">Sair da conta</v-btn>
+            </v-card-text>
+          </v-card>
+        </v-menu>
+      </div>
     </div>
-
-    <v-spacer />
-
-    <!-- Menu de Navegação -->
-    <v-toolbar-items class="d-flex align-center">
-      <v-btn
-        v-for="item in currentMenu"
-        :key="item.to"
-        variant="text"
-        class="mr-2"
-        :color="isActive(item.to) ? 'green-darken-2' : 'grey-darken-2'"
-        @click="goTo(item.to)"
-      >
-        <v-icon size="24" class="mr-1 nav-icon-3d" :color="isActive(item.to) ? green : 'grey-darken-2'">
-          {{ item.icon }}
-        </v-icon>
-        {{ item.title }}
-      </v-btn>
-    </v-toolbar-items>
-
-    <v-spacer />
-
-    <!-- Notificações -->
-    <v-btn
-      icon
-      :color="isActive('/notifications') ? green : 'grey-darken-2'"
-      class="notification-btn mr-5"
-      @click="goToNotification()"
-    >
-      <v-icon class="nav-icon-3d">mdi-bell-outline</v-icon>
-    </v-btn>
-
-    <!-- Menu do Usuário -->
-    <v-menu min-width="200px">
-      <template v-slot:activator="{ props }">
-        <div v-bind="props" class="user-menu-trigger">
-          <v-avatar size="40" class="user-avatar">
-            <img src="@/assets/Logomaptreeverde.png" alt="Perfil" class="avatar-img" />
-          </v-avatar>
-          <span class="user-name">{{ user?.name || 'Usuário' }}</span>
-          <v-icon size="20">mdi-menu-down</v-icon>
-        </div>
-      </template>
-
-      <v-card>
-        <v-card-text>
-          <div class="mx-auto text-center">
-            <v-avatar size="40" class="user-avatar">
-              <img src="@/assets/Logomaptreeverde.png" alt="Perfil" class="avatar-img" />
-            </v-avatar>
-            <h3>{{ user?.name }}</h3>
-            <p class="text-caption mt-1">{{ user?.email }}</p>
-            <v-divider class="my-3" />
-            <v-btn variant="text" rounded @click="editAccount">Edit Account</v-btn>
-            <v-divider class="my-3" />
-            <v-btn variant="text" rounded @click="logout">Disconnect</v-btn>
-          </div>
-        </v-card-text>
-      </v-card>
-    </v-menu>
   </v-app-bar>
 
   <!-- ===== Mobile AppBar ===== -->
@@ -192,17 +190,21 @@ const MENUS: Record<string, MenuItem[]> = {
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
     { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
     { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
+    { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/admin/trees/new' },
     { title: 'Mapa', icon: 'mdi-map', to: '/admin/map' },
   ],
   MANAGER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
     { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
+    { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/manager/trees/new' },
+    { title: 'Rotas diárias', icon: 'mdi-map-marker-path', to: '/manager/routes/daily' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
     { title: 'Mapa', icon: 'mdi-map', to: '/manager/map' },
   ],
   USER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
     { title: 'Podas', icon: 'mdi-content-cut', to: '/user/podas' },
+    { title: 'Rota do dia', icon: 'mdi-map-marker-path', to: '/user/routes/daily' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
     { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
   ],
@@ -237,6 +239,10 @@ export default {
     isMobile(): boolean {
       return this.store.isMobile
     },
+
+    isNotificationActive(): boolean {
+      return this.$route.path.endsWith('/notifications')
+    },
   },
 
   watch: {
@@ -257,7 +263,9 @@ export default {
 
   methods: {
     isActive(path: string): boolean {
-      return this.$route.path === path
+      const homePaths = ['/admin', '/manager', '/user']
+      if (homePaths.includes(path)) return this.$route.path === path
+      return this.$route.path === path || this.$route.path.startsWith(`${path}/`)
     },
 
     goToHome(): void {
@@ -289,12 +297,16 @@ export default {
     },
 
     checkMobile(): void {
-      this.store.setIsMobile(window.innerWidth < 960)
+      this.store.setIsMobile(window.innerWidth < 1040)
     },
 
-    logout(): void {
-      this.$api.logout()
-      this.$router.push('/login')
+    async logout(): Promise<void> {
+      try {
+        await this.$api.logout()
+      } finally {
+        this.store.logout()
+        await this.$router.push('/login')
+      }
     },
 
     onLogoError(): void {
@@ -312,85 +324,88 @@ export default {
 
 <style scoped>
 .appbar-desktop {
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: 1px solid #e8edda !important;
+  box-shadow: 0 2px 14px rgba(31, 55, 23, 0.06) !important;
+  z-index: 1200;
 }
 
-/* Efeito de "volume/3D" nos ícones do menu — apenas sombra e profundidade
-   via CSS (sem WebGL, sem animação), então não pesa nada. Dá uma leve
-   elevação e relevo que faz o ícone parecer ter profundidade. */
+.appbar-content {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+}
+
+.desktop-nav {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.desktop-nav::-webkit-scrollbar { display: none; }
+.nav-item {
+  min-width: 0;
+  border-radius: 10px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.nav-item--active {
+  background: #f2f8dc;
+  font-weight: 700;
+}
 .nav-icon-3d {
-  filter:
-    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.18))
-    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.22));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.16));
   transition: filter 0.2s ease, transform 0.2s ease;
 }
-
-.nav-icon-3d:hover {
-  filter:
-    drop-shadow(0 1px 0 rgba(0, 0, 0, 0.22))
-    drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
-  transform: translateY(-1px);
+.nav-icon-3d:hover { filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22)); transform: translateY(-1px); }
+.appbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
 }
-
-/* Alinha o conteúdo da barra (logo, menu, usuário) com a mesma largura
-   do conteúdo das páginas (page-shell = 1440px centralizado), para a barra
-   não parecer "mais larga" que o resto do dashboard. */
-.appbar-desktop :deep(.v-toolbar__content) {
-  max-width: 1440px;
-  width: 100%;
-  margin: 0 auto;
-  padding-left: 16px;
-  padding-right: 16px;
-}
-
 .logo-container {
-  height: 100%;
   display: flex;
   align-items: center;
-  align-content: center;
+  flex: 0 0 auto;
+  width: 146px;
+  height: 52px;
+  border: 0;
+  padding: 0;
+  background: transparent;
   cursor: pointer;
 }
+.logo-img { max-width: 146px; max-height: 46px; object-fit: contain; filter: saturate(1.2) brightness(1.03); transition: transform 0.2s; }
+.logo-img:hover { transform: scale(1.03); }
+.user-menu-trigger { display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 10px; }
+.user-menu-trigger:hover { background: #f6f8f0; }
+.user-avatar { background-color: #c1e328; }
+.avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.user-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; color: #1f2933; }
 
-.logo-img {
-  max-width: 160px;
-  max-height: 48px;
-  object-fit: contain;
-  /* Melhora a vivacidade da logo atual enquanto não trocamos */
-  filter: saturate(1.4) brightness(1.1);
-  transition: transform 0.2s;
+.mobile-drawer { z-index: 1400 !important; }
+.appbar-mobile { z-index: 1200 !important; border-bottom: 1px solid #e8edda !important; }
+.logo-mobile { display: flex; align-items: center; cursor: pointer; }
+
+@media (max-width: 1280px) {
+  .appbar-content { padding: 0 14px; gap: 8px; }
+  .desktop-nav { justify-content: flex-start; }
+  .nav-label { display: none; }
+  .nav-item { padding: 0 9px; }
+  .logo-container { width: 125px; }
+  .logo-img { max-width: 125px; }
+  .user-name { max-width: 100px; }
 }
 
-.logo-img:hover {
-  transform: scale(1.05);
-}
-
-.notification-btn {
-  background-color: #d9d9d9;
-  height: 45px;
-  width: 45px;
-}
-
-.user-menu-trigger {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  gap: 10px;
-  padding: 5px 10px;
-}
-
-.user-avatar {
-  background-color: #c1e328;
-}
-
-.avatar-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-}
-
-.user-name {
-  font-size: 16px;
-  color: black;
+@media (max-width: 420px) {
+  .appbar-mobile :deep(.v-toolbar__content) { padding: 0 8px; }
+  .logo-mobile img { max-width: 140px; height: 30px !important; object-fit: contain; }
 }
 </style>
 

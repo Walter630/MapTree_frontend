@@ -48,6 +48,9 @@ import PruningList from '@/pages/PruningList.vue'
 import PruningRegistration from '@/pages/PruningRegistration.vue'
 import LogoutPage from '@/pages/LogoutPage.vue'
 import NovaPagina from '@/pages/NovaPagina.vue'
+import TreeRegistrationPage from '@/pages/TreeRegistrationPage.vue'
+import DailyRoutesPage from '@/pages/DailyRoutesPage.vue'
+import DashboardPreviewsPage from '@/pages/DashboardPreviewsPage.vue'
 
 /* ===================================
    DEFINIÇÃO DAS ROTAS
@@ -69,6 +72,7 @@ const router = createRouter({
         { path: 'reset-password', name: 'ResetPassword', component: ResetPasswordComponent },
         { path: 'logout', name: 'Logout', component: LogoutPage },
         { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina },
+        { path: 'dashboard-previews', name: 'DashboardPreviews', component: DashboardPreviewsPage },
         { path: 'edit-account', name: 'EditAccount', component: () => import('@/components/MainView/EditProfileComponent.vue') },
 
         /* --- Admin --- */
@@ -82,6 +86,7 @@ const router = createRouter({
             { path: 'companies', name: 'AdminCompanies', component: AdminCompaniesView },
             { path: 'register-company', name: 'AdminRegisterCompany', component: AdminRegisterCompanyView },
             { path: 'register-managers', name: 'AdminRegisterManagers', component: AdminRegisterManagersView },
+            { path: 'trees/new', name: 'AdminTreeRegistration', component: TreeRegistrationPage },
             { path: 'map', name: 'AdminMap', component: MapPage },
           ],
         },
@@ -95,6 +100,8 @@ const router = createRouter({
             { path: '', name: 'ManagerHome', component: ManagerMainComponent },
             { path: 'employees', name: 'ManagerEmployees', component: ManagerEmployeesView },
             { path: 'register-employee', name: 'RegisterEmployee', component: RegisterEmployee },
+            { path: 'trees/new', name: 'ManagerTreeRegistration', component: TreeRegistrationPage },
+            { path: 'routes/daily', name: 'ManagerDailyRoutes', component: DailyRoutesPage },
             { path: 'reports', name: 'ManagerReports', component: ManagerReportsView },
             {
               path: 'notifications',
@@ -116,6 +123,7 @@ const router = createRouter({
             { path: '', name: 'UserHome', component: MainComponent },
             { path: 'reports', name: 'UserReports', component: ReportsPage },
             { path: 'mapUser', name: 'Map', component: MapPage },
+            { path: 'routes/daily', name: 'UserDailyRoutes', component: DailyRoutesPage },
             { path: 'podas', name: 'PruningList', component: PruningList },
             { path: 'podas/nova', name: 'PruningRegistration', component: PruningRegistration },
             {
