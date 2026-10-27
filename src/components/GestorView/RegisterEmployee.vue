@@ -1,8 +1,8 @@
 <template>
-  <v-container fluid class="page-shell">
+  <v-container fluid class="page-shell py-8">
     <PageHeader
       title="Cadastro de Funcionário"
-      subtitle="Cadastre Os Funcionários E Suas Funções."
+      subtitle="Cadastre os funcionários e suas funções."
       :breadcrumbs="[
         { text: 'Meu Painel', to: '/manager' },
         { text: 'Funcionários', to: '/manager/employees' },
@@ -10,90 +10,105 @@
       ]"
     />
 
-    <!-- Formulário -->
-    <v-form ref="form" v-model="valid" lazy-validation class="mt-12">
-      <v-row class="d-flex justify-center" style="gap: 15px">
-        <!-- Coluna Esquerda -->
-        <v-col cols="12" md="4">
-          <p>Nome do Funcionario</p>
-          <v-text-field
-            v-model="formData.name"
-            :rules="[rules.required]"
-            label="Nome do Funcionário"
-            placeholder="Digite o nome"
-            outlined
-            dense
-          />
+    <v-card class="mx-auto registration-card" elevation="0">
+      <v-card-item class="pb-2">
+        <template #prepend>
+          <v-avatar color="green-lighten-5" size="48">
+            <v-icon color="green-darken-2">mdi-account-plus</v-icon>
+          </v-avatar>
+        </template>
+        <v-card-title>Cadastro de funcionário</v-card-title>
+        <v-card-subtitle>Cadastre os funcionários e suas funções.</v-card-subtitle>
+      </v-card-item>
 
-          <p>Email</p>
-          <v-text-field
-            v-model="formData.email"
-            :rules="[rules.required, rules.email]"
-            label="Email"
-            placeholder="Digite o email"
-            outlined
-            dense
+      <v-divider />
+
+      <v-form ref="form" v-model="valid" lazy-validation class="pa-6" @submit.prevent="registrar">
+        <p class="text-subtitle-1 font-weight-bold mb-4">Dados do funcionário</p>
+        <v-row>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formData.name"
+              :rules="[rules.required]"
+              label="Nome do funcionário"
+              placeholder="Digite o nome"
+              prepend-inner-icon="mdi-account"
+              variant="outlined"
+            />
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formData.cpf"
+              :rules="[rules.required]"
+              label="CPF"
+              placeholder="000.000.000-00"
+              prepend-inner-icon="mdi-card-account-details"
+              variant="outlined"
+            />
+          </v-col>
+        </v-row>
+
+        <p class="text-subtitle-1 font-weight-bold mb-4 mt-4">Contato e acesso</p>
+        <v-row>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formData.email"
+              :rules="[rules.required, rules.email]"
+              label="E-mail"
+              placeholder="Digite o e-mail"
+              prepend-inner-icon="mdi-email-outline"
+              variant="outlined"
+            >
+              <template #label>
+                E-mail <span class="text-grey">— Endereço de e-mail</span>
+              </template>
+            </v-text-field>
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formData.phone"
+              :rules="[rules.required, rules.contactFormat]"
+              label="Número de contato"
+              placeholder="(88) 00000-0000"
+              prepend-inner-icon="mdi-phone-outline"
+              variant="outlined"
+            >
+              <template #prepend-inner>
+                <div class="d-flex align-center mr-2">
+                  <span class="mr-2">+55</span>
+                  <v-divider vertical />
+                </div>
+              </template>
+            </v-text-field>
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formData.password"
+              :rules="[rules.required, rules.minPassword]"
+              label="Senha"
+              placeholder="Digite a senha"
+              type="password"
+              prepend-inner-icon="mdi-lock-outline"
+              variant="outlined"
+              hint="A senha deve ter pelo menos 6 caracteres."
+              persistent-hint
+            />
+          </v-col>
+        </v-row>
+
+        <div class="d-flex flex-wrap justify-end ga-3 mt-2">
+          <v-btn variant="outlined" type="button" @click="cancelForm">Cancelar</v-btn>
+          <v-btn
+            color="green-darken-2"
+            type="submit"
+            :disabled="!valid"
+            prepend-icon="mdi-content-save"
           >
-            <template v-slot:label>
-              Email <span class="grey--text">— Endereço de Email</span>
-            </template>
-          </v-text-field>
-
-          <p>Senha</p>
-          <v-text-field
-            v-model="formData.password"
-            :rules="[rules.required, rules.minPassword]"
-            label="Senha"
-            placeholder="Digite a senha"
-            type="password"
-            outlined
-            dense
-          />
-        </v-col>
-
-        <!-- Coluna Direita -->
-        <v-col cols="12" md="4">
-          <p>CPF</p>
-          <v-text-field
-            v-model="formData.cpf"
-            :rules="[rules.required]"
-            label="CPF"
-            placeholder="000.000.000-00"
-            outlined
-            dense
-          />
-
-          <p>Numero do Contato</p>
-          <v-text-field
-            v-model="formData.phone"
-            :rules="[rules.required, rules.contactFormat]"
-            label="Número de Contato"
-            placeholder="(88) 00000-0000"
-            outlined
-            dense
-          >
-            <template v-slot:prepend-inner>
-              <div class="d-flex align-center mr-2">
-                <span class="mr-2">+55</span>
-                <v-divider vertical />
-              </div>
-            </template>
-          </v-text-field>
-        </v-col>
-      </v-row>
-
-      <!-- Botões de Ação -->
-      <v-row class="mt-4">
-        <v-col cols="12" class="d-flex justify-center">
-          <v-btn :disabled="!valid" color="#A7D129" dark large class="mr-4" @click="registrar">
-            SALVAR
+            Salvar funcionário
           </v-btn>
-          <v-btn color="black" dark large @click="cancelForm">
-            CANCELAR
-          </v-btn>
-        </v-col>
-      </v-row>
-    </v-form>
+        </div>
+      </v-form>
+    </v-card>
   </v-container>
 </template>
 
@@ -144,7 +159,7 @@ export default {
           cpf: this.formData.cpf.replace(/\D/g, ''),
           phone: this.formData.phone.replace(/\D/g, ''),
           role: 'USER',
-          isActive: true
+          isActive: true,
         }
 
         const response = await this.$api.post<User>('/users', payload)
@@ -171,6 +186,11 @@ export default {
 </script>
 
 <style scoped>
+.registration-card {
+  max-width: 980px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+}
 
 .v-text-field:deep(.v-input__prepend-inner) .v-divider {
   height: 70%;
