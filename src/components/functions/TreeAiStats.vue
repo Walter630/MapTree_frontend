@@ -70,6 +70,19 @@
       </v-btn>
 
       <div v-if="showDetails" class="technical-details">
+      <!-- Aviso quando a predição está ausente/incompleta: evita exibir zeros
+           e defaults como se fossem resultado da análise. -->
+      <v-alert
+        v-if="!hasValidPrediction"
+        type="info"
+        variant="tonal"
+        density="compact"
+        icon="mdi-information-outline"
+        class="mb-5"
+        rounded="lg"
+      >
+        <span class="font-weight-medium">Dados de análise incompletos para esta árvore. Os valores abaixo podem não refletir uma previsão real.</span>
+      </v-alert>
       <!-- ===== Progresso Altura vs Fio ===== -->
       <div class="section-block mb-6">
         <div class="section-header">
@@ -334,6 +347,19 @@ export default defineComponent({
   },
 
   computed: {
+    /* ---------- Validação da predição ---------- */
+    // A predição é considerada válida quando traz pelo menos a altura estimada
+    // ou a altura da fiação como número finito. Sem isso, os cálculos recaem em
+    // defaults (0 / 6.5m) que NÃO representam uma análise real.
+    hasValidPrediction(): boolean {
+      const p = this.data.aiPrediction
+      if (!p || typeof p !== 'object') return false
+      return (
+        Number.isFinite(Number(p.estimated_height_m)) ||
+        Number.isFinite(Number(p.wire_height_m))
+      )
+    },
+
     /* ---------- Risco ---------- */
     riskClass(): string {
       // OVERRIDE: Se estiver a 90% ou mais da fiação, é CRÍTICO independente do status da IA

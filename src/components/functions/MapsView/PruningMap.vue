@@ -209,17 +209,17 @@ const DEFAULT_STATUS: StatusInfo = { label: 'Normal', emoji: '🌳', color: '#4C
 
 function getStatusCfg(status: string, danger: boolean): StatusInfo {
   const s = String(status).toUpperCase()
-  
+
   // SE ESTIVER EM PERIGO (por altura/IA), forçamos CRÍTICO (Vermelho)
   if (danger || s === 'CRITICAL' || s === 'DANGER') {
     return STATUS_CONFIG['CRITICAL'] || STATUS_CONFIG['DANGER'] || DEFAULT_STATUS
   }
-  
+
   // SE FOR PARA PODAR, retorna o status laranja/amarelo correto (TO_PRUNE)
   if (s === 'TO_PRUNE') {
     return STATUS_CONFIG['TO_PRUNE'] || DEFAULT_STATUS
   }
-  
+
   // Caso contrário, respeita o status (incluindo TO_PRUNE em amarelo/laranja)
   return STATUS_CONFIG[s] || DEFAULT_STATUS
 }
@@ -261,6 +261,9 @@ export default defineComponent({
     const trees = ref<TreeOnMap[]>([])
     const markedLocations = ref<MarkedLocation[]>([])
     const markMode = ref(false)
+    const noteDialog = ref(false)
+    const noteText = ref('')
+    let pendingMarkLatLng: L.LatLng | null = null
     const isExpanded = ref(false)
     const loadingTrees = ref(false)
     const isInitialLoad = ref(true)
@@ -385,9 +388,20 @@ export default defineComponent({
       return trees.value.filter(t => t.status === activeFilter.value)
     })
 
+    // ESCOPOS DOS CONTADORES (regra adotada — ver FEAT-003):
+    // - treeCount: árvores CARREGADAS em memória (depende do modo nearby/bounds/city/tile).
+    //   NÃO é o total do banco; é o que foi trazido para o cliente.
+    // - visibleTreeCount: subconjunto de treeCount que está DENTRO do bounds atual do mapa.
+    // - cityStats.total: TOTAL global na cidade (vem do servidor via getCityStats), escopo distinto.
+    // Esses três contadores medem coisas diferentes e NÃO devem ser forçados a bater.
     const treeCount = computed(() => trees.value.length)
     const dangerCount = computed(() => trees.value.filter(t => t.nearPowerLine).length)
+    // criticalCount = "Precisa de poda" (isTreeForPruning): status TO_PRUNE/CRITICAL,
+    // altura >=90% da fiação ou previsão de alcançar o fio. É o escopo do filtro PRIORITY/"Pendentes".
     const criticalCount = computed(() => prioritizeTrees(trees.value).filter((item) => isTreeForPruning(item.tree)).length)
+    // criticalUrgencyCount = "Críticos": apenas urgência CRITICAL (contato/risco iminente na fiação).
+    // É um subconjunto de criticalCount e é o escopo coerente com o filtro CRITICAL (activeFilter === 'CRITICAL').
+    const criticalUrgencyCount = computed(() => prioritizeTrees(trees.value).filter((item) => item.urgency === 'CRITICAL').length)
     const markedCount = computed(() => markedLocations.value.length)
     const statusCounts = computed(() => {
       const counts: Record<string, number> = { NORMAL: 0, TO_PRUNE: 0, UNDER_OBSERVATION: 0, PRUNED: 0, CRITICAL: 0 }
@@ -1165,7 +1179,7 @@ export default defineComponent({
         console.error('Routing error:', e)
         notify('Não foi possível calcular a rota. Servidor OSRM ocupado ou inacessível.', 'error')
       })
-      
+
       // Fechar popups abertos
       if (map) map.closePopup()
     }
@@ -1248,7 +1262,7 @@ export default defineComponent({
               <p style="margin:0; font-size:11px; color:#888; text-align:center;">Coordenadas: ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</p>
               <div style="display:flex; gap:8px; margin-top:16px;">
                 <button id="btn-route-${popupTreeId}" style="
-                  flex:1; background:#007bff; color:#fff; border:none; 
+                  flex:1; background:#007bff; color:#fff; border:none;
                   padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
                   font-size:12px; text-transform:uppercase;
                   box-shadow: 0 4px 12px rgba(0,123,255,0.3); transition: transform 0.2s;
@@ -1371,7 +1385,7 @@ export default defineComponent({
               3: 'Tempo esgotado ao buscar localização',
             }
             locationError.value = msgs[err.code] || 'Erro desconhecido'
-            
+
             // Fallback: Se falhar a localização, centraliza na primeira árvore
             if (map?.getPane?.('mapPane') && trees.value.length > 0 && trees.value[0]) {
               const first = trees.value[0]
@@ -1380,7 +1394,7 @@ export default defineComponent({
             } else {
               notify(locationError.value, 'warning')
             }
-            
+
             locating.value = false
             resolve(false)
           },
@@ -1462,6 +1476,34 @@ export default defineComponent({
       const loc = markedLocations.value.find(m => m.id === id)
       if (loc?.marker) markedMarkersLayer?.removeLayer(loc.marker as unknown as L.Layer)
       markedLocations.value = markedLocations.value.filter(m => m.id !== id)
+    }
+
+    const createMarkingAt = (latlng: L.LatLng, notes: string) => {
+      const marker = L.marker([latlng.lat, latlng.lng], { icon: createMarkIcon() })
+      marker.bindPopup(`
+        <div style="min-width:160px;font-family:system-ui;">
+          <div style="font-weight:700;color:#7B1FA2;margin-bottom:4px;">📌 Marcação</div>
+          <p style="margin:2px 0;font-size:13px;">${escapeHtml(notes || 'Sem nota')}</p>
+          <p style="margin:2px 0;font-size:11px;color:#888;">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</p>
+        </div>
+      `)
+      markedMarkersLayer!.addLayer(marker)
+      marker.openPopup()
+      markedLocations.value.push({ id: String(Date.now()), lat: latlng.lat, lng: latlng.lng, notes: notes || '', timestamp: new Date(), marker })
+      notify('📌 Marcação adicionada!', 'info')
+    }
+
+    const confirmMarking = () => {
+      if (pendingMarkLatLng) {
+        createMarkingAt(pendingMarkLatLng, noteText.value)
+      }
+      noteDialog.value = false
+      pendingMarkLatLng = null
+    }
+
+    const cancelMarking = () => {
+      noteDialog.value = false
+      pendingMarkLatLng = null
     }
 
     const toggleExpand = () => {
@@ -1551,27 +1593,42 @@ export default defineComponent({
         const res = await apiConnect.get<any>(`/trees/${t.id}`)
         const data = res.data || {}
 
+        // Valida se um objeto tem o formato mínimo de uma predição de IA.
+        // Evita passar a resposta bruta de /trees/:id (que NÃO tem os campos de
+        // predição) como se fosse uma predição válida — isso faria o painel exibir
+        // zeros/defaults enganosos em vez do estado "sem análise".
+        const isValidPrediction = (p: unknown): boolean => {
+          if (!p || typeof p !== 'object') return false
+          const pred = p as { estimated_height_m?: unknown; wire_height_m?: unknown }
+          return Number.isFinite(Number(pred.estimated_height_m)) || Number.isFinite(Number(pred.wire_height_m))
+        }
+
         // Se não tiver predição nos dados básicos, tenta buscar no novo endpoint
-        let aiPrediction = data.aiPrediction
+        let aiPrediction = isValidPrediction(data.aiPrediction) ? data.aiPrediction : null
         if (!aiPrediction) {
           try {
             const predRes = await apiConnect.getAiPrediction(t.id)
-            aiPrediction = predRes.data
+            aiPrediction = isValidPrediction(predRes.data) ? predRes.data : null
           } catch (pErr) {
             console.warn('Predição IA não encontrada para esta árvore', pErr)
           }
         }
 
-        // Montamos o objeto TreeWithAi combinando os dados
-        aiTreeData.value = {
-          id: t.id,
-          commonName: data.species?.commonName || t.speciesName || 'Árvore Independente',
-          status: t.status as any,
-          aiPrediction: aiPrediction || data, 
-          soil: data.soil || (data.solo ? data.solo[0] : null) || null,
-          vigor: data.vigor || 'GOOD',
-          measurements: data.measurements || [],
-          maintenanceSchedule: data.maintenanceSchedule || []
+        // Só montamos o objeto quando há predição válida. Sem predição, deixamos
+        // aiTreeData nulo para que o drawer mostre o estado "sem análise disponível".
+        if (aiPrediction) {
+          aiTreeData.value = {
+            id: t.id,
+            commonName: data.species?.commonName || t.speciesName || 'Árvore Independente',
+            status: t.status as any,
+            aiPrediction,
+            soil: data.soil || (data.solo ? data.solo[0] : null) || null,
+            vigor: data.vigor || 'GOOD',
+            measurements: data.measurements || [],
+            maintenanceSchedule: data.maintenanceSchedule || []
+          }
+        } else {
+          aiTreeData.value = null
         }
       } catch (err) {
         console.error('Erro ao buscar dados completos da árvore:', err)
@@ -1683,37 +1740,26 @@ export default defineComponent({
         if (isSimulationMode.value) {
           userLat.value = ev.latlng.lat
           userLng.value = ev.latlng.lng
-          
+
           if (userMarker) {
             userMarker.setLatLng(ev.latlng)
           } else {
             userMarker = L.marker(ev.latlng, { icon: createUserIcon(), zIndexOffset: 1000 }).addTo(map!)
           }
-          
+
           if (userAccuracyCircle) {
             userAccuracyCircle.setLatLng(ev.latlng).setRadius(10)
           }
-          
+
           notify('📍 Posição definida manualmente!', 'success')
           isSimulationMode.value = false
           return
         }
 
         if (!markMode.value) return
-        const notes = prompt('📌 Digite uma nota para esta marcação:')
-        if (notes === null) return
-        const marker = L.marker([ev.latlng.lat, ev.latlng.lng], { icon: createMarkIcon() })
-        marker.bindPopup(`
-          <div style="min-width:160px;font-family:system-ui;">
-            <div style="font-weight:700;color:#7B1FA2;margin-bottom:4px;">📌 Marcação</div>
-            <p style="margin:2px 0;font-size:13px;">${escapeHtml(notes || 'Sem nota')}</p>
-            <p style="margin:2px 0;font-size:11px;color:#888;">${ev.latlng.lat.toFixed(6)}, ${ev.latlng.lng.toFixed(6)}</p>
-          </div>
-        `)
-        markedMarkersLayer!.addLayer(marker)
-        marker.openPopup()
-        markedLocations.value.push({ id: String(Date.now()), lat: ev.latlng.lat, lng: ev.latlng.lng, notes: notes || '', timestamp: new Date(), marker })
-        notify('📌 Marcação adicionada!', 'info')
+        pendingMarkLatLng = ev.latlng
+        noteText.value = ''
+        noteDialog.value = true
       })
 
       // Iniciar: Primeiro obtém localização, depois carrega árvores
@@ -1833,9 +1879,10 @@ export default defineComponent({
 
     return {
       trees, filteredTrees, markedLocations, markMode, isExpanded,
+      noteDialog, noteText, confirmMarking, cancelMarking,
       loadingTrees, blockingMapLoading, locating, locationError, searchQuery, searching,
       sidebarOpen, activeFilter, mapStyle, snackbar, snackbarText, snackbarColor,
-      selectedTree, treeCount, visibleTreeCount, dangerCount, criticalCount, markedCount, statusCounts, isMobile,
+      selectedTree, treeCount, visibleTreeCount, dangerCount, criticalCount, criticalUrgencyCount, markedCount, statusCounts, isMobile,
       goToUserLocation, toggleMarkMode, toggleExpand, toggleMapStyle, setFollowUserPosition,
       refreshData, removeMarkedLocation, searchAddress, flyToTree,
       STATUS_CONFIG, isRouting, stopRouting, isSimulationMode, toggleSimulationMode,
@@ -1965,7 +2012,7 @@ export default defineComponent({
         </v-btn>
         <v-btn value="CRITICAL" class="toggle-btn">
           <v-icon start color="red">mdi-alert-decagram</v-icon>
-          Críticos ({{ criticalCount }})
+          Críticos ({{ criticalUrgencyCount }})
         </v-btn>
         <v-btn value="UNDER_OBSERVATION" class="toggle-btn">
           <v-icon start color="amber">mdi-eye</v-icon>
@@ -2095,7 +2142,13 @@ export default defineComponent({
               <v-icon size="16" color="green-darken-2" class="mr-1">mdi-leaf</v-icon>
               Mapa de Podas
             </span>
-            <v-chip size="x-small" color="green" variant="flat" class="font-weight-bold">
+            <v-chip
+              size="x-small"
+              color="green"
+              variant="flat"
+              class="font-weight-bold"
+              title="Visíveis no mapa / Carregadas em memória"
+            >
               {{ visibleTreeCount }}/{{ treeCount }}
             </v-chip>
           </div>
@@ -2107,6 +2160,7 @@ export default defineComponent({
               size="small"
               color="green-lighten-4"
               class="stat-btn"
+              title="Visíveis no mapa (dentro da área atual)"
               @click="sidebarOpen = true; activeTab = 'arvores'"
             >
               <v-icon size="14" color="green-darken-2" class="mr-1">mdi-eye</v-icon>
@@ -2118,6 +2172,7 @@ export default defineComponent({
               size="small"
               color="blue-lighten-4"
               class="stat-btn"
+              title="Carregadas em memória (depende do modo de carregamento)"
               @click="sidebarOpen = true; activeTab = 'arvores'"
             >
               <v-icon size="14" color="blue-darken-2" class="mr-1">mdi-tree</v-icon>
@@ -2691,13 +2746,44 @@ export default defineComponent({
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="importCsvMode = false">Cancelar</v-btn>
-          <v-btn 
-            color="deep-purple-darken-1" 
-            variant="flat" 
-            @click="syncCsvIA" 
+          <v-btn
+            color="deep-purple-darken-1"
+            variant="flat"
+            @click="syncCsvIA"
             :loading="importingIA"
           >
             Iniciar Importação
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- =====================================================
+         MODAL - Nota de nova marcação no mapa
+         ===================================================== -->
+    <v-dialog v-model="noteDialog" max-width="400">
+      <v-card class="rounded-xl pa-4">
+        <v-card-title class="headline d-flex align-center">
+          📌 Nova marcação
+        </v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="noteText"
+            label="Nota da marcação"
+            variant="outlined"
+            autofocus
+            @keyup.enter="confirmMarking"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="cancelMarking">Cancelar</v-btn>
+          <v-btn
+            color="deep-purple-darken-1"
+            variant="flat"
+            @click="confirmMarking"
+          >
+            Confirmar
           </v-btn>
         </v-card-actions>
       </v-card>

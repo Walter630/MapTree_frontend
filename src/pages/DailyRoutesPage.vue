@@ -38,6 +38,12 @@ const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const feedback = ref('')
+// Estado de sincronização da rota salva:
+// - 'idle': ainda não salvou nesta sessão
+// - 'local': salvo apenas neste dispositivo (snapshot), sem servidor ainda
+// - 'pending': salvo localmente, mas alguma parada falhou no servidor
+// - 'server': todas as paradas confirmadas no servidor
+const syncState = ref<'idle' | 'local' | 'pending' | 'server'>('idle')
 const filters = reactive({ date: new Date().toISOString().slice(0, 10), urgency: 'ALL', search: '' })
 
 // Paginação da lista de árvores (10 por página)
@@ -78,6 +84,18 @@ watch(pageCount, (count) => {
   if (page.value > count) page.value = count
 })
 const totalScore = computed(() => routeStops.value.reduce((sum, stop) => sum + (prioritized.value.find((item) => item.tree.id === stop.id)?.priorityScore || 0), 0))
+
+const syncStateChip = computed(() => {
+  switch (syncState.value) {
+    case 'server':
+      return { color: 'green-darken-2', icon: 'mdi-cloud-check', label: 'Confirmada no servidor' }
+    case 'pending':
+      return { color: 'orange-darken-2', icon: 'mdi-cloud-alert', label: 'Pendente de sincronização' }
+    case 'local':
+    default:
+      return { color: 'blue-grey', icon: 'mdi-cellphone-check', label: 'Salvo neste dispositivo' }
+  }
+})
 
 function treeName(item: PrioritizedTree<Tree>) {
   return item.tree.species?.commonName || item.tree.speciesName || `Árvore #${String(item.tree.id).slice(-6)}`
@@ -210,14 +228,10 @@ async function saveRoute() {
 
   saving.value = true
   feedback.value = ''
-  const payload = {
-    plannedDate: filters.date,
-    type: 'PRUNING_ROUTE',
-    status: 'PENDING',
-    treeIds: routeStops.value.map((stop) => stop.id),
-    stops: routeStops.value.map((stop) => ({ treeId: stop.id, order: stop.order })),
-  }
+  syncState.value = 'local'
 
+  // Snapshot local primeiro: a rota fica sempre disponível neste dispositivo
+  // (mini-mapa e "Ver rota no mapa"), independente do resultado da sincronização.
   const snapshot = {
     date: filters.date,
     updatedAt: new Date().toISOString(),
@@ -231,13 +245,37 @@ async function saveRoute() {
     })),
   }
   saveDailyRouteSnapshot(snapshot)
-  try {
-    await apiConnect.post('/scheduling', payload)
+
+  // DECISÃO (ver FEAT-003): o backend expõe POST /scheduling com CreateScheduleDto,
+  // que exige treeId SINGULAR e descarta campos não declarados (treeIds/stops/status)
+  // por causa do ValidationPipe com whitelist. O payload antigo (treeIds/stops) caía
+  // em 400 sempre. Por isso enviamos UMA solicitação de agendamento POR PARADA.
+  // A data planejada vira um ISO com horário fixo (08:00) para satisfazer @IsDate.
+  const plannedDate = new Date(`${filters.date}T08:00:00`).toISOString()
+  const results = await Promise.allSettled(
+    routeStops.value.map((stop) =>
+      apiConnect.post('/scheduling', {
+        treeId: stop.id,
+        type: 'PRUNING',
+        plannedDate,
+        notes: `Rota diária ordem ${stop.order}`,
+      }),
+    ),
+  )
+
+  const failed = results.filter((r) => r.status === 'rejected').length
+  saving.value = false
+
+  // Só declaramos "confirmada no servidor" quando TODAS as paradas persistem.
+  // Qualquer falha mantém o estado "pendente de sincronização" e permite nova tentativa.
+  if (failed === 0) {
+    syncState.value = 'server'
     feedback.value = 'Rota confirmada no servidor e disponível no mapa.'
-  } catch {
-    feedback.value = 'Não foi possível confirmar a rota no servidor. A visualização do mapa está disponível neste dispositivo, mas a operação só deve ser considerada oficial após a sincronização.'
-  } finally {
-    saving.value = false
+  } else {
+    syncState.value = 'pending'
+    const total = routeStops.value.length
+    const ok = total - failed
+    feedback.value = `Rota salva neste dispositivo, mas pendente de sincronização: ${ok} de ${total} paradas confirmadas no servidor. Toque em "Salvar rota" para tentar novamente.`
   }
 }
 
@@ -368,8 +406,17 @@ function organizeSelectedRoute() {
 
 watch(() => filters.date, () => {
   routeStops.value = []
+  syncState.value = 'idle'
   loadLocalRoute()
 })
+
+// Qualquer edição das paradas após salvar invalida a confirmação anterior:
+// a rota passa a estar apenas "local" até um novo "Salvar rota" bem-sucedido.
+watch(routeStops, () => {
+  if (syncState.value === 'server' || syncState.value === 'pending') {
+    syncState.value = 'local'
+  }
+}, { deep: true })
 
 onMounted(async () => {
   await loadTrees()
@@ -399,6 +446,18 @@ onBeforeUnmount(() => {
         <v-btn variant="tonal" color="blue-darken-2" prepend-icon="mdi-map" :disabled="!routeStops.length" @click="openRouteOnMap">Ver rota no mapa</v-btn>
         <v-btn color="green-darken-2" prepend-icon="mdi-content-save" :loading="saving" @click="saveRoute">Salvar rota</v-btn>
       </div>
+      <!-- Estado de sincronização: distingue claramente o que está só no dispositivo
+           do que foi confirmado no servidor. Não apresenta dado local como persistido. -->
+      <v-chip
+        v-if="syncState !== 'idle'"
+        :color="syncStateChip.color"
+        variant="tonal"
+        size="small"
+        :prepend-icon="syncStateChip.icon"
+        class="font-weight-bold"
+      >
+        {{ syncStateChip.label }}
+      </v-chip>
     </div>
 
     <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-4">{{ errorMessage }}</v-alert>
