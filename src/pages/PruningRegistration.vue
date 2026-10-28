@@ -69,18 +69,6 @@
                 />
               </v-col>
 
-              <!-- Data Original (quando a árvore foi plantada/identificada) -->
-              <v-col cols="12" md="6">
-                <label class="field-label">Data da Árvore (opcional)</label>
-                <v-text-field
-                  v-model="form.dateTree"
-                  type="date"
-                  placeholder="Data original da árvore"
-                  variant="outlined"
-                  density="comfortable"
-                />
-              </v-col>
-
               <!-- Observações -->
               <v-col cols="12">
                 <label class="field-label">Observações</label>
@@ -141,7 +129,7 @@
             height="48"
             class="mb-3 font-weight-bold text-none"
             :loading="submitting"
-            :disabled="!isValid && showValidation"
+            :disabled="submitting || (!isValid && showValidation)"
             @click="submit"
           >
             <v-icon start>mdi-check</v-icon>
@@ -189,6 +177,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const router = useRouter()
 
@@ -209,7 +198,6 @@ const form = ref({
   idTree: '',
   type: '',
   date: new Date().toISOString().split('T')[0],
-  dateTree: '',
   observations: '',
 })
 
@@ -272,14 +260,13 @@ const submit = async () => {
       idTree: form.value.idTree,
       type: form.value.type,
       date: form.value.date,
-      dateTree: form.value.dateTree || null,
       observations: form.value.observations,
     })
 
     showSuccess.value = true
   } catch (error: any) {
     console.error('Erro ao registrar poda:', error)
-    errorMessage.value = error.response?.data?.message || 'Erro ao registrar poda'
+    errorMessage.value = getApiErrorMessage(error, 'Não foi possível registrar a poda. Tente novamente.')
     showError.value = true
   } finally {
     submitting.value = false

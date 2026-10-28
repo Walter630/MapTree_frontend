@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiConnect } from '@/plugins/apiConnect'
+import { getApiErrorMessage } from '@/utils/apiError'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface SpeciesOption {
@@ -28,9 +29,13 @@ const form = reactive({
   vigor: 'GOOD',
 })
 
-const isManager = computed(() => route.path.startsWith('/manager'))
-const backRoute = computed(() => (isManager.value ? '/manager' : '/admin'))
-const pageTitle = computed(() => (isManager.value ? 'Cadastrar árvore' : 'Cadastrar árvore na organização'))
+const backRoute = computed(() => {
+  if (route.path.startsWith('/manager')) return '/manager'
+  if (route.path.startsWith('/user')) return '/user'
+  return '/admin'
+})
+const isAdmin = computed(() => route.path.startsWith('/admin'))
+const pageTitle = computed(() => (isAdmin.value ? 'Cadastrar árvore na organização' : 'Cadastrar árvore'))
 
 const statusOptions = [
   { title: 'Normal', value: 'NORMAL' },
@@ -52,10 +57,12 @@ const rules = {
   },
   latitude: (value: unknown) => {
     const number = Number(value)
+    if (!Number.isFinite(number)) return 'Informe uma latitude válida'
     return (number >= -90 && number <= 90) || 'Latitude deve estar entre -90 e 90'
   },
   longitude: (value: unknown) => {
     const number = Number(value)
+    if (!Number.isFinite(number)) return 'Informe uma longitude válida'
     return (number >= -180 && number <= 180) || 'Longitude deve estar entre -180 e 180'
   },
 }
@@ -80,13 +87,23 @@ async function submit() {
 
   loading.value = true
   try {
-    const payload = {
-      speciesId: form.speciesId,
-      lat: Number(form.latitude),
-      lng: Number(form.longitude),
-      age: form.age ? `${form.age}-01-01` : undefined,
+    const payload: {
+      idSpecies: string
+      latitude: number
+      longitude: number
+      status: string
+      vigor: string
+      age?: string
+    } = {
+      idSpecies: form.speciesId,
+      latitude: Number(form.latitude),
+      longitude: Number(form.longitude),
       status: form.status,
       vigor: form.vigor,
+    }
+
+    if (form.age) {
+      payload.age = new Date(`${form.age}-01-01`).toISOString()
     }
 
     await apiConnect.post('/trees', payload)
@@ -98,8 +115,7 @@ async function submit() {
     form.status = 'NORMAL'
     form.vigor = 'GOOD'
   } catch (error: unknown) {
-    const apiError = error as { response?: { data?: { message?: string } } }
-    errorMessage.value = apiError.response?.data?.message || 'Não foi possível cadastrar a árvore. Confira os dados e tente novamente.'
+    errorMessage.value = getApiErrorMessage(error, 'Não foi possível cadastrar a árvore. Confira os dados e tente novamente.')
   } finally {
     loading.value = false
   }
@@ -136,7 +152,7 @@ onMounted(loadSpecies)
         {{ errorMessage }}
       </v-alert>
 
-      <v-form ref="formRef" class="pa-6" @submit.prevent="submit">
+      <v-form ref="formRef" validate-on="submit" class="pa-6" @submit.prevent="submit">
         <p class="text-subtitle-1 font-weight-bold mb-4">Identificação</p>
         <v-row>
           <v-col cols="12" md="7">
@@ -171,6 +187,8 @@ onMounted(loadSpecies)
               label="Latitude *"
               type="number"
               step="any"
+              min="-90"
+              max="90"
               variant="outlined"
               prepend-inner-icon="mdi-latitude"
               :rules="[rules.required, rules.coordinate, rules.latitude]"
@@ -184,6 +202,8 @@ onMounted(loadSpecies)
               label="Longitude *"
               type="number"
               step="any"
+              min="-180"
+              max="180"
               variant="outlined"
               prepend-inner-icon="mdi-longitude"
               :rules="[rules.required, rules.coordinate, rules.longitude]"
@@ -209,7 +229,7 @@ onMounted(loadSpecies)
 
         <div class="d-flex flex-wrap justify-end ga-3">
           <v-btn variant="outlined" @click="router.push(backRoute)">Cancelar</v-btn>
-          <v-btn color="green-darken-2" type="submit" :loading="loading" prepend-icon="mdi-content-save">Salvar árvore</v-btn>
+          <v-btn color="green-darken-2" type="submit" :loading="loading" :disabled="loading" prepend-icon="mdi-content-save">Salvar árvore</v-btn>
         </div>
       </v-form>
     </v-card>
