@@ -505,8 +505,13 @@ export type { ApiConnect }
    TYPE AUGMENTATION
 =================================== */
 
-declare module '@vue/runtime-core' {
+declare module 'vue' {
   interface ComponentCustomProperties {
     $api: ApiConnect
+    axios: AxiosInstance
+    $router: import('vue-router').Router
+    $route: import('vue-router').RouteLocationNormalizedLoaded
+    $store: ReturnType<typeof import('@/stores/app').useAppStore>
+    $isMobile: () => boolean
   }
 }
