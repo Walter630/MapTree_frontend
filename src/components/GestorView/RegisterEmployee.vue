@@ -30,7 +30,7 @@
             <v-text-field
               v-model="formData.name"
               :rules="[rules.required]"
-              label="Nome do funcionário"
+              label="Nome do funcionário *"
               placeholder="Digite o nome"
               prepend-inner-icon="mdi-account"
               variant="outlined"
@@ -38,11 +38,14 @@
           </v-col>
           <v-col cols="12" md="6">
             <v-text-field
-              v-model="formData.cpf"
+              id="cpf-input"
+              v-model="cpfInput"
               :rules="[rules.required]"
-              label="CPF"
+              label="CPF *"
               placeholder="000.000.000-00"
               prepend-inner-icon="mdi-card-account-details"
+              inputmode="numeric"
+              maxlength="14"
               variant="outlined"
             />
           </v-col>
@@ -54,23 +57,27 @@
             <v-text-field
               v-model="formData.email"
               :rules="[rules.required, rules.email]"
-              label="E-mail"
+              label="E-mail *"
               placeholder="Digite o e-mail"
               prepend-inner-icon="mdi-email-outline"
               variant="outlined"
             >
               <template #label>
                 E-mail <span class="text-grey">— Endereço de e-mail</span>
+                <span class="text-error">*</span>
               </template>
             </v-text-field>
           </v-col>
           <v-col cols="12" md="6">
             <v-text-field
-              v-model="formData.phone"
+              id="phone-input"
+              v-model="phoneInput"
               :rules="[rules.required, rules.contactFormat]"
-              label="Número de contato"
+              label="Número de contato *"
               placeholder="(88) 00000-0000"
               prepend-inner-icon="mdi-phone-outline"
+              inputmode="numeric"
+              maxlength="15"
               variant="outlined"
             >
               <template #prepend-inner>
@@ -85,7 +92,7 @@
             <v-text-field
               v-model="formData.password"
               :rules="[rules.required, rules.minPassword]"
-              label="Senha"
+              label="Senha *"
               placeholder="Digite a senha"
               type="password"
               prepend-inner-icon="mdi-lock-outline"
@@ -113,12 +120,18 @@
 </template>
 
 <script lang="ts">
+import { useRouter } from 'vue-router'
 import type { User } from '@/plugins/apiConnect'
 import PageHeader from '@/components/shared/PageHeader.vue'
+import { onlyDigits, formatCpf, formatPhone } from '@/utils/masks'
 
 export default {
   name: 'CadastroFuncionario',
   components: { PageHeader },
+
+  setup() {
+    return { router: useRouter() }
+  },
 
   data() {
     return {
@@ -146,9 +159,28 @@ export default {
     }
   },
 
+  computed: {
+    cpfInput: {
+      get(): string {
+        return this.formData.cpf
+      },
+      set(value: string) {
+        this.formData.cpf = formatCpf(value)
+      },
+    },
+    phoneInput: {
+      get(): string {
+        return this.formData.phone
+      },
+      set(value: string) {
+        this.formData.phone = formatPhone(value)
+      },
+    },
+  },
+
   methods: {
     goBack() {
-      this.$router.push('/manager/employees')
+      this.router.push('/manager/employees')
     },
 
     async registrar() {
@@ -156,15 +188,15 @@ export default {
         // Garantir que estamos registrando um 'USER' associado à organização do gestor
         const payload = {
           ...this.formData,
-          cpf: this.formData.cpf.replace(/\D/g, ''),
-          phone: this.formData.phone.replace(/\D/g, ''),
+          cpf: onlyDigits(this.formData.cpf),
+          phone: onlyDigits(this.formData.phone),
           role: 'USER',
           isActive: true,
         }
 
         const response = await this.$api.post<User>('/users', payload)
         if (response.status === 201) {
-          this.$router.push('/manager/employees')
+          this.router.push('/manager/employees')
         }
       } catch (error) {
         console.error('Erro no registro: ', error)
@@ -179,7 +211,7 @@ export default {
 
     cancelForm() {
       this.resetForm()
-      this.$router.push('/manager/employees')
+      this.router.push('/manager/employees')
     },
   },
 }

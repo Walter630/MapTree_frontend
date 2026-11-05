@@ -10,7 +10,7 @@
       ]"
     />
 
-    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px;">
+    <v-form ref="form" v-model="valid" lazy-validation style="margin-top: 50px">
       <v-row justify="center">
         <v-col cols="12" md="4" class="d-flex flex-column">
           <div class="input-group">
@@ -20,7 +20,6 @@
               :rules="[rules.required]"
               placeholder="Digite o nome"
               variant="outlined"
-
               hide-details
             ></v-text-field>
           </div>
@@ -34,7 +33,7 @@
               hide-details
             >
               <template v-slot:label>
-                <span style="color: #667085; font-size: 0.875rem;">Endereço de Email</span>
+                <span style="color: #667085; font-size: 0.875rem">Endereço de Email</span>
               </template>
             </v-text-field>
           </div>
@@ -46,7 +45,6 @@
               placeholder="Digite o CPF"
               mask="###.###.###-##"
               variant="outlined"
-
               hide-details
             ></v-text-field>
           </div>
@@ -65,7 +63,7 @@
             >
               <template v-slot:prepend-inner>
                 <div class="d-flex align-center mr-2">
-                  <span class="mr-2" style="color: #344054;">+55</span>
+                  <span class="mr-2" style="color: #344054">+55</span>
                   <v-divider vertical class="contact-divider"></v-divider>
                 </div>
               </template>
@@ -81,7 +79,6 @@
               placeholder="Nome da Empresa"
               :rules="[rules.required]"
               variant="outlined"
-
               hide-details
             ></v-select>
           </div>
@@ -93,13 +90,11 @@
               placeholder="Digite a senha"
               type="password"
               variant="outlined"
-
               hide-details
             ></v-text-field>
           </div>
         </v-col>
       </v-row>
-
 
       <v-row class="mt-8">
         <v-col cols="12" class="d-flex justify-center">
@@ -114,13 +109,7 @@
             SALVAR
           </v-btn>
 
-          <v-btn
-            color="#344054"
-            dark
-            large
-            class="cancel-button"
-            @click="cancelForm"
-          >
+          <v-btn color="#344054" dark large class="cancel-button" @click="cancelForm">
             CANCELAR
           </v-btn>
         </v-col>
@@ -134,12 +123,12 @@ import type { User, Company } from '@/plugins/apiConnect.ts'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Empresa {
-  id: string;
-  name: string;
-  taxId: string;
-  isOutsourced: boolean     //se é terceirizada
-  managerId: string;
-  isActive?: boolean;
+  id: string
+  name: string
+  taxId: string
+  isOutsourced: boolean //se é terceirizada
+  managerId: string
+  isActive?: boolean
 }
 
 export default {
@@ -162,17 +151,23 @@ export default {
       allCompanies: [] as Empresa[],
       // ... dentro do data()
       rules: {
-        required: (value: any) => !!value || 'Campo obrigatório.',
-        email: (value: any) => {
-          const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        required: (value: unknown) => !!value || 'Campo obrigatório.',
+        email: (value: unknown) => {
+          const pattern =
+            /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
           return pattern.test(String(value)) || 'Email inválido.'
         },
-        minPassword: (v: any) => String(v).length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
-        contactFormat: (v: any) => (v && String(v).replace(/[^0-9]/g, '').length >= 10) || 'Contato deve ter pelo menos 10 dígitos (DDD + Número).',
-        cpfFormat: (v: any) => (v && String(v).replace(/[^0-9]/g, '').length === 11) || 'CPF inválido. Deve conter 11 dígitos.',
+        minPassword: (v: unknown) =>
+          String(v).length >= 6 || 'A senha deve ter pelo menos 6 caracteres.',
+        contactFormat: (v: unknown) =>
+          (Boolean(v) && String(v).replace(/[^0-9]/g, '').length >= 10) ||
+          'Contato deve ter pelo menos 10 dígitos (DDD + Número).',
+        cpfFormat: (v: unknown) =>
+          (Boolean(v) && String(v).replace(/[^0-9]/g, '').length === 11) ||
+          'CPF inválido. Deve conter 11 dígitos.',
       },
-// ...
-    };
+      // ...
+    }
   },
   mounted() {
     this.getCompanies()
@@ -184,46 +179,46 @@ export default {
     },
     async getCompanies() {
       try {
-        const response = await this.$api.get<Company[]>('/organizations');
-        this.allCompanies = response.data.map(comp => ({
+        const response = await this.$api.get<Company[]>('/organizations')
+        this.allCompanies = response.data.map((comp) => ({
           id: comp.id,
           name: comp.name,
           taxId: comp.taxId,
           isOutsourced: comp.isOutsourced,
           managerId: comp.managerId ?? '',
-          isActive: comp.isActive ?? true
-        }));
-        this.empresas = this.allCompanies.filter(comp => comp.isActive);
+          isActive: comp.isActive ?? true,
+        }))
+        this.empresas = this.allCompanies.filter((comp) => comp.isActive)
       } catch (error) {
-        console.error('Erro ao buscar empresas: ', error);
+        console.error('Erro ao buscar empresas: ', error)
       }
     },
     async registrar() {
       try {
-        const response = await this.$api.post<User>('/auth/register', this.formData);
+        const response = await this.$api.post<User>('/auth/register', this.formData)
         if (response.status === 201) {
           this.$router.push('/admin/managers')
         } else {
-          console.log('Erro no registro: ', response);
+          console.log('Erro no registro: ', response)
         }
       } catch (error) {
-        console.error('Erro no registro: ', error);
+        console.error('Erro no registro: ', error)
         alert('Erro no registro: ' + error)
       }
     },
     async submitForm() {
-      const { valid } = await (this.$refs.form as HTMLFormElement).validate();
+      const { valid } = await (this.$refs.form as HTMLFormElement).validate()
 
       if (valid) {
-        console.log('Formulário Válido, enviando dados:', this.formData);
-        alert('Gestor Cadastrado com Sucesso!');
-        this.resetForm();
+        console.log('Formulário Válido, enviando dados:', this.formData)
+        alert('Gestor Cadastrado com Sucesso!')
+        this.resetForm()
       } else {
-        console.log('Formulário Inválido');
+        console.log('Formulário Inválido')
       }
     },
     resetForm() {
-      (this.$refs.form as HTMLFormElement).reset();
+      ;(this.$refs.form as HTMLFormElement).reset()
       this.formData = {
         name: '',
         email: '',
@@ -233,19 +228,17 @@ export default {
         empresa: '',
         role: 'MANAGER',
         isActive: true,
-      };
+      }
     },
     cancelForm() {
-      console.log('Ação de Cancelar');
-      this.resetForm();
+      console.log('Ação de Cancelar')
+      this.resetForm()
     },
   },
-};
+}
 </script>
 
 <style scoped>
-
-
 .input-label {
   font-size: 0.875rem; /* Tamanho da fonte das labels */
   color: #344054; /* Cor mais escura para as labels */
@@ -260,9 +253,9 @@ export default {
 
 .custom-text-field.v-text-field--solo :deep(.v-field),
 .custom-text-field.v-select--solo :deep(.v-field) {
-  border: 1px solid #D0D5DD;
+  border: 1px solid #d0d5dd;
   border-radius: 8px;
-  background-color: #FFFFFF !important;
+  background-color: #ffffff !important;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   padding: 0 14px;
 }
@@ -295,7 +288,7 @@ export default {
 
 .contact-field :deep(.v-divider) {
   height: 24px;
-  border-right: 1px solid #D0D5DD;
+  border-right: 1px solid #d0d5dd;
   margin-right: 8px;
   margin-left: -4px;
 }
@@ -306,7 +299,7 @@ export default {
 
 /* Botões */
 .save-button {
-  background-color: #A7D129 !important; /* Cor exata do botão salvar */
+  background-color: #a7d129 !important; /* Cor exata do botão salvar */
   color: white !important;
   text-transform: uppercase;
   font-weight: 600;
@@ -317,13 +310,13 @@ export default {
 }
 
 .cancel-button {
-  background-color: #FFFFFF !important; /* Botão cancelar branco */
+  background-color: #ffffff !important; /* Botão cancelar branco */
   color: #344054 !important; /* Texto cinza escuro */
   text-transform: uppercase;
   font-weight: 600;
   height: 44px !important;
   border-radius: 8px;
-  border: 1px solid #D0D5DD;
+  border: 1px solid #d0d5dd;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
   padding: 0 18px;
 }

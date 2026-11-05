@@ -5,10 +5,7 @@
         <PageHeader
           title="Empresas"
           subtitle="Gerencie empresas cadastradas no sistema"
-          :breadcrumbs="[
-            { text: 'Meu Painel', to: '/admin' },
-            { text: '#Empresas' },
-          ]"
+          :breadcrumbs="[{ text: 'Meu Painel', to: '/admin' }, { text: '#Empresas' }]"
         />
       </v-col>
     </v-row>
@@ -27,7 +24,6 @@
       </v-col>
     </v-row>
 
-
     <!-- Quick cards (com "ocr" ícone no canto direito) -->
     <v-row class="cards-row" align="stretch" justify="start" elevation="0">
       <v-col cols="12" sm="6" md="3">
@@ -39,7 +35,8 @@
             <v-icon class="corner-icon" small>mdi-domain</v-icon>
           </div>
 
-          <div class="summary-value">{{ totalCompanies }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
+          <div class="summary-value">{{ totalCompanies }}</div>
+          <div class="summary-note">+ 12% vs mês anterior</div>
         </v-card>
       </v-col>
 
@@ -147,9 +144,9 @@
       </v-col>
     </v-row>
 
-    <v-row class="mt-12" style="background-color: #F6F6F6; border-radius: 8px;">
+    <v-row class="mt-12" style="background-color: #f6f6f6; border-radius: 8px">
       <v-col cols="12" class="pa-0">
-        <p class="table-title-text mb-4 " style="font-size: 14px">Empresas Cadastradas</p>
+        <p class="table-title-text mb-4" style="font-size: 14px">Empresas Cadastradas</p>
         <v-data-table
           :headers="headers"
           :items="companies"
@@ -193,7 +190,7 @@
       <v-card-title class="text-h6">
         Confirmação de Exclusão
         <v-btn
-          style="position: absolute; top: 0; right: 0;"
+          style="position: absolute; top: 0; right: 0"
           icon="mdi-close"
           variant="text"
           @click="closeDialogDelete"
@@ -211,7 +208,14 @@
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn text @click="closeDialogDelete" :disabled="dialogDelete.loading">Cancelar</v-btn>
-        <v-btn color="red" :loading="dialogDelete.loading" :disabled="dialogDelete.loading" text @click="deleteItem">Excluir</v-btn>
+        <v-btn
+          color="red"
+          :loading="dialogDelete.loading"
+          :disabled="dialogDelete.loading"
+          text
+          @click="deleteItem"
+          >Excluir</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -220,7 +224,7 @@
       <v-card-title class="text-h6">
         Edição de Empresa
         <v-btn
-          style="position: absolute; top: 0; right: 0;"
+          style="position: absolute; top: 0; right: 0"
           icon="mdi-close"
           variant="text"
           @click="closeDialogUpdate"
@@ -241,11 +245,17 @@
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn text @click="closeDialogUpdate" :disabled="dialogUpdate.loading">Cancelar</v-btn>
-        <v-btn color="red" :loading="dialogUpdate.loading" :disabled="dialogUpdate.loading" text @click="editItem">Editar</v-btn>
+        <v-btn
+          color="red"
+          :loading="dialogUpdate.loading"
+          :disabled="dialogUpdate.loading"
+          text
+          @click="editItem"
+          >Editar</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>
-
 </template>
 
 <script lang="ts">
@@ -254,13 +264,13 @@ import type { Manager } from '@/plugins/apiConnect.ts'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 interface Company {
-  id: string;
-  name: string;
-  taxId: string;
-  isOutsourced: boolean     //se é terceirizada
-  managerId?: string;
-  manager: Manager;
-  isActive: boolean;
+  id: string
+  name: string
+  taxId: string
+  isOutsourced: boolean //se é terceirizada
+  managerId?: string
+  manager: Manager
+  isActive: boolean
 }
 
 export default defineComponent({
@@ -300,8 +310,8 @@ export default defineComponent({
       dialogUpdate: {
         active: false,
         item: null as Company | null,
-        loading: false
-      }
+        loading: false,
+      },
     }
   },
   computed: {
@@ -310,19 +320,18 @@ export default defineComponent({
     },
     totalCompanies() {
       return this.companies.length
-    }
+    },
   },
   mounted() {
     this.getCompanies()
   },
-
 
   methods: {
     // Função auxiliar para retornar a cor do v-chip com base no Status
     async getCompanies(): Promise<void> {
       try {
         const res = await this.$api.get<Company[]>('/organizations')
-        this.allCompanies = res.data.map(company => ({
+        this.allCompanies = res.data.map((company) => ({
           id: company.id,
           name: company.name,
           taxId: company.taxId,
@@ -334,7 +343,6 @@ export default defineComponent({
         this.companies = [...this.allCompanies]
       } catch (error) {
         console.error('Failed to fetch companies:', error)
-
       }
     },
 
@@ -349,7 +357,7 @@ export default defineComponent({
     },
     async editItem() {
       try {
-        this.dialogUpdate.loading = true;
+        this.dialogUpdate.loading = true
         await this.$api.patch(`/organizations/${this.dialogUpdate?.item?.id}`, {
           name: this.dialogUpdate?.item?.name,
           taxId: this.dialogUpdate?.item?.taxId,
@@ -357,27 +365,27 @@ export default defineComponent({
           manager: this.dialogUpdate?.item?.manager,
           managerId: this.dialogUpdate?.item?.managerId,
           isActive: this.dialogUpdate?.item?.isActive,
-        });
+        })
       } catch (error) {
-        console.error('Erro ao buscar empresa:', error);
+        console.error('Erro ao buscar empresa:', error)
       } finally {
-        await this.getCompanies();
-        this.dialogUpdate.loading = false;
-        this.dialogUpdate.active = false;
-        this.dialogUpdate.item = null;
+        await this.getCompanies()
+        this.dialogUpdate.loading = false
+        this.dialogUpdate.active = false
+        this.dialogUpdate.item = null
       }
     },
     async deleteItem() {
       try {
-        this.dialogDelete.loading = true;
-        await this.$api.delete(`/organizations/${this.dialogDelete?.item?.id}`);
+        this.dialogDelete.loading = true
+        await this.$api.delete(`/organizations/${this.dialogDelete?.item?.id}`)
       } catch (e) {
-        console.error('Erro ao deletar empresa:', e);
+        console.error('Erro ao deletar empresa:', e)
       } finally {
-        await this.getCompanies();
-        this.dialogDelete.loading = false;
-        this.dialogDelete.active = false;
-        this.dialogDelete.item = null;
+        await this.getCompanies()
+        this.dialogDelete.loading = false
+        this.dialogDelete.active = false
+        this.dialogDelete.item = null
       }
     },
     openDialogDelete(item: Company) {
@@ -385,14 +393,14 @@ export default defineComponent({
       this.dialogDelete.item = item
     },
     closeDialogDelete() {
-      this.dialogDelete.active = false;
-      this.dialogDelete.item = null;
-      this.dialogDelete.loading = false;
+      this.dialogDelete.active = false
+      this.dialogDelete.item = null
+      this.dialogDelete.loading = false
     },
     closeDialogUpdate() {
-      this.dialogUpdate.active = false;
-      this.dialogUpdate.item = null;
-      this.dialogUpdate.loading = false;
+      this.dialogUpdate.active = false
+      this.dialogUpdate.item = null
+      this.dialogUpdate.loading = false
     },
     openDialogUpdate(item: Company) {
       this.dialogUpdate.active = true
@@ -403,8 +411,6 @@ export default defineComponent({
 </script>
 
 <style scoped>
-
-
 /* Botão Novo Empresa — estilo Gestores */
 .new-empresa-btn {
   height: 42px !important;
@@ -417,12 +423,12 @@ export default defineComponent({
 /* ---- CARDS RESUMO ---- */
 
 .summary-card {
-  border: 1px solid #CDCDCD;
+  border: 1px solid #cdcdcd;
   border-radius: 8px;
   padding: 16px;
   min-height: 120px;
   display: flex;
-  background-color: #F6F6F6;
+  background-color: #f6f6f6;
   flex-direction: column;
   justify-content: flex-start;
   position: relative;
@@ -476,7 +482,7 @@ export default defineComponent({
 .data-table-custom {
   border-radius: 8px;
   overflow: hidden;
-  background-color: #F6F6F6;
+  background-color: #f6f6f6;
   box-shadow: none;
   padding: 10px !important;
   margin-bottom: 10px !important;
@@ -506,5 +512,4 @@ export default defineComponent({
   box-shadow: none;
   padding: 0 !important;
 }
-
 </style>

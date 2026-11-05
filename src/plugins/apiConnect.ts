@@ -241,13 +241,13 @@ class ApiConnect {
 
         const isAuthRequest =
           url.includes('/auth/login') ||
+          url.includes('/auth/google') ||
           url.includes('/auth/refresh')
 
-        if (
-          error.response?.status === 401 &&
-          !originalRequest._retry &&
-          !isAuthRequest
-        ) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
+          // A chamada em fila também será repetida após o refresh. Marque-a
+          // antes de enfileirar para impedir uma segunda renovação em caso de 401.
+          originalRequest._retry = true
           if (this.isRefreshing) {
             return new Promise((resolve, reject) => {
               this.failedRequestsQueue.push({
@@ -260,7 +260,6 @@ class ApiConnect {
             })
           }
 
-          originalRequest._retry = true
           this.isRefreshing = true
 
           try {
@@ -296,24 +295,22 @@ class ApiConnect {
   /* ---------- Refresh Token ---------- */
 
   private async refreshAccessToken(): Promise<string> {
-  const response = await axios.post<RefreshTokenResponse | string>(
-    `${this.axiosInstance.defaults.baseURL}/auth/refresh`,
-    {},
-    {
-      withCredentials: true,
-      headers: { 'Content-Type': 'application/json' },
-    },
-  )
+    const response = await axios.post<RefreshTokenResponse | string>(
+      `${this.axiosInstance.defaults.baseURL}/auth/refresh`,
+      {},
+      {
+        withCredentials: true,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
 
-  const accessToken =
-    typeof response.data === 'string'
-      ? response.data
-      : response.data.accessToken
+    const accessToken =
+      typeof response.data === 'string' ? response.data : response.data.accessToken
 
-  this.setAccessToken(accessToken)
+    this.setAccessToken(accessToken)
 
-  return accessToken
-}
+    return accessToken
+  }
 
   /* ---------- Tratamento de Erro de Auth ---------- */
 
@@ -373,7 +370,9 @@ class ApiConnect {
   }
 
   public getTreesMap() {
-    return this.axiosInstance.get<Array<{ id: string, latitude: number, longitude: number, status: string }>>('/trees/map/risk')
+    return this.axiosInstance.get<
+      Array<{ id: string; latitude: number; longitude: number; status: string }>
+    >('/trees/map/risk')
   }
 
   /**
@@ -382,7 +381,7 @@ class ApiConnect {
    */
   public getTreesInBounds(north: number, south: number, east: number, west: number, limit = 10000) {
     return this.axiosInstance.get<any[]>('/trees/bounds', {
-      params: { north, south, east, west, limit }
+      params: { north, south, east, west, limit },
     })
   }
 
@@ -392,7 +391,7 @@ class ApiConnect {
    */
   public getTreesNearby(lat: number, lng: number, radiusKm = 5, limit = 5000) {
     return this.axiosInstance.get<any[]>('/trees/nearby', {
-      params: { lat, lng, radius: radiusKm, limit }
+      params: { lat, lng, radius: radiusKm, limit },
     })
   }
 
@@ -401,9 +400,12 @@ class ApiConnect {
    * Mais eficiente que bounds para regiões conhecidas
    */
   public getTreesByCity(cityId: string, limit = 10000) {
-    return this.axiosInstance.get<{ cityId: string; bounds: any; count: number; trees: any[] }>(`/trees/city/${cityId}`, {
-      params: { limit }
-    })
+    return this.axiosInstance.get<{ cityId: string; bounds: any; count: number; trees: any[] }>(
+      `/trees/city/${cityId}`,
+      {
+        params: { limit },
+      },
+    )
   }
 
   /**
@@ -411,14 +413,22 @@ class ApiConnect {
    * Útil para mostrar preview antes de carregar árvores
    */
   public getCityStats(cityId: string) {
-    return this.axiosInstance.get<{ cityId: string; name: string; total: number; withRisk: number; byStatus: Record<string, number> }>(`/trees/city/${cityId}/stats`)
+    return this.axiosInstance.get<{
+      cityId: string
+      name: string
+      total: number
+      withRisk: number
+      byStatus: Record<string, number>
+    }>(`/trees/city/${cityId}/stats`)
   }
 
   /**
    * Lista todas as cidades/regiões disponíveis (endpoint legado)
    */
   public getAvailableCities() {
-    return this.axiosInstance.get<{ cities: Array<{ id: string; name: string; type: string }> }>('/trees/cities')
+    return this.axiosInstance.get<{ cities: Array<{ id: string; name: string; type: string }> }>(
+      '/trees/cities',
+    )
   }
 
   /**
@@ -426,17 +436,19 @@ class ApiConnect {
    * Mais completo - inclui bounds e metadados
    */
   public getRegions() {
-    return this.axiosInstance.get<Array<{
-      id: string;
-      slug: string;
-      name: string;
-      type: string;
-      north: number;
-      south: number;
-      east: number;
-      west: number;
-      isActive: boolean;
-    }>>('/regions')
+    return this.axiosInstance.get<
+      Array<{
+        id: string
+        slug: string
+        name: string
+        type: string
+        north: number
+        south: number
+        east: number
+        west: number
+        isActive: boolean
+      }>
+    >('/regions')
   }
 
   /**
@@ -444,14 +456,14 @@ class ApiConnect {
    */
   public getRegionBySlug(slug: string) {
     return this.axiosInstance.get<{
-      id: string;
-      slug: string;
-      name: string;
-      type: string;
-      north: number;
-      south: number;
-      east: number;
-      west: number;
+      id: string
+      slug: string
+      name: string
+      type: string
+      north: number
+      south: number
+      east: number
+      west: number
     }>(`/regions/${slug}`)
   }
 

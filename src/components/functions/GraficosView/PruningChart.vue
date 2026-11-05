@@ -1,6 +1,6 @@
 <template>
   <div class="pruning-chart-container">
-    <Line v-if="loaded" :data="chartData" :options="chartOptions" />
+    <LineChart v-if="loaded" :data="chartData" :options="chartOptions" />
     <div v-else class="d-flex align-center justify-center h-100">
       <v-progress-circular indeterminate color="primary" />
     </div>
@@ -20,9 +20,9 @@ import {
   Legend,
   Filler,
   type ChartData,
-  type ChartOptions
+  type ChartOptions,
 } from 'chart.js'
-import { Line } from 'vue-chartjs'
+import { Line as LineChart } from 'vue-chartjs'
 
 ChartJS.register(
   CategoryScale,
@@ -32,12 +32,12 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 )
 
 export default defineComponent({
   name: 'PruningChart',
-  components: { Line },
+  components: { LineChart },
   setup() {
     const loaded = ref(false)
     const chartData = ref<ChartData<'line'>>({
@@ -45,7 +45,7 @@ export default defineComponent({
       datasets: [
         {
           label: 'Podas Realizadas',
-          backgroundColor: (context: any) => {
+          backgroundColor: (context: import('chart.js').ScriptableContext<'line'>) => {
             const chart = context.chart
             const { ctx, chartArea } = chart
             if (!chartArea) return 'rgba(46, 125, 50, 0.2)'
@@ -62,9 +62,9 @@ export default defineComponent({
           fill: true,
           tension: 0.4,
           borderWidth: 3,
-          data: [12, 19, 15, 25, 22, 30]
-        }
-      ]
+          data: [12, 19, 15, 25, 22, 30],
+        },
+      ],
     })
 
     const chartOptions = ref<ChartOptions<'line'>>({
@@ -72,7 +72,7 @@ export default defineComponent({
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          display: false
+          display: false,
         },
         tooltip: {
           backgroundColor: '#1a1a1a',
@@ -80,36 +80,36 @@ export default defineComponent({
           bodyFont: { size: 13 },
           padding: 12,
           cornerRadius: 8,
-          displayColors: false
-        }
+          displayColors: false,
+        },
       },
       scales: {
         y: {
           beginAtZero: true,
           grid: {
-            display: false
+            display: false,
           },
           border: {
-            display: false
+            display: false,
           },
           ticks: {
             color: '#9e9e9e',
-            font: { size: 11 }
-          }
+            font: { size: 11 },
+          },
         },
         x: {
           grid: {
-            display: false
+            display: false,
           },
           border: {
-            display: false
+            display: false,
           },
           ticks: {
             color: '#9e9e9e',
-            font: { size: 11 }
-          }
-        }
-      }
+            font: { size: 11 },
+          },
+        },
+      },
     })
 
     let timeoutId: ReturnType<typeof setTimeout>
@@ -125,7 +125,7 @@ export default defineComponent({
     })
 
     return { chartData, chartOptions, loaded }
-  }
+  },
 })
 </script>
 

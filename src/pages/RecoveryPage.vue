@@ -6,6 +6,4 @@ import PasswordRecoveryComponent from '@/components/MainView/PasswordRecoveryCom
   <PasswordRecoveryComponent />
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

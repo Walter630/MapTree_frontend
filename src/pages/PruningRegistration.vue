@@ -96,11 +96,13 @@
           <div v-if="selectedTree" class="mb-4">
             <div class="d-flex align-center mb-2">
               <v-icon size="20" color="green-darken-2" class="mr-2">mdi-tree</v-icon>
-              <span class="font-weight-medium">{{ selectedTree.species?.commonName || 'Árvore' }}</span>
+              <span class="font-weight-medium">{{
+                selectedTree.species?.commonName || 'Árvore'
+              }}</span>
             </div>
             <div class="text-caption text-grey-darken-1 ml-7">
-              Lat: {{ selectedTree.latitude?.toFixed(4) }}<br>
-              Lng: {{ selectedTree.longitude?.toFixed(4) }}
+              Lat: {{ Number(selectedTree.latitude).toFixed(4) }}<br />
+              Lng: {{ Number(selectedTree.longitude).toFixed(4) }}
             </div>
           </div>
 
@@ -156,9 +158,7 @@
         <v-icon size="64" color="success" class="mb-4">mdi-check-circle</v-icon>
         <h3 class="text-h6 font-weight-bold mb-2">Poda Registrada!</h3>
         <p class="text-body-2 text-grey mb-4">A poda foi registrada com sucesso no sistema.</p>
-        <v-btn color="success" block @click="goToList">
-          Ver Lista de Podas
-        </v-btn>
+        <v-btn color="success" block @click="goToList"> Ver Lista de Podas </v-btn>
       </v-card>
     </v-dialog>
 
@@ -173,6 +173,7 @@
 </template>
 
 <script setup lang="ts">
+import type { TreeApiRecord } from '@/types/treeApi'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/shared/PageHeader.vue'
@@ -182,7 +183,7 @@ import { getApiErrorMessage } from '@/utils/apiError'
 const router = useRouter()
 
 // Refs
-const formRef = ref<any>(null)
+const formRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
 const isValid = ref(false)
 const showValidation = ref(false)
 const submitting = ref(false)
@@ -191,7 +192,7 @@ const showError = ref(false)
 const errorMessage = ref('')
 
 // Data
-const trees = ref<any[]>([])
+const trees = ref<(TreeApiRecord & { displayName: string })[]>([])
 const loadingTrees = ref(true)
 
 const form = ref({
@@ -208,34 +209,34 @@ const pruningTypes = [
 ]
 
 const rules = {
-  required: (v: any) => !!v || 'Campo obrigatório',
+  required: (v: unknown) => !!v || 'Campo obrigatório',
 }
 
 // Computed
 const selectedTree = computed(() => {
-  return trees.value.find(t => t.id === form.value.idTree)
+  return trees.value.find((t) => t.id === form.value.idTree)
 })
 
 // Methods
 const getTypeColor = (type: string) => {
   const colors: Record<string, string> = {
-    'LIGHT': 'blue',
-    'MODERATE': 'orange',
-    'HEAVY': 'green',
+    LIGHT: 'blue',
+    MODERATE: 'orange',
+    HEAVY: 'green',
   }
   return colors[type] || 'grey'
 }
 
 const getTypeLabel = (type: string) => {
-  const typeObj = pruningTypes.find(t => t.value === type)
+  const typeObj = pruningTypes.find((t) => t.value === type)
   return typeObj?.label || type
 }
 
 const loadTrees = async () => {
   loadingTrees.value = true
   try {
-    const response = await apiConnect.get<any[]>('/trees')
-    trees.value = (response.data || []).map((tree: any) => ({
+    const response = await apiConnect.get<TreeApiRecord[]>('/trees')
+    trees.value = (response.data || []).map((tree) => ({
       ...tree,
       displayName: tree.species?.commonName
         ? `${tree.species.commonName} (#${tree.id.slice(-4)})`
@@ -251,7 +252,8 @@ const loadTrees = async () => {
 const submit = async () => {
   showValidation.value = true
 
-  const { valid } = await formRef.value?.validate()
+  const validation = await formRef.value?.validate()
+  const valid = validation?.valid
   if (!valid) return
 
   submitting.value = true
@@ -264,9 +266,12 @@ const submit = async () => {
     })
 
     showSuccess.value = true
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao registrar poda:', error)
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível registrar a poda. Tente novamente.')
+    errorMessage.value = getApiErrorMessage(
+      error,
+      'Não foi possível registrar a poda. Tente novamente.',
+    )
     showError.value = true
   } finally {
     submitting.value = false
@@ -299,7 +304,7 @@ onMounted(() => {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #C5E11F 0%, #9ed013 100%);
+  background: linear-gradient(135deg, #c5e11f 0%, #9ed013 100%);
   display: flex;
   align-items: center;
   justify-content: center;

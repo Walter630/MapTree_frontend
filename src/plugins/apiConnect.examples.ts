@@ -143,7 +143,7 @@ export async function createCompany(companyData: Omit<Company, 'id'>): Promise<C
  */
 export async function updateCompany(
   companyId: string,
-  data: Partial<Company>
+  data: Partial<Company>,
 ): Promise<Company | null> {
   try {
     const response = await apiConnect.patch<Company>(`/companies/${companyId}`, data)
@@ -277,4 +277,3 @@ export function useCompany() {
     removeCompany,
   }
 }
-

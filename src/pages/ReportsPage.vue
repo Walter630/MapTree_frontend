@@ -4,10 +4,7 @@
     <PageHeader
       title="Relatórios de Podas"
       subtitle="Visualize estatísticas e relatórios das podas realizadas"
-      :breadcrumbs="[
-        { text: 'Meu Painel', to: '/user' },
-        { text: '#Relatórios' },
-      ]"
+      :breadcrumbs="[{ text: 'Meu Painel', to: '/user' }, { text: '#Relatórios' }]"
     />
 
     <!-- Cards de Resumo -->
@@ -68,15 +65,8 @@
           <v-skeleton-loader v-if="loading" height="250" type="image" />
           <div v-else class="chart-placeholder">
             <div class="bar-chart">
-              <div
-                v-for="(bar, i) in periodChartData"
-                :key="i"
-                class="bar-wrapper"
-              >
-                <div
-                  class="bar"
-                  :style="{ height: bar.value + '%', backgroundColor: bar.color }"
-                />
+              <div v-for="(bar, i) in periodChartData" :key="i" class="bar-wrapper">
+                <div class="bar" :style="{ height: bar.value + '%', backgroundColor: bar.color }" />
                 <span class="bar-label">{{ bar.label }}</span>
               </div>
             </div>
@@ -99,16 +89,9 @@
             <p class="text-body-2 text-grey mt-2">Nenhuma poda registrada</p>
           </div>
           <div v-else class="pie-chart-container">
-            <div
-              class="pie-chart"
-              :style="pieChartStyle"
-            />
+            <div class="pie-chart" :style="pieChartStyle" />
             <div class="pie-legend">
-              <div
-                v-for="(stat, i) in pruningStats"
-                :key="i"
-                class="legend-item"
-              >
+              <div v-for="(stat, i) in pruningStats" :key="i" class="legend-item">
                 <div class="legend-color" :style="{ backgroundColor: stat.color }" />
                 <span class="legend-label">{{ stat.label }}</span>
                 <span class="legend-value">{{ stat.value }}%</span>
@@ -148,7 +131,7 @@
         no-data-text="Nenhuma poda registrada"
       >
         <!-- Árvore -->
-        <template #item.tree="{ item }">
+        <template #[`item.tree`]="{ item }">
           <div class="d-flex align-center">
             <v-icon size="18" color="green-darken-2" class="mr-2">mdi-tree</v-icon>
             <span class="text-body-2 font-weight-medium">
@@ -158,12 +141,12 @@
         </template>
 
         <!-- Data -->
-        <template #item.date="{ item }">
+        <template #[`item.date`]="{ item }">
           <span class="text-body-2">{{ formatDate(item.date) }}</span>
         </template>
 
         <!-- Tipo -->
-        <template #item.type="{ item }">
+        <template #[`item.type`]="{ item }">
           <v-chip
             :color="getTypeColor(item.type)"
             size="small"
@@ -175,35 +158,117 @@
         </template>
 
         <!-- Observações -->
-        <template #item.observations="{ item }">
-          <span class="text-caption text-grey-darken-1 text-truncate" style="max-width: 200px; display: block;">
+        <template #[`item.observations`]="{ item }">
+          <span
+            class="text-caption text-grey-darken-1 text-truncate"
+            style="max-width: 200px; display: block"
+          >
             {{ item.observations || '—' }}
           </span>
         </template>
 
         <!-- Ações -->
-        <template #item.actions="{ item }">
-          <v-btn
-            icon
-            size="small"
-            variant="text"
-            color="primary"
-            @click="viewDetails(item)"
-          >
+        <template #[`item.actions`]="{ item }">
+          <v-btn icon size="small" variant="text" color="primary" @click="viewDetails(item)">
             <v-icon size="18">mdi-eye</v-icon>
           </v-btn>
-          <v-btn
-            icon
-            size="small"
-            variant="text"
-            color="grey"
-            @click="downloadReport(item)"
-          >
+          <v-btn icon size="small" variant="text" color="grey" @click="downloadReport(item)">
             <v-icon size="18">mdi-download</v-icon>
           </v-btn>
         </template>
       </v-data-table>
     </v-card>
+
+    <v-dialog v-model="reportDialog" max-width="680" scrollable>
+      <v-card v-if="selectedReport" class="report-detail-dialog" rounded="xl">
+        <header class="report-detail-hero">
+          <div class="d-flex justify-space-between align-center">
+            <v-avatar color="rgba(255,255,255,.14)" size="46"
+              ><v-icon color="#D7ED63">mdi-tree</v-icon></v-avatar
+            >
+            <v-btn
+              icon="mdi-close"
+              variant="text"
+              color="white"
+              aria-label="Fechar detalhes do relatório"
+              @click="reportDialog = false"
+            />
+          </div>
+          <div class="mt-5">
+            <div class="report-detail-eyebrow">REGISTRO DE MANEJO</div>
+            <h2 class="text-h5 font-weight-bold mt-1">
+              {{ selectedReport.tree?.species?.commonName || 'Árvore sem identificação' }}
+            </h2>
+            <p class="mb-0 text-body-2 text-white">
+              {{
+                selectedReport.tree?.species?.scientificName || 'Espécie científica não informada'
+              }}
+            </p>
+          </div>
+          <v-chip
+            class="report-detail-type"
+            :color="getTypeColor(selectedReport.type)"
+            size="small"
+            variant="flat"
+            >{{ getTypeLabel(selectedReport.type) }}</v-chip
+          >
+        </header>
+        <v-card-text class="report-detail-content">
+          <h3 class="text-subtitle-2 font-weight-bold mb-3">Dados da intervenção</h3>
+          <div class="report-detail-grid">
+            <div class="report-detail-tile">
+              <v-icon color="green-darken-2">mdi-calendar-month-outline</v-icon>
+              <div>
+                <span>Data de execução</span
+                ><strong>{{ formatDateFull(selectedReport.date) }}</strong>
+              </div>
+            </div>
+            <div class="report-detail-tile">
+              <v-icon color="green-darken-2">mdi-account-hard-hat-outline</v-icon>
+              <div>
+                <span>Responsável</span
+                ><strong>{{ selectedReport.user?.name || 'Não informado' }}</strong>
+              </div>
+            </div>
+            <div class="report-detail-tile">
+              <v-icon color="green-darken-2">mdi-map-marker-outline</v-icon>
+              <div>
+                <span>Localização</span
+                ><strong>{{ formatCoordinates(selectedReport.tree) }}</strong>
+              </div>
+            </div>
+            <div class="report-detail-tile">
+              <v-icon color="green-darken-2">mdi-leaf</v-icon>
+              <div>
+                <span>Vigor da árvore</span
+                ><strong>{{ selectedReport.tree?.vigor || 'Não informado' }}</strong>
+              </div>
+            </div>
+          </div>
+          <section class="report-detail-notes mt-5">
+            <div class="d-flex align-center ga-2 mb-2">
+              <v-icon color="green-darken-2">mdi-clipboard-text-outline</v-icon>
+              <h3 class="text-subtitle-2 font-weight-bold">Ações e observações</h3>
+            </div>
+            <p class="mb-0">
+              {{
+                selectedReport.observations?.trim() ||
+                'Nenhuma observação foi registrada nesta intervenção.'
+              }}
+            </p>
+          </section>
+        </v-card-text>
+        <v-card-actions class="report-detail-actions"
+          ><v-btn
+            variant="text"
+            color="green-darken-2"
+            class="text-none font-weight-bold"
+            @click="reportDialog = false"
+            >Fechar detalhes</v-btn
+          ></v-card-actions
+        >
+      </v-card>
+    </v-dialog>
 
     <!-- Snackbar -->
     <v-snackbar v-model="showError" color="error" timeout="5000">
@@ -220,16 +285,34 @@ import { defineComponent } from 'vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
 
+interface ReportTree {
+  latitude?: number | null
+  longitude?: number | null
+  vigor?: string | null
+  species?: { commonName?: string | null; scientificName?: string | null } | null
+}
+
+interface PruningReport {
+  idTree?: string | null
+  date?: string | Date | null
+  type?: string | null
+  observations?: string | null
+  user?: { name?: string | null } | null
+  tree?: ReportTree | null
+}
+
 export default defineComponent({
   name: 'ReportsPage',
   components: { PageHeader },
 
   data() {
     return {
-      prunings: [] as any[],
+      prunings: [] as PruningReport[],
       loading: true,
       showError: false,
       errorMessage: '',
+      reportDialog: false,
+      selectedReport: null as PruningReport | null,
 
       headers: [
         { title: 'Árvore', key: 'tree', sortable: false },
@@ -257,7 +340,7 @@ export default defineComponent({
 
     thisMonthPrunings(): number {
       const now = new Date()
-      return this.prunings.filter(p => {
+      return this.prunings.filter((p) => {
         if (!p.date) return false
         const d = new Date(p.date)
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -265,7 +348,7 @@ export default defineComponent({
     },
 
     totalTreesPruned(): number {
-      const uniqueTrees = new Set(this.prunings.map(p => p.idTree))
+      const uniqueTrees = new Set(this.prunings.map((p) => p.idTree))
       return uniqueTrees.size
     },
 
@@ -281,7 +364,7 @@ export default defineComponent({
       }
 
       const count: Record<string, number> = { LIGHT: 0, MODERATE: 0, HEAVY: 0 }
-      this.prunings.forEach(p => {
+      this.prunings.forEach((p) => {
         if (p.type && p.type in count) {
           count[p.type] = (count[p.type] || 0) + 1
         }
@@ -290,7 +373,7 @@ export default defineComponent({
       const total = this.prunings.length
       if (total === 0) return []
 
-      return Object.keys(count).map(type => {
+      return Object.keys(count).map((type) => {
         const typeInfo = types[type]
         const typeCount = count[type] || 0
         return {
@@ -328,46 +411,69 @@ export default defineComponent({
     async loadPrunings() {
       this.loading = true
       try {
-        const response = await apiConnect.get<any[]>('/pruning')
+        const response = await apiConnect.get<PruningReport[]>('/pruning')
         this.prunings = response.data || []
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Erro ao carregar podas:', error)
-        this.errorMessage = error.response?.data?.message || 'Erro ao carregar relatórios'
+        const apiError = error as { response?: { data?: { message?: string } } }
+        this.errorMessage = apiError.response?.data?.message || 'Erro ao carregar relatórios'
         this.showError = true
       } finally {
         this.loading = false
       }
     },
 
-    formatDate(date: string | Date | undefined): string {
+    formatDate(date: string | Date | null | undefined): string {
       if (!date) return '—'
       const d = new Date(date)
+      if (Number.isNaN(d.getTime())) return 'Data inválida'
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     },
 
-    getTypeColor(type: string): string {
+    getTypeColor(type?: string | null): string {
       const colors: Record<string, string> = {
         LIGHT: 'blue',
         MODERATE: 'orange',
         HEAVY: 'green',
       }
-      return colors[type] || 'grey'
+      return colors[type || ''] || 'grey'
     },
 
-    getTypeLabel(type: string): string {
+    getTypeLabel(type?: string | null): string {
       const labels: Record<string, string> = {
         LIGHT: 'Leve',
         MODERATE: 'Moderada',
         HEAVY: 'Pesada',
       }
-      return labels[type] || type
+      return labels[type || ''] || type || 'Não informado'
     },
 
-    viewDetails(item: any) {
-      console.log('Ver detalhes:', item)
+    viewDetails(item: PruningReport) {
+      this.selectedReport = item
+      this.reportDialog = true
     },
 
-    downloadReport(item: any) {
+    formatDateFull(date: string | Date | null | undefined): string {
+      if (!date) return '—'
+      const parsed = new Date(date)
+      if (Number.isNaN(parsed.getTime())) return 'Data inválida'
+      return parsed.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+    },
+
+    formatCoordinates(tree?: ReportTree | null): string {
+      const latitude = tree?.latitude
+      const longitude = tree?.longitude
+      if (
+        typeof latitude !== 'number' ||
+        !Number.isFinite(latitude) ||
+        typeof longitude !== 'number' ||
+        !Number.isFinite(longitude)
+      )
+        return 'Localização não informada'
+      return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+    },
+
+    downloadReport(item: PruningReport) {
       console.log('Download relatório:', item)
     },
   },
@@ -428,7 +534,7 @@ export default defineComponent({
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #C5E11F 0%, #9ed013 100%);
+  background: linear-gradient(135deg, #c5e11f 0%, #9ed013 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -482,7 +588,7 @@ export default defineComponent({
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #C5E11F 0%, #9ed013 100%);
+  background: linear-gradient(135deg, #c5e11f 0%, #9ed013 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -545,5 +651,107 @@ export default defineComponent({
   font-weight: 700;
   color: #333;
   margin-left: auto;
+}
+
+.report-detail-dialog {
+  overflow: hidden;
+  border: 1px solid rgba(34, 69, 45, 0.12);
+  box-shadow: 0 24px 70px rgba(15, 35, 23, 0.24) !important;
+}
+.report-detail-hero {
+  position: relative;
+  padding: 24px 28px 28px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(197, 225, 31, 0.22), transparent 31%),
+    linear-gradient(125deg, #173d2a 0%, #245a39 58%, #367044 100%);
+}
+.report-detail-hero h2 {
+  padding-right: 126px;
+}
+.report-detail-eyebrow {
+  color: #d7ed63;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.report-detail-type {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  font-weight: 700;
+}
+.report-detail-content {
+  padding: 24px 28px;
+  background: #f7f9f5;
+}
+.report-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.report-detail-tile {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e8ede5;
+  border-radius: 14px;
+  background: #fff;
+}
+.report-detail-tile div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.report-detail-tile span {
+  color: #778278;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+.report-detail-tile strong {
+  overflow-wrap: anywhere;
+  color: #25372b;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+.report-detail-notes {
+  padding: 16px;
+  border: 1px solid #e1e9cf;
+  border-left: 4px solid #a7c92b;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #f1f6e5, #fbfcf8 72%);
+}
+.report-detail-notes p {
+  padding: 13px 14px;
+  border: 1px solid #e8ede5;
+  border-radius: 10px;
+  background: white;
+  color: #37463a;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.report-detail-actions {
+  justify-content: flex-end;
+  padding: 8px 20px 18px;
+  background: #f7f9f5;
+}
+@media (max-width: 520px) {
+  .report-detail-hero {
+    padding: 20px;
+  }
+  .report-detail-type {
+    right: 20px;
+    bottom: 20px;
+  }
+  .report-detail-content {
+    padding: 20px 16px;
+  }
+  .report-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

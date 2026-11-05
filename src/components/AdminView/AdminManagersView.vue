@@ -6,10 +6,7 @@
         <PageHeader
           title="Gestores"
           subtitle="Gerencie usuários e suas permissões no sistema"
-          :breadcrumbs="[
-            { text: 'Meu Painel', to: '/admin' },
-            { text: '#Gestores' },
-          ]"
+          :breadcrumbs="[{ text: 'Meu Painel', to: '/admin' }, { text: '#Gestores' }]"
         />
 
         <!-- Novo Gestor abaixo do título -->
@@ -40,7 +37,8 @@
             <!-- ícone pequeno no canto (ocr) -->
             <v-icon class="corner-icon" small>mdi-account-multiple</v-icon>
           </div>
-          <div class="summary-value">{{ totalGestores }}</div> <div class="summary-note">+ 12% vs mês anterior</div>
+          <div class="summary-value">{{ totalGestores }}</div>
+          <div class="summary-note">+ 12% vs mês anterior</div>
         </v-card>
       </v-col>
 
@@ -94,7 +92,10 @@
           <v-icon class="mr-2 filter-icon">mdi-filter-variant</v-icon>
           <p class="filter-text">Filtros</p>
         </div>
-        <v-row  no-gutters style="display: flex; align-items: center; justify-content: space-between;">
+        <v-row
+          no-gutters
+          style="display: flex; align-items: center; justify-content: space-between"
+        >
           <v-col cols="12" sm="4" md="2" class="pr-4">
             <p class="mb-2">Empresa</p>
             <v-select
@@ -129,7 +130,6 @@
             <p class="mb-2">Cidade</p>
             <v-select
               v-model="filterCidade"
-
               label="Cidade"
               placeholder="Selecione a Cidade"
               variant="outlined"
@@ -139,13 +139,7 @@
             />
           </v-col>
           <v-col cols="auto">
-            <v-btn
-              color="black"
-              class="text-white buscar-btn"
-              height="40"
-
-              @click="applyFilters"
-            >
+            <v-btn color="black" class="text-white buscar-btn" height="40" @click="applyFilters">
               BUSCAR
             </v-btn>
           </v-col>
@@ -153,20 +147,19 @@
       </v-col>
     </v-row>
 
-
     <!-- Table card -->
-    <v-row class="mt-12" style="background-color: #F6F6F6; border-radius: 8px;">
+    <v-row class="mt-12" style="background-color: #f6f6f6; border-radius: 8px">
       <v-col cols="12" class="pa-0">
         <p class="table-title-text mb-4" style="font-size: 14px">Gestores Cadastradas</p>
-          <v-data-table
-            :headers="headers"
-            :items="gestores"
-            :search="search"
-            :sort-by="[{ key: 'nome', order: 'asc' }]"
-            class="elevation-0 data-table-custom"
-            hide-default-footer
-          >
-           <template #item="{ item }">
+        <v-data-table
+          :headers="headers"
+          :items="gestores"
+          :search="search"
+          :sort-by="[{ key: 'nome', order: 'asc' }]"
+          class="elevation-0 data-table-custom"
+          hide-default-footer
+        >
+          <template #item="{ item }">
             <tr>
               <td class="table-id">{{ item.name }}</td>
               <td class="table-text">{{ item.email }}</td>
@@ -174,7 +167,6 @@
               <td>
                 <v-chip color="green" v-if="item.isActive">
                   {{ item.isActive }}
-
                 </v-chip>
               </td>
               <td>
@@ -186,11 +178,11 @@
                 </v-icon>
               </td>
             </tr>
-            </template>
-          </v-data-table>
-          <v-card-actions class="justify-center py-6">
-            <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
-          </v-card-actions>
+          </template>
+        </v-data-table>
+        <v-card-actions class="justify-center py-6">
+          <v-pagination v-model="page" :length="pageCount" total-visible="5" color="black" />
+        </v-card-actions>
       </v-col>
     </v-row>
 
@@ -199,7 +191,7 @@
         <v-card-title class="text-h6">
           Edição de Gestor
           <v-btn
-            style="position: absolute; top: 0; right: 0;"
+            style="position: absolute; top: 0; right: 0"
             icon="mdi-close"
             variant="text"
             @click="closeDialogEdit"
@@ -208,7 +200,7 @@
           />
         </v-card-title>
         <v-card-text>
-          <v-card v-if="dialogEdit.item" >
+          <v-card v-if="dialogEdit.item">
             <v-card-text>
               <v-text-field v-model="dialogEdit.item.name" label="Nome" />
               <v-text-field v-model="dialogEdit.item.email" label="Email" />
@@ -220,18 +212,24 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn text @click="closeDialogEdit" :disabled="dialogEdit.loading">Cancelar</v-btn>
-          <v-btn color="red" :loading="dialogEdit.loading" :disabled="dialogEdit.loading" text @click="editItem">Editar</v-btn>
+          <v-btn
+            color="red"
+            :loading="dialogEdit.loading"
+            :disabled="dialogEdit.loading"
+            text
+            @click="editItem"
+            >Editar</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
-
   </v-container>
   <v-dialog v-model="dialogDelete.active" max-width="500px">
     <v-card width="500px">
       <v-card-title class="text-h6">
         Confirmação de Exclusão
         <v-btn
-          style="position: absolute; top: 0; right: 0;"
+          style="position: absolute; top: 0; right: 0"
           icon="mdi-close"
           variant="text"
           @click="closeDialogDelete"
@@ -249,7 +247,14 @@
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn text @click="closeDialogDelete" :disabled="dialogDelete.loading">Cancelar</v-btn>
-        <v-btn color="red" :loading="dialogDelete.loading" :disabled="dialogDelete.loading" text @click="deleteItem">Excluir</v-btn>
+        <v-btn
+          color="red"
+          :loading="dialogDelete.loading"
+          :disabled="dialogDelete.loading"
+          text
+          @click="deleteItem"
+          >Excluir</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -283,7 +288,6 @@ export default defineComponent({
     return {
       gestores: [] as Gestor[],
 
-
       comparacaoPercentual: '',
       comparacaoCor: 'text-success', // ou 'text-danger'
       // filtros
@@ -299,11 +303,11 @@ export default defineComponent({
       itemsPerPage: 6,
       page: 1,
       headers: [
-        { title: 'Nome', key: 'name' , sortable: true},
-        { title: 'Email', key: 'email' , sortable: true},
-        { title: 'Empresa', key: 'company' ,sortable: true },
+        { title: 'Nome', key: 'name', sortable: true },
+        { title: 'Email', key: 'email', sortable: true },
+        { title: 'Empresa', key: 'company', sortable: true },
         { title: 'Status', key: 'isActive', sortable: true },
-        { title: 'Ações', key: 'acoes',  sortable: false },
+        { title: 'Ações', key: 'acoes', sortable: false },
       ],
       dialogDelete: {
         active: false,
@@ -327,7 +331,7 @@ export default defineComponent({
     },
     pageCount() {
       return Math.ceil(this.gestores.length / this.itemsPerPage)
-    }
+    },
   },
 
   mounted() {
@@ -336,13 +340,13 @@ export default defineComponent({
 
   methods: {
     async getAllCompaniesAndUsers(): Promise<void> {
-      await this.getAllUsers();     // Em seguida, carrega os usuários
+      await this.getAllUsers() // Em seguida, carrega os usuários
     },
     //usar computed
     async getAllUsers(): Promise<void> {
       try {
         const response = await this.$api.get<User[]>('/users') // Usando 'any' para flexibilidade
-        this.allGestores = response.data.map(user => ({
+        this.allGestores = response.data.map((user) => ({
           id: user.id,
           name: user.name,
           cpf: user.cpf,
@@ -354,7 +358,7 @@ export default defineComponent({
           isActive: user.isActive,
         }))
         // NOVO: Define o valor total
-        this.totalGestores = this.allGestores.length;
+        this.totalGestores = this.allGestores.length
         // exibir na tabela
         this.gestores = [...this.allGestores]
       } catch (error) {
@@ -364,7 +368,7 @@ export default defineComponent({
 
     async editItem() {
       try {
-        this.dialogEdit.loading = true;
+        this.dialogEdit.loading = true
         await this.$api.patch(`/users/${this.dialogEdit?.item?.id}`, {
           name: this.dialogEdit?.item?.name,
           email: this.dialogEdit?.item?.email,
@@ -374,10 +378,10 @@ export default defineComponent({
       } catch (error) {
         console.error('Erro ao buscar usuário:', error)
       } finally {
-        await this.getAllUsers();
-        this.dialogEdit.loading = false;
-        this.dialogEdit.active = false;
-        this.dialogEdit.item = null;
+        await this.getAllUsers()
+        this.dialogEdit.loading = false
+        this.dialogEdit.active = false
+        this.dialogEdit.item = null
       }
     },
 
@@ -386,9 +390,9 @@ export default defineComponent({
       this.dialogEdit.item = item
     },
     closeDialogEdit() {
-      this.dialogEdit.active = false;
-      this.dialogEdit.item = null;
-      this.dialogEdit.loading = false;
+      this.dialogEdit.active = false
+      this.dialogEdit.item = null
+      this.dialogEdit.loading = false
     },
 
     /** 🔹 Usuário logado */
@@ -400,26 +404,27 @@ export default defineComponent({
       this.$router.push('/admin/register-managers')
     },
 
-
     /** 🔹 Excluir item */
     async deleteItem() {
       try {
-        this.dialogDelete.loading = true;
+        this.dialogDelete.loading = true
         await this.$api.delete(`/users/${this.dialogDelete?.item?.id}`)
       } catch (error) {
         console.error('Erro ao buscar usuário:', error)
       } finally {
-        await this.getAllUsers();
-        this.dialogDelete.loading = false;
-        this.dialogDelete.active = false;
-        this.dialogDelete.item = null;
+        await this.getAllUsers()
+        this.dialogDelete.loading = false
+        this.dialogDelete.active = false
+        this.dialogDelete.item = null
       }
     },
 
     /** 🔹 Aplicar filtros */
     applyFilters() {
-      this.gestores = this.allGestores.filter(g => {
-        const matchName = this.search ? g.name?.toLowerCase().includes(this.search.toLowerCase()) : true
+      this.gestores = this.allGestores.filter((g) => {
+        const matchName = this.search
+          ? g.name?.toLowerCase().includes(this.search.toLowerCase())
+          : true
         const matchConta = this.filterConta ? g.organization.name === this.filterConta : true
 
         return matchName && matchConta
@@ -432,9 +437,9 @@ export default defineComponent({
       this.dialogDelete.item = item
     },
     closeDialogDelete() {
-      this.dialogDelete.active = false;
-      this.dialogDelete.item = null;
-      this.dialogDelete.loading = false;
+      this.dialogDelete.active = false
+      this.dialogDelete.item = null
+      this.dialogDelete.loading = false
     },
 
     /** 🔹 Voltar */
@@ -445,9 +450,7 @@ export default defineComponent({
 })
 </script>
 
-
 <style scoped>
-
 .filters-box {
   border-radius: 8px;
   padding: 18px !important;
@@ -458,15 +461,14 @@ export default defineComponent({
 .cards-row {
   margin-top: 8px;
   box-shadow: none;
-
 }
 .summary-card {
-  border: 1px solid #D0D5DD;
+  border: 1px solid #d0d5dd;
   border-radius: 8px;
   padding: 16px;
   min-height: 120px;
   display: flex;
-  background-color: #F6F6F6;
+  background-color: #f6f6f6;
   flex-direction: column;
   justify-content: flex-start;
   position: relative;
@@ -524,7 +526,7 @@ export default defineComponent({
 .data-table-custom {
   border-radius: 8px;
   overflow: hidden;
-  background-color: #F6F6F6;
+  background-color: #f6f6f6;
   box-shadow: none;
   padding: 10px !important;
   margin-bottom: 10px !important;
@@ -541,7 +543,7 @@ export default defineComponent({
   .summary-card {
     min-height: 100px;
   }
-  .cards-row  {
+  .cards-row {
     margin-bottom: 12px;
   }
   .corner-icon {

@@ -73,7 +73,11 @@ const router = createRouter({
         { path: 'logout', name: 'Logout', component: LogoutPage },
         { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina },
         { path: 'dashboard-previews', name: 'DashboardPreviews', component: DashboardPreviewsPage },
-        { path: 'edit-account', name: 'EditAccount', component: () => import('@/components/MainView/EditProfileComponent.vue') },
+        {
+          path: 'edit-account',
+          name: 'EditAccount',
+          component: () => import('@/components/MainView/EditProfileComponent.vue'),
+        },
 
         /* --- Admin --- */
         {
@@ -84,8 +88,16 @@ const router = createRouter({
             { path: '', name: 'AdminHome', component: AdminMainComponent },
             { path: 'managers', name: 'AdminManagers', component: AdminManagersView },
             { path: 'companies', name: 'AdminCompanies', component: AdminCompaniesView },
-            { path: 'register-company', name: 'AdminRegisterCompany', component: AdminRegisterCompanyView },
-            { path: 'register-managers', name: 'AdminRegisterManagers', component: AdminRegisterManagersView },
+            {
+              path: 'register-company',
+              name: 'AdminRegisterCompany',
+              component: AdminRegisterCompanyView,
+            },
+            {
+              path: 'register-managers',
+              name: 'AdminRegisterManagers',
+              component: AdminRegisterManagersView,
+            },
             { path: 'trees/new', name: 'AdminTreeRegistration', component: TreeRegistrationPage },
             { path: 'map', name: 'AdminMap', component: MapPage },
           ],
@@ -121,6 +133,7 @@ const router = createRouter({
           meta: { requiresAuth: true, role: 'USER', home: true },
           children: [
             { path: '', name: 'UserHome', component: MainComponent },
+            { path: 'trees/new', name: 'UserTreeRegistration', component: TreeRegistrationPage },
             { path: 'reports', name: 'UserReports', component: ReportsPage },
             { path: 'mapUser', name: 'Map', component: MapPage },
             { path: 'routes/daily', name: 'UserDailyRoutes', component: DailyRoutesPage },

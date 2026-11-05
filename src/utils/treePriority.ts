@@ -52,7 +52,7 @@ export function isTreeForPruning(tree: TreePriorityInput): boolean {
 
   return (
     PRUNING_STATUSES.has(status) ||
-    ratio !== null && ratio >= 0.9 ||
+    (ratio !== null && ratio >= 0.9) ||
     prediction?.will_reach_wire === true
   )
 }
@@ -78,9 +78,10 @@ export function prioritizeTree<T extends TreePriorityInput>(tree: T): Prioritize
 
   let urgency: TreeUrgency | null = null
   if (needsPruning) {
-    urgency = status === 'CRITICAL' || (ratio !== null && ratio >= 1) || prediction?.will_reach_wire
-      ? 'CRITICAL'
-      : 'HIGH'
+    urgency =
+      status === 'CRITICAL' || (ratio !== null && ratio >= 1) || prediction?.will_reach_wire
+        ? 'CRITICAL'
+        : 'HIGH'
   } else if (status === 'UNDER_OBSERVATION') {
     urgency = 'MEDIUM'
   }
@@ -111,9 +112,7 @@ export function prioritizeTree<T extends TreePriorityInput>(tree: T): Prioritize
 }
 
 export function prioritizeTrees<T extends TreePriorityInput>(trees: T[]): PrioritizedTree<T>[] {
-  return trees
-    .map(prioritizeTree)
-    .sort((a, b) => b.priorityScore - a.priorityScore)
+  return trees.map(prioritizeTree).sort((a, b) => b.priorityScore - a.priorityScore)
 }
 
 export function urgencyLabel(urgency: TreeUrgency | null): string {

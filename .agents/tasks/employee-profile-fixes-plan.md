@@ -1,0 +1,27 @@
+# Implementation Plan
+
+- [ ] 1. Tornar a máscara de CPF e telefone um valor controlado e visível no `RegisterEmployee`.
+      Substituir o binding atual por propriedades computadas graváveis (`cpfInput` e `phoneInput`) no Options API: o getter expõe o estado formatado ao `v-text-field` e o setter chama `formatCpf`/`formatPhone` antes de persistir `formData`. Assim digitação, colagem e edição passam pelo mesmo caminho e o valor renderizado no input permanece mascarado. O CPF deve remover caracteres não numéricos, limitar a 11 dígitos e progredir até `000.000.000-00`; o telefone deve limitar a 11 dígitos e progredir para `(00) 0000-0000` com 10 dígitos ou `(00) 00000-0000` com 11. Adicionar `inputmode="numeric"`, limites de comprimento compatíveis com o valor mascarado (`14` para CPF e `15` para telefone) e identificadores DOM estáveis para a validação. Manter `rules` e a lógica de cadastro, mas construir o payload com `onlyDigits` imediatamente antes do POST para que a API continue recebendo CPF/telefone sem pontuação.
+      Files: `src/components/GestorView/RegisterEmployee.vue`
+      Verify: `npm run type-check` — o componente continua compilando sem erros e os limites/handlers de máscara não introduzem erro de tipagem.
+
+- [ ] 2. Criar cobertura unitária para o comportamento real do campo e do payload de funcionário.
+      Adicionar um teste Vitest em `src/components/GestorView/__tests__/RegisterEmployee.spec.ts`, montando o componente com o plugin Vuetify e mocks de `$api`/`$router` conforme os componentes Options API existentes. Preencher os inputs via DOM com dígitos, texto colado já pontuado e caracteres inválidos, e verificar `input.value` depois de cada atualização: CPF mascarado e truncado em 11 dígitos, telefone progressivo para 10/11 dígitos e nenhuma sequência crua de dígitos renderizada após a atualização. Preencher os dados necessários, chamar o submit/`registrar` e verificar que o mock de `POST /users` recebe `cpf` e `phone` somente com dígitos, sem alterar as regras atuais.
+      Files: `src/components/GestorView/__tests__/RegisterEmployee.spec.ts`
+      Verify: `npm run test:unit -- --run src/components/GestorView/__tests__/RegisterEmployee.spec.ts` — todos os testes novos passam e a asserção de DOM confirma a máscara no próprio input.
+
+- [ ] 3. Reestruturar o botão de retorno no cabeçalho verde de `EditProfileComponent` sem alterar a navegação.
+      Agrupar o botão e o chip de função em uma área de ações do hero, dar ao botão hierarquia de ação secundária coerente com o gradiente verde (ícone de retorno, contraste, borda/foco/hover, padding e altura mínima de área clicável) e manter `@click="goHome"`/`getHomeRouteByRole` intactos. Ajustar o layout para que a identidade possa encolher sem sobrepor título ou subtítulo; em desktop as ações ficam separadas da identidade, e em tablet/mobile ocupam uma linha/coluna responsiva com botão de largura confortável e chip alinhado, sem desalinhamento do cabeçalho.
+      Files: `src/components/MainView/EditProfileComponent.vue`
+      Verify: `npm run type-check` — o template e o CSS responsivo compilam; conferir no navegador que clicar no botão ainda leva à rota de home correspondente ao papel do usuário.
+
+- [ ] 4. Validar build, estilo e a aparência/DOM nas duas rotas afetadas.
+      Rodar a suíte de validação do projeto depois das alterações e fazer uma checagem visual autenticada no app. Iniciar com `npm run dev` (o script do projeto usa a porta `3500`), acessar `/manager/register-employee` com uma sessão de gestor, inspecionar os inputs CPF/telefone pelo DevTools ou Playwright após digitar/colar valores e confirmar que `input.value` contém a máscara enquanto uma interceptação de `/users` confirma o payload sem pontuação. Acessar `/edit-account` com um usuário autenticado, verificar em desktop, viewport intermediário e mobile que o botão tem contraste, ícone, espaçamento e área clicável adequados, não cobre título/subtítulo e navega para a home. Se for usado o Playwright existente, observar que `playwright.config.ts` espera `5173` enquanto `npm run dev` fixa `3500`; para execução manual iniciar Vite explicitamente em `5173` ou ajustar somente o servidor de teste, sem adicionar dependências.
+      Files: `src/components/GestorView/RegisterEmployee.vue`, `src/components/GestorView/__tests__/RegisterEmployee.spec.ts`, `src/components/MainView/EditProfileComponent.vue`
+      Verify: `npm run test:unit -- --run`, `npm run build`, `npm run lint:check` e `npm run format:check` — testes, type-check/build, lint e formatação passam; a inspeção visual/DOM confirma os critérios acima. O teste e2e de exemplo existente em `e2e/vue.spec.ts` é apenas o smoke test padrão e não substitui a checagem autenticada destas rotas.
+
+## Decisões e premissas
+
+- A máscara ficará local ao `RegisterEmployee.vue`, sem nova dependência ou refatoração global, porque o cadastro já possui `formatCpf`, `formatPhone` e `onlyDigits`; a correção deve tornar esse estado controlado efetivo no DOM e preservar as validações existentes.
+- O perfil continuará enviando e lendo telefone/CPF como já faz hoje; esta solicitação altera apenas o botão de retorno do hero. A navegação continuará delegada a `getHomeRouteByRole`.
+- Não foram encontrados `AGENTS.md`, `CONTRIBUTING.md` ou arquivos de steering no repositório. Os comandos de build/test usados no plano vêm de `README.md` e `package.json`; o projeto usa Vue 3/Vuetify/Vite, Vitest em `jsdom` e Playwright para e2e.

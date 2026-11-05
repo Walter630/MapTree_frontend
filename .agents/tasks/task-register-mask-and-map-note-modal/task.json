@@ -1,0 +1,7 @@
+{
+  "task_id": "task-register-mask-and-map-note-modal",
+  "task_description": "Fix two user-reported visual problems in the MapTree Vue frontend: (1) apply visible CPF (000.000.000-00) and Brazilian phone ((00) 00000-0000) masks to the public self-registration screen RegisterComponent.vue while sending digits-only to the API; (2) replace the native prompt() used to capture a map marking note in PruningMap.vue with an accessible Vuetify modal, preserving all existing marker/icon/persistence logic.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

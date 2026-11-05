@@ -33,9 +33,13 @@
         <v-card class="kpi-card" :class="{ 'kpi-card--warning': stats.pending > 0 }" flat>
           <div class="kpi-header">
             <span class="kpi-label">Pendentes</span>
-            <v-icon size="20" :color="stats.pending > 0 ? 'warning' : 'grey'">mdi-clock-alert</v-icon>
+            <v-icon size="20" :color="stats.pending > 0 ? 'warning' : 'grey'"
+              >mdi-clock-alert</v-icon
+            >
           </div>
-          <div class="kpi-value" :class="{ 'text-warning': stats.pending > 0 }">{{ stats.pending }}</div>
+          <div class="kpi-value" :class="{ 'text-warning': stats.pending > 0 }">
+            {{ stats.pending }}
+          </div>
           <div class="kpi-subtitle">Aguardando</div>
         </v-card>
       </v-col>
@@ -73,25 +77,25 @@
         no-data-text="Nenhuma poda registrada"
       >
         <!-- Árvore -->
-        <template #item.tree="{ item }">
+        <template #[`item.tree`]="{ item }">
           <div class="d-flex align-center">
             <v-icon size="18" color="green-darken-2" class="mr-2">mdi-tree</v-icon>
             <span class="text-body-2">
-              {{ item.tree?.species?.commonName || 'Árvore #' + item.idTree?.slice(-4) }}
+              {{ item.tree?.species?.commonName || 'Árvore #' + (item.idTree?.slice(-4) || '—') }}
             </span>
           </div>
         </template>
 
         <!-- Localização -->
-        <template #item.location="{ item }">
-          <div v-if="item.tree?.latitude" class="text-caption text-grey-darken-1">
-            {{ item.tree.latitude.toFixed(4) }}, {{ item.tree.longitude.toFixed(4) }}
+        <template #[`item.location`]="{ item }">
+          <div v-if="hasCoordinates(item.tree)" class="text-caption text-grey-darken-1">
+            {{ formatCoordinate(item.tree.latitude) }}, {{ formatCoordinate(item.tree.longitude) }}
           </div>
           <span v-else class="text-caption text-grey">—</span>
         </template>
 
         <!-- Tipo -->
-        <template #item.type="{ item }">
+        <template #[`item.type`]="{ item }">
           <v-chip
             :color="getTypeColor(item.type)"
             size="small"
@@ -103,31 +107,131 @@
         </template>
 
         <!-- Data -->
-        <template #item.date="{ item }">
+        <template #[`item.date`]="{ item }">
           <span class="text-body-2">{{ formatDate(item.date) }}</span>
         </template>
 
         <!-- Observações -->
-        <template #item.observations="{ item }">
-          <span class="text-caption text-grey-darken-1 text-truncate" style="max-width: 200px; display: block;">
+        <template #[`item.observations`]="{ item }">
+          <span
+            class="text-caption text-grey-darken-1 text-truncate"
+            style="max-width: 200px; display: block"
+          >
             {{ item.observations || '—' }}
           </span>
         </template>
 
         <!-- Ações -->
-        <template #item.actions="{ item }">
-          <v-btn
-            icon
-            size="small"
-            variant="text"
-            color="primary"
-            @click="viewDetails(item)"
-          >
+        <template #[`item.actions`]="{ item }">
+          <v-btn icon size="small" variant="text" color="primary" @click="viewDetails(item)">
             <v-icon size="18">mdi-eye</v-icon>
           </v-btn>
         </template>
       </v-data-table>
     </v-card>
+
+    <v-dialog v-model="detailsOpen" max-width="680" scrollable>
+      <v-card v-if="selectedPruning" class="details-dialog" rounded="xl">
+        <header class="details-hero">
+          <div class="details-hero__topline">
+            <v-avatar color="rgba(255,255,255,.14)" size="46">
+              <v-icon color="#D7ED63" size="24">mdi-tree</v-icon>
+            </v-avatar>
+            <v-btn
+              icon="mdi-close"
+              variant="text"
+              color="white"
+              aria-label="Fechar detalhes da poda"
+              @click="detailsOpen = false"
+            />
+          </div>
+          <div class="details-hero__content">
+            <div class="details-eyebrow">HISTÓRICO DE MANEJO</div>
+            <h2 class="details-title">Detalhes da poda</h2>
+            <p class="details-tree-name">{{ treeDisplayName(selectedPruning) }}</p>
+          </div>
+          <v-chip
+            class="details-type-chip"
+            :color="getTypeColor(selectedPruning.type)"
+            size="small"
+            variant="flat"
+          >
+            {{ getTypeLabel(selectedPruning.type) }}
+          </v-chip>
+        </header>
+
+        <v-card-text class="details-content">
+          <section class="details-section" aria-labelledby="pruning-info-heading">
+            <h3 id="pruning-info-heading" class="details-section__title">
+              Informações do registro
+            </h3>
+            <div class="details-grid">
+              <div class="detail-tile">
+                <v-avatar color="green-lighten-5" size="38"
+                  ><v-icon color="green-darken-2" size="19"
+                    >mdi-calendar-month-outline</v-icon
+                  ></v-avatar
+                >
+                <div>
+                  <span class="detail-label">Data da poda</span
+                  ><strong>{{ formatDate(selectedPruning.date) }}</strong>
+                </div>
+              </div>
+              <div class="detail-tile">
+                <v-avatar color="lime-lighten-4" size="38"
+                  ><v-icon color="green-darken-3" size="19"
+                    >mdi-map-marker-outline</v-icon
+                  ></v-avatar
+                >
+                <div>
+                  <span class="detail-label">Localização</span
+                  ><strong>{{ coordinatesDisplay(selectedPruning.tree) }}</strong>
+                </div>
+              </div>
+              <div class="detail-tile detail-tile--wide">
+                <v-avatar color="blue-grey-lighten-5" size="38"
+                  ><v-icon color="blue-grey-darken-1" size="19">mdi-leaf</v-icon></v-avatar
+                >
+                <div>
+                  <span class="detail-label">Nome científico</span
+                  ><strong>{{
+                    selectedPruning.tree?.species?.scientificName?.trim() ||
+                    'Espécie não identificada'
+                  }}</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="action-note" aria-labelledby="pruning-action-heading">
+            <div class="action-note__heading">
+              <v-avatar color="white" size="36"
+                ><v-icon color="green-darken-2" size="19">mdi-content-cut</v-icon></v-avatar
+              >
+              <div>
+                <h3 id="pruning-action-heading">Ação registrada</h3>
+                <span>Observações informadas no atendimento</span>
+              </div>
+            </div>
+            <p class="observations-text">{{ observationDisplay(selectedPruning.observations) }}</p>
+          </section>
+          <p class="details-footnote">
+            <v-icon size="15" class="mr-1">mdi-information-outline</v-icon>Detalhes exibidos
+            conforme as informações disponíveis neste registro.
+          </p>
+        </v-card-text>
+
+        <v-card-actions class="details-actions">
+          <v-btn
+            variant="text"
+            color="green-darken-2"
+            class="text-none font-weight-bold"
+            @click="detailsOpen = false"
+            >Fechar detalhes</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Error Snackbar -->
     <v-snackbar v-model="showError" color="error" timeout="5000">
@@ -148,10 +252,27 @@ import { apiConnect } from '@/plugins/apiConnect'
 const router = useRouter()
 
 // State
-const prunings = ref<any[]>([])
+const prunings = ref<PruningRecord[]>([])
 const loading = ref(true)
 const showError = ref(false)
 const errorMessage = ref('')
+const detailsOpen = ref(false)
+const selectedPruning = ref<PruningRecord | null>(null)
+
+interface TreeLocation {
+  latitude?: number | null
+  longitude?: number | null
+  species?: { commonName?: string | null; scientificName?: string | null } | null
+}
+
+interface PruningRecord {
+  id?: string | null
+  idTree?: string | null
+  type?: string | null
+  date?: string | Date | null
+  observations?: string | null
+  tree?: TreeLocation | null
+}
 
 // Headers da tabela
 const headers = [
@@ -166,7 +287,7 @@ const headers = [
 // Stats computadas
 const stats = computed(() => {
   const total = prunings.value.length
-  const completed = prunings.value.filter(p => p.type === 'HEAVY').length // HEAVY = poda completa
+  const completed = prunings.value.filter((p) => p.type === 'HEAVY').length // HEAVY = poda completa
   const pending = total - completed
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0
 
@@ -176,43 +297,70 @@ const stats = computed(() => {
 // Métodos
 const createPruning = () => router.push('/user/podas/nova')
 
-const viewDetails = (item: any) => {
-  console.log('Ver detalhes:', item)
-  // router.push(`/user/podas/${item.id}`)
+const viewDetails = (item: PruningRecord) => {
+  selectedPruning.value = item
+  detailsOpen.value = true
 }
 
-const getTypeColor = (type: string) => {
+const getTypeColor = (type?: string | null) => {
   const colors: Record<string, string> = {
-    'LIGHT': 'blue',
-    'MODERATE': 'orange',
-    'HEAVY': 'green',
+    LIGHT: 'blue',
+    MODERATE: 'orange',
+    HEAVY: 'green',
   }
-  return colors[type] || 'grey'
+  return colors[type || ''] || 'grey'
 }
 
-const getTypeLabel = (type: string) => {
+const getTypeLabel = (type?: string | null) => {
   const labels: Record<string, string> = {
-    'LIGHT': 'Leve',
-    'MODERATE': 'Moderada',
-    'HEAVY': 'Pesada',
+    LIGHT: 'Leve',
+    MODERATE: 'Moderada',
+    HEAVY: 'Pesada',
   }
-  return labels[type] || type
+  return labels[type || ''] || type || 'Não informado'
 }
 
-const formatDate = (date: string | Date | undefined) => {
+const formatDate = (date: string | Date | null | undefined) => {
   if (!date) return '—'
   const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return 'Data inválida'
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+
+const hasCoordinates = (
+  tree?: TreeLocation | null,
+): tree is TreeLocation & { latitude: number; longitude: number } =>
+  typeof tree?.latitude === 'number' &&
+  Number.isFinite(tree.latitude) &&
+  typeof tree.longitude === 'number' &&
+  Number.isFinite(tree.longitude)
+
+const formatCoordinate = (value: number) => value.toFixed(4)
+
+const coordinatesDisplay = (tree?: TreeLocation | null) =>
+  hasCoordinates(tree)
+    ? `${formatCoordinate(tree.latitude)}, ${formatCoordinate(tree.longitude)}`
+    : 'Localização não informada'
+
+const treeDisplayName = (pruning: PruningRecord) => {
+  const commonName = pruning.tree?.species?.commonName?.trim()
+  if (commonName) return commonName
+  const id = pruning.idTree?.trim()
+  return id ? `Árvore #${id.slice(-4)}` : 'Árvore sem identificação'
+}
+
+const observationDisplay = (observations?: string | null) =>
+  observations?.trim() || 'Nenhuma observação foi registrada para esta poda.'
 
 const loadPrunings = async () => {
   loading.value = true
   try {
-    const response = await apiConnect.get<any[]>('/pruning')
+    const response = await apiConnect.get<PruningRecord[]>('/pruning')
     prunings.value = response.data || []
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao carregar podas:', error)
-    errorMessage.value = error.response?.data?.message || 'Erro ao carregar podas'
+    const apiError = error as { response?: { data?: { message?: string } } }
+    errorMessage.value = apiError.response?.data?.message || 'Erro ao carregar podas'
     showError.value = true
   } finally {
     loading.value = false
@@ -288,5 +436,203 @@ onMounted(() => {
 .pruning-table :deep(td) {
   padding-top: 12px !important;
   padding-bottom: 12px !important;
+}
+
+.details-dialog {
+  overflow: hidden;
+  border: 1px solid rgba(34, 69, 45, 0.12);
+  box-shadow: 0 24px 70px rgba(15, 35, 23, 0.24) !important;
+}
+
+.details-hero {
+  position: relative;
+  min-height: 204px;
+  padding: 24px 28px 26px;
+  overflow: hidden;
+  color: white;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(197, 225, 31, 0.22), transparent 31%),
+    linear-gradient(125deg, #173d2a 0%, #245a39 58%, #367044 100%);
+}
+
+.details-hero::after {
+  position: absolute;
+  right: -42px;
+  bottom: -112px;
+  width: 238px;
+  height: 238px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  content: '';
+  box-shadow:
+    0 0 0 24px rgba(255, 255, 255, 0.035),
+    0 0 0 48px rgba(255, 255, 255, 0.025);
+  pointer-events: none;
+}
+
+.details-hero__topline,
+.details-hero__content,
+.details-type-chip {
+  position: relative;
+  z-index: 1;
+}
+
+.details-hero__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.details-hero__content {
+  margin-top: 22px;
+}
+
+.details-eyebrow {
+  color: #d7ed63;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.details-title {
+  margin-top: 3px;
+  font-size: 1.45rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.details-tree-name {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.92rem;
+}
+
+.details-type-chip {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  font-weight: 700;
+}
+
+.details-content {
+  display: grid;
+  gap: 22px;
+  padding: 24px 28px 12px;
+  background: #f7f9f5;
+}
+
+.details-section__title {
+  margin-bottom: 12px;
+  color: #26382c;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-tile {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e8ede5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.detail-tile > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.detail-tile strong {
+  overflow-wrap: anywhere;
+  color: #25372b;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+.detail-tile--wide {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  color: #778278;
+  font-size: 0.69rem;
+  font-weight: 650;
+  letter-spacing: 0.025em;
+}
+
+.action-note {
+  padding: 16px;
+  border: 1px solid #e1e9cf;
+  border-left: 4px solid #a7c92b;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #f1f6e5, #fbfcf8 72%);
+}
+
+.action-note__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.action-note__heading h3 {
+  color: #2d4933;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+.action-note__heading span {
+  color: #788276;
+  font-size: 0.72rem;
+}
+
+.observations-text {
+  margin: 14px 0 0;
+  padding: 13px 14px;
+  border: 1px solid #e8ede5;
+  border-radius: 10px;
+  background: white;
+  color: #37463a;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.details-footnote {
+  display: flex;
+  align-items: center;
+  color: #7b857c;
+  font-size: 0.7rem;
+}
+.details-actions {
+  justify-content: flex-end;
+  padding: 8px 20px 18px;
+  background: #f7f9f5;
+}
+
+@media (max-width: 520px) {
+  .details-hero {
+    min-height: 194px;
+    padding: 20px;
+  }
+  .details-type-chip {
+    right: 20px;
+    bottom: 20px;
+  }
+  .details-content {
+    gap: 18px;
+    padding: 20px 16px 10px;
+  }
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+  .detail-tile--wide {
+    grid-column: auto;
+  }
 }
 </style>

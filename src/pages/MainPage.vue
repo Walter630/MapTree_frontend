@@ -35,7 +35,7 @@ const HIDDEN_ROUTES = [
 const showAppBar = computed(() => !HIDDEN_ROUTES.includes(route.path))
 
 const MAP_ROUTES = ['/user/mapUser', '/manager/map', '/admin/map']
-const isMapPage = computed(() => MAP_ROUTES.some(r => route.path.startsWith(r)))
+const isMapPage = computed(() => MAP_ROUTES.some((r) => route.path.startsWith(r)))
 </script>
 
 <style>
@@ -48,7 +48,7 @@ const isMapPage = computed(() => MAP_ROUTES.some(r => route.path.startsWith(r)))
 
 <template>
   <!-- Só mostra o AppBar se não estiver em login/cadastro -->
-  <AppBarComponent v-if="showAppBar"  />
+  <AppBarComponent v-if="showAppBar" />
 
   <v-main
     :class="{ 'map-page': isMapPage }"

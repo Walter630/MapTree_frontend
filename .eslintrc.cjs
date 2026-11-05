@@ -1,24 +1,23 @@
-/* eslint-env node */
 module.exports = {
   root: true,
   env: {
     browser: true,
     es2021: true,
-    node: true
+    node: true,
   },
   extends: [
     'eslint:recommended',
     'plugin:vue/vue3-recommended',
     'plugin:@typescript-eslint/recommended',
     'plugin:prettier/recommended',
-    'prettier'
+    'prettier',
   ],
   parser: 'vue-eslint-parser',
   parserOptions: {
     parser: '@typescript-eslint/parser',
     ecmaVersion: 'latest',
     sourceType: 'module',
-    extraFileExtensions: ['.vue']
+    extraFileExtensions: ['.vue'],
   },
   plugins: ['vue', '@typescript-eslint'],
   rules: {
@@ -36,11 +35,11 @@ module.exports = {
         semi: false,
         trailingComma: 'none',
         endOfLine: 'auto',
-        printWidth: 100
-      }
+        printWidth: 100,
+      },
     ],
-    'quotes': ['error', 'single'],
-    'semi': ['error', 'never'],
+    quotes: ['error', 'single'],
+    semi: ['error', 'never'],
     'arrow-parens': ['error', 'always'],
     'space-before-function-paren': ['error', 'never'],
 
@@ -52,18 +51,18 @@ module.exports = {
         html: {
           void: 'always',
           normal: 'never',
-          component: 'always'
+          component: 'always',
         },
         svg: 'always',
-        math: 'always'
-      }
+        math: 'always',
+      },
     ],
     'vue/max-attributes-per-line': [
       'error',
       {
         singleline: 4,
-        multiline: 1
-      }
+        multiline: 1,
+      },
     ],
     'vue/html-indent': ['error', 2, { baseIndent: 1 }],
     'vue/singleline-html-element-content-newline': 'off',
@@ -71,14 +70,7 @@ module.exports = {
     /* 🔹 TypeScript */
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/ban-ts-comment': 'off'
+    '@typescript-eslint/ban-ts-comment': 'off',
   },
-  ignorePatterns: [
-    'dist',
-    'node_modules',
-    'public',
-    '*.config.*',
-    'vite.config.*',
-    'env.d.ts'
-  ]
+  ignorePatterns: ['dist', 'node_modules', 'public', '*.config.*', 'vite.config.*', 'env.d.ts'],
 }

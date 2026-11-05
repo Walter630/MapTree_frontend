@@ -4,13 +4,13 @@
  */
 
 export interface SoilTypeInfo {
-  name: string;
-  color: string;
-  quality: 'GOOD' | 'REGULAR' | 'BAD';
-  description: string;
-  growthImpact: string;
-  typicalClay: number;
-  typicalPh: number;
+  name: string
+  color: string
+  quality: 'GOOD' | 'REGULAR' | 'BAD'
+  description: string
+  growthImpact: string
+  typicalClay: number
+  typicalPh: number
 }
 
 export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
@@ -18,10 +18,11 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     name: 'Latossolo Vermelho',
     color: '#B71C1C',
     quality: 'GOOD',
-    description: 'Solos profundos, muito intemperizados e ricos em ferro. Excelente para raízes profundas.',
+    description:
+      'Solos profundos, muito intemperizados e ricos em ferro. Excelente para raízes profundas.',
     growthImpact: 'Acelerado (+20%)',
     typicalClay: 65,
-    typicalPh: 5.2
+    typicalPh: 5.2,
   },
   LATOSSOLO_AMARELO: {
     name: 'Latossolo Amarelo',
@@ -30,7 +31,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Solos profundos, bem drenados, comuns em regiões de platôs.',
     growthImpact: 'Estável (Normal)',
     typicalClay: 45,
-    typicalPh: 5.5
+    typicalPh: 5.5,
   },
   LATOSSOLO_VERMELHO_AMARELO: {
     name: 'Latossolo Vermelho-Amarelo',
@@ -39,7 +40,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Transição entre solos férreos e argilosos suaves.',
     growthImpact: 'Estável (Normal)',
     typicalClay: 50,
-    typicalPh: 5.3
+    typicalPh: 5.3,
   },
   ARGISSOLO: {
     name: 'Argissolo',
@@ -48,7 +49,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Acúmulo de argila em profundidade. Risco moderado de erosão.',
     growthImpact: 'Moderado (+5%)',
     typicalClay: 35,
-    typicalPh: 5.8
+    typicalPh: 5.8,
   },
   CAMBISSOLO: {
     name: 'Cambissolo',
@@ -57,7 +58,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Solo jovem, com desenvolvimento incipiente.',
     growthImpact: 'Estável (Normal)',
     typicalClay: 25,
-    typicalPh: 4.8
+    typicalPh: 4.8,
   },
   CHERNOSSOLO: {
     name: 'Chernossolo',
@@ -66,7 +67,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Altamente fértil, rico em matéria orgânica e cálcio.',
     growthImpact: 'Muito Acelerado (+35%)',
     typicalClay: 40,
-    typicalPh: 7.0
+    typicalPh: 7.0,
   },
   NEOSSOLO_QUARTZARENICO: {
     name: 'Neossolo Quartzarênico',
@@ -75,7 +76,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Basciamente composto por areia. Baixa retenção de água e nutrientes.',
     growthImpact: 'Retardado (-25%)',
     typicalClay: 10,
-    typicalPh: 5.0
+    typicalPh: 5.0,
   },
   GLEISSOLO: {
     name: 'Gleissolo',
@@ -84,7 +85,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Saturado de água (hidromórfico). Pode causar apodrecimento de raízes.',
     growthImpact: 'Crítico (-40%)',
     typicalClay: 15,
-    typicalPh: 5.5
+    typicalPh: 5.5,
   },
   PLANOSSOLO: {
     name: 'Planossolo',
@@ -93,7 +94,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Drenagem deficiente com risco de alagamentos temporários.',
     growthImpact: 'Sazonal',
     typicalClay: 30,
-    typicalPh: 5.2
+    typicalPh: 5.2,
   },
   PLINTOSSOLO: {
     name: 'Plintossolo',
@@ -102,7 +103,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Presença de plintita, que endurece quando seca.',
     growthImpact: 'Retardado (-15%)',
     typicalClay: 22,
-    typicalPh: 5.1
+    typicalPh: 5.1,
   },
   NITOSSOLO: {
     name: 'Nitossolo',
@@ -111,7 +112,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Solo profundo e muito estruturado, ideal para grandes árvores.',
     growthImpact: 'Acelerado (+15%)',
     typicalClay: 70,
-    typicalPh: 6.2
+    typicalPh: 6.2,
   },
   VERTISSOLO: {
     name: 'Vertissolo',
@@ -120,7 +121,7 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Rico em argilas que expandem e contraem (fendas no solo).',
     growthImpact: 'Instável',
     typicalClay: 55,
-    typicalPh: 7.2
+    typicalPh: 7.2,
   },
   UNKNOWN: {
     name: 'Solo não Mapeado',
@@ -129,9 +130,9 @@ export const SOIL_TYPES: Record<string, SoilTypeInfo> = {
     description: 'Dados ainda não consolidados para esta coordenada.',
     growthImpact: 'N/A',
     typicalClay: 40,
-    typicalPh: 6.0
-  }
-};
+    typicalPh: 6.0,
+  },
+}
 
 export function getSoilInfo(type: string): SoilTypeInfo {
   // Fallback seguro - sempre retorna um valor válido
@@ -142,40 +143,40 @@ export function getSoilInfo(type: string): SoilTypeInfo {
     description: 'Solos profundos, muito intemperizados e ricos em ferro.',
     growthImpact: 'Acelerado (+20%)',
     typicalClay: 65,
-    typicalPh: 5.2
-  });
+    typicalPh: 5.2,
+  })
 
   if (!type || type === 'UNKNOWN') {
-    return getFallback();
+    return getFallback()
   }
 
-  const normalizedKey = type.toUpperCase().replace(/\s+/g, '_');
+  const normalizedKey = type.toUpperCase().replace(/\s+/g, '_')
 
   // Busca por chave usando verificação segura
   for (const [key, value] of Object.entries(SOIL_TYPES)) {
     if (key === normalizedKey) {
-      return value;
+      return value
     }
   }
 
   // Busca por nome
-  const typeLower = type.toLowerCase().trim();
+  const typeLower = type.toLowerCase().trim()
   for (const value of Object.values(SOIL_TYPES)) {
     if (value.name.toLowerCase() === typeLower) {
-      return value;
+      return value
     }
   }
 
   // Mapeamento por qualidade
   if (type === 'GOOD' || type === 'VERDE') {
-    return SOIL_TYPES.LATOSSOLO_VERMELHO ?? getFallback();
+    return SOIL_TYPES.LATOSSOLO_VERMELHO ?? getFallback()
   }
   if (type === 'REGULAR' || type === 'AMARELO') {
-    return SOIL_TYPES.ARGISSOLO ?? getFallback();
+    return SOIL_TYPES.ARGISSOLO ?? getFallback()
   }
   if (type === 'BAD' || type === 'AZUL') {
-    return SOIL_TYPES.NEOSSOLO_QUARTZARENICO ?? getFallback();
+    return SOIL_TYPES.NEOSSOLO_QUARTZARENICO ?? getFallback()
   }
 
-  return getFallback();
+  return getFallback()
 }

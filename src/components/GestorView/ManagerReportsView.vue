@@ -5,10 +5,7 @@
         <PageHeader
           title="Relatórios Gerenciais"
           subtitle="Gerencie seus relatórios cadastrados no sistema"
-          :breadcrumbs="[
-            { text: 'Meu Painel', to: '/manager' },
-            { text: '#Relatórios' },
-          ]"
+          :breadcrumbs="[{ text: 'Meu Painel', to: '/manager' }, { text: '#Relatórios' }]"
         />
       </v-col>
     </v-row>
@@ -16,7 +13,10 @@
     <!-- KPI Cards (Novo) -->
     <v-row class="mb-4">
       <v-col cols="12" sm="4" md="3">
-        <v-card class="pa-4 rounded-xl elevation-2" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: white">
+        <v-card
+          class="pa-4 rounded-xl elevation-2"
+          style="background: linear-gradient(135deg, #1e293b, #0f172a); color: white"
+        >
           <div class="d-flex justify-space-between align-center mb-2">
             <v-icon color="green-lighten-2">mdi-content-cut</v-icon>
             <span class="text-caption">Total Podas</span>
@@ -106,7 +106,7 @@
             <v-chip size="small" color="primary" variant="flat">Últimos 12 meses</v-chip>
           </div>
 
-          <div class="chart-container" style="height: 280px;">
+          <div class="chart-container" style="height: 280px">
             <div class="y-axis">
               <span>Máx</span>
               <span>Méd</span>
@@ -114,7 +114,10 @@
             </div>
             <div class="bars">
               <div v-for="(item, i) in chartData" :key="i" class="bar-col">
-                <div class="bar-fill" :style="{ height: item.percent + '%', backgroundColor: item.color }">
+                <div
+                  class="bar-fill"
+                  :style="{ height: item.percent + '%', backgroundColor: item.color }"
+                >
                   <v-tooltip activator="parent" location="top">{{ item.count }} podas</v-tooltip>
                 </div>
                 <span class="bar-label">{{ item.month }}</span>
@@ -127,7 +130,7 @@
       <v-col cols="12" md="5">
         <v-card class="pa-5 rounded-xl elevation-1" border style="height: 100%">
           <h3 class="text-h6 font-weight-bold mb-6">Tipos de Intervenção</h3>
-          
+
           <div class="donut-chart-wrapper">
             <div v-for="(stat, i) in pruningStats" :key="i" class="donut-stat-row mb-4">
               <div class="d-flex justify-space-between align-center mb-1">
@@ -143,8 +146,8 @@
               />
             </div>
             <div v-if="!pruningStats.length" class="text-center py-12">
-               <v-icon color="grey-lighten-3" size="48">mdi-chart-donut</v-icon>
-               <p class="text-caption text-grey">Sem dados de estatística</p>
+              <v-icon color="grey-lighten-3" size="48">mdi-chart-donut</v-icon>
+              <p class="text-caption text-grey">Sem dados de estatística</p>
             </div>
           </div>
         </v-card>
@@ -154,7 +157,9 @@
     <v-card class="pa-5 rounded-xl elevation-1" border>
       <div class="d-flex justify-space-between align-center mb-6">
         <h3 class="text-h6 font-weight-bold">Relatório de Atividades Executadas</h3>
-        <v-btn variant="outlined" size="small" prepend-icon="mdi-download" @click="downloadAll">Exportar CSV</v-btn>
+        <v-btn variant="outlined" size="small" prepend-icon="mdi-download" @click="downloadAll"
+          >Exportar CSV</v-btn
+        >
       </div>
 
       <v-data-table
@@ -170,7 +175,9 @@
               <v-icon color="green-darken-2" size="18">mdi-tree</v-icon>
             </v-avatar>
             <div>
-              <div class="font-weight-bold text-caption">{{ item.tree?.species?.commonName || 'Árvore Independente' }}</div>
+              <div class="font-weight-bold text-caption">
+                {{ item.tree?.species?.commonName || 'Árvore Independente' }}
+              </div>
               <div class="text-grey" style="font-size: 10px">ID: {{ item.idTree?.slice(-6) }}</div>
             </div>
           </div>
@@ -178,19 +185,27 @@
 
         <template #[`item.location`]="{ item }">
           <div class="text-caption text-grey-darken-1">
-             <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
-             {{ item.tree?.latitude?.toFixed(5) }}, {{ item.tree?.longitude?.toFixed(5) }}
+            <template v-if="hasCoordinates(item.tree)">
+              <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
+              {{ item.tree.latitude.toFixed(5) }}, {{ item.tree.longitude.toFixed(5) }}
+            </template>
+            <span v-else>Localização indisponível</span>
           </div>
         </template>
 
         <template #[`item.type`]="{ item }">
-          <v-chip :color="getPruningColor(item.type)" size="x-small" variant="flat" class="font-weight-bold">
+          <v-chip
+            :color="getPruningColor(item.type)"
+            size="x-small"
+            variant="flat"
+            class="font-weight-bold"
+          >
             {{ item.type }}
           </v-chip>
         </template>
 
         <template #[`item.date`]="{ item }">
-           <span class="text-caption">{{ formatDateFull(item.date) }}</span>
+          <span class="text-caption">{{ formatDateFull(item.date) }}</span>
         </template>
 
         <template #[`item.actions`]="{ item }">
@@ -204,7 +219,8 @@
 </template>
 
 <script lang="ts">
-import { useAppStore } from '@/stores/app'
+import type { TreeApiRecord, PruningApiRecord } from '@/types/treeApi'
+import { getTreeHeightRatio } from '@/utils/treePriority'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 export default {
@@ -214,7 +230,7 @@ export default {
     return {
       search: '',
       loading: false,
-      prunings: [] as any[],
+      prunings: [] as PruningApiRecord[],
       totalTrees: 0,
       countUrgent: 0,
       filters: {
@@ -228,7 +244,7 @@ export default {
         { title: 'Tipo', key: 'type', align: 'center' },
         { title: 'Data/Hora', key: 'date', align: 'center' },
         { title: 'Ações', key: 'actions', align: 'end' },
-      ] as any[],
+      ] as const,
       PRUNING_TYPE_MAP: {
         LIGHT: { label: 'Leve', color: '#81C784' },
         MODERATE: { label: 'Moderada', color: '#FFB74D' },
@@ -267,32 +283,54 @@ export default {
 
     chartData() {
       // Simulação baseada em dados reais (agrupamento por mês)
-      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+      const months = [
+        'Jan',
+        'Fev',
+        'Mar',
+        'Abr',
+        'Mai',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Set',
+        'Out',
+        'Nov',
+        'Dez',
+      ]
       return months.map((m) => ({
         month: m,
         count: Math.floor(Math.random() * 50) + 10,
         percent: Math.floor(Math.random() * 80) + 20,
-        color: m === 'Nov' ? '#22c55e' : '#cbd5e1'
+        color: m === 'Nov' ? '#22c55e' : '#cbd5e1',
       }))
-    }
+    },
   },
 
   methods: {
+    hasCoordinates(
+      tree: Pick<TreeApiRecord, 'latitude' | 'longitude'> | undefined,
+    ): tree is { latitude: number; longitude: number } {
+      return (
+        tree?.latitude != null &&
+        tree.longitude != null &&
+        Number.isFinite(tree.latitude) &&
+        Number.isFinite(tree.longitude)
+      )
+    },
+
     getPrunings() {
       this.loading = true
-      this.$api.get<any[]>('/pruning').then((res) => {
+      this.$api.get<PruningApiRecord[]>('/pruning').then((res) => {
         this.prunings = res.data || []
         this.loading = false
       })
     },
 
     getTreesCount() {
-      this.$api.get<any[]>('/trees').then((res) => {
+      this.$api.get<TreeApiRecord[]>('/trees').then((res) => {
         const trees = res.data || []
         this.totalTrees = trees.length
-        this.countUrgent = trees.filter((t: any) => 
-          (t.aiPrediction?.estimated_height_m / t.aiPrediction?.wire_height_m) >= 0.9
-        ).length
+        this.countUrgent = trees.filter((t) => (getTreeHeightRatio(t) ?? 0) >= 0.9).length
       })
     },
 
@@ -304,10 +342,15 @@ export default {
 
     formatDateFull(dateStr: string) {
       if (!dateStr) return '-'
-      return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+      return new Date(dateStr).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     },
 
-    viewDetails(item: any) {
+    viewDetails(item: PruningApiRecord) {
       this.$router.push(`/manager?report=${item.id}`)
     },
 
@@ -319,7 +362,6 @@ export default {
 </script>
 
 <style scoped>
-
 /* Ajuste fino para a barra de pesquisa superior */
 .search-bar-container .custom-search-field {
   max-width: 200px;

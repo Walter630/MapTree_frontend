@@ -1,6 +1,6 @@
 /**
  * Soil Renderers - Alternativas de Visualização de Solo
- * 
+ *
  * Opções disponíveis:
  * 1. HEATMAP - Mapa de calor interpolado (melhor para grandes áreas)
  * 2. GRID - Grid/Quadriculado colorido (balanceado)
@@ -45,38 +45,27 @@ export function renderSoilHeatmap(
   map: L.Map,
   container: L.LayerGroup,
   points: SoilPoint[],
-  options: { opacity?: number } = {}
+  options: { opacity?: number } = {},
 ): void {
   container.clearLayers()
 
   const opacity = options.opacity ?? 0.6
 
   // Cria um layer de canvas customizado
-  const canvasLayer = L.GridLayer.extend({
-    createTile: function(coords: any) {
+  class SoilCanvasLayer extends L.GridLayer {
+    createTile(coords: L.Coords): HTMLCanvasElement {
       const tile = document.createElement('canvas')
       const tileSize = this.getTileSize()
-      tile.setAttribute('width', String(tileSize.x))
-      tile.setAttribute('height', String(tileSize.y))
-
+      tile.width = tileSize.x
+      tile.height = tileSize.y
       const ctx = tile.getContext('2d')
       if (!ctx) return tile
-
-      // Calcula bounds deste tile
-      const tileBounds = getTileBounds(coords, this._map.getZoom())
-
-      // Desenha interpolação de cores
+      const tileBounds = getTileBounds(coords, map.getZoom())
       drawHeatmapInterpolation(ctx, tileSize.x, tileSize.y, points, tileBounds, opacity)
-
       return tile
     }
-  })
-
-  // @ts-ignore
-  const layer = new canvasLayer({
-    opacity: opacity,
-    zIndex: 100
-  })
+  }
+  const layer = new SoilCanvasLayer({ opacity, zIndex: 100 })
 
   container.addLayer(layer)
 }
@@ -89,8 +78,8 @@ function drawHeatmapInterpolation(
   width: number,
   height: number,
   points: SoilPoint[],
-  tileBounds: { north: number, south: number, east: number, west: number },
-  opacity: number
+  tileBounds: { north: number; south: number; east: number; west: number },
+  opacity: number,
 ): void {
   const imageData = ctx.createImageData(width, height)
   const data = imageData.data
@@ -108,7 +97,7 @@ function drawHeatmapInterpolation(
       const color = valueToColor(value)
 
       const idx = (y * width + x) * 4
-      data[idx] = color.r     // R
+      data[idx] = color.r // R
       data[idx + 1] = color.g // G
       data[idx + 2] = color.b // B
       data[idx + 3] = Math.floor(255 * opacity * color.a) // A
@@ -126,9 +115,7 @@ function interpolateValue(lat: number, lng: number, points: SoilPoint[]): number
   const power = 2 // IDW power
 
   for (const point of points) {
-    const distance = Math.sqrt(
-      Math.pow(lat - point.lat, 2) + Math.pow(lng - point.lng, 2)
-    )
+    const distance = Math.sqrt(Math.pow(lat - point.lat, 2) + Math.pow(lng - point.lng, 2))
 
     if (distance < 0.0001) {
       return point.value ?? getSoilQualityValue(point.soilQuality)
@@ -146,16 +133,22 @@ function interpolateValue(lat: number, lng: number, points: SoilPoint[]): number
 
 function getSoilQualityValue(quality?: string): number {
   switch (quality?.toUpperCase()) {
-    case 'EXCELLENT': return 0.9
-    case 'GOOD': return 0.7
-    case 'REGULAR': return 0.5
-    case 'POOR': return 0.3
-    case 'BAD': return 0.1
-    default: return 0.5
+    case 'EXCELLENT':
+      return 0.9
+    case 'GOOD':
+      return 0.7
+    case 'REGULAR':
+      return 0.5
+    case 'POOR':
+      return 0.3
+    case 'BAD':
+      return 0.1
+    default:
+      return 0.5
   }
 }
 
-function valueToColor(value: number): { r: number, g: number, b: number, a: number } {
+function valueToColor(value: number): { r: number; g: number; b: number; a: number } {
   // Escala: 0 = vermelho ruim, 0.5 = amarelo regular, 1 = verde bom
   if (value < 0.33) {
     // Vermelho a laranja
@@ -169,10 +162,10 @@ function valueToColor(value: number): { r: number, g: number, b: number, a: numb
   }
 }
 
-function getTileBounds(coords: { x: number, y: number, z: number }, zoom: number) {
+function getTileBounds(coords: { x: number; y: number; z: number }, zoom: number) {
   const n = Math.pow(2, zoom)
-  const west = coords.x / n * 360 - 180
-  const east = (coords.x + 1) / n * 360 - 180
+  const west = (coords.x / n) * 360 - 180
+  const east = ((coords.x + 1) / n) * 360 - 180
 
   const lat1 = tile2lat(coords.y, n)
   const lat2 = tile2lat(coords.y + 1, n)
@@ -181,13 +174,13 @@ function getTileBounds(coords: { x: number, y: number, z: number }, zoom: number
     north: lat1,
     south: lat2,
     east,
-    west
+    west,
   }
 }
 
 function tile2lat(y: number, n: number): number {
-  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)))
-  return latRad * 180 / Math.PI
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)))
+  return (latRad * 180) / Math.PI
 }
 
 // ============================================================
@@ -202,7 +195,7 @@ export function renderSoilGrid(
   map: L.Map,
   container: L.LayerGroup,
   points: SoilPoint[],
-  options: { cellSizeMeters?: number, opacity?: number } = {}
+  options: { cellSizeMeters?: number; opacity?: number } = {},
 ): void {
   container.clearLayers()
 
@@ -210,7 +203,7 @@ export function renderSoilGrid(
   const opacity = options.opacity ?? 0.25
 
   // Agrupa pontos por célula do grid
-  const gridCells = new Map<string, { points: SoilPoint[], center: { lat: number, lng: number } }>()
+  const gridCells = new Map<string, { points: SoilPoint[]; center: { lat: number; lng: number } }>()
 
   for (const point of points) {
     const cellKey = getGridCellKey(point.lat, point.lng, cellSize)
@@ -218,7 +211,7 @@ export function renderSoilGrid(
     if (!gridCells.has(cellKey)) {
       gridCells.set(cellKey, {
         points: [],
-        center: getCellCenter(point.lat, point.lng, cellSize)
+        center: getCellCenter(point.lat, point.lng, cellSize),
       })
     }
 
@@ -226,7 +219,7 @@ export function renderSoilGrid(
   }
 
   // Renderiza cada célula como um retângulo
-  for (const [key, cell] of gridCells) {
+  for (const cell of gridCells.values()) {
     const dominantSoil = getDominantSoilType(cell.points)
     const info = getSoilInfo(dominantSoil)
 
@@ -239,7 +232,7 @@ export function renderSoilGrid(
       weight: 1,
       opacity: 0.8,
       dashArray: '2, 4',
-      interactive: false
+      interactive: false,
     })
 
     container.addLayer(polygon)
@@ -250,13 +243,13 @@ export function renderSoilGrid(
       color: '#fff',
       fillColor: info.color,
       fillOpacity: 1,
-      weight: 1
+      weight: 1,
     })
 
     marker.bindTooltip(info.name, {
       permanent: false,
       direction: 'top',
-      className: 'soil-tooltip'
+      className: 'soil-tooltip',
     })
 
     container.addLayer(marker)
@@ -266,7 +259,7 @@ export function renderSoilGrid(
 function getGridCellKey(lat: number, lng: number, cellSizeMeters: number): string {
   // Aproximadamente 111km por grau de latitude
   const latFactor = cellSizeMeters / 111000
-  const lngFactor = cellSizeMeters / (111000 * Math.cos(lat * Math.PI / 180))
+  const lngFactor = cellSizeMeters / (111000 * Math.cos((lat * Math.PI) / 180))
 
   const cellX = Math.floor(lng / lngFactor)
   const cellY = Math.floor(lat / latFactor)
@@ -274,26 +267,33 @@ function getGridCellKey(lat: number, lng: number, cellSizeMeters: number): strin
   return `${cellX}_${cellY}`
 }
 
-function getCellCenter(lat: number, lng: number, cellSizeMeters: number): { lat: number, lng: number } {
+function getCellCenter(
+  lat: number,
+  lng: number,
+  cellSizeMeters: number,
+): { lat: number; lng: number } {
   const latFactor = cellSizeMeters / 111000
-  const lngFactor = cellSizeMeters / (111000 * Math.cos(lat * Math.PI / 180))
+  const lngFactor = cellSizeMeters / (111000 * Math.cos((lat * Math.PI) / 180))
 
   const cellX = Math.floor(lng / lngFactor)
   const cellY = Math.floor(lat / latFactor)
 
   return {
     lat: (cellY + 0.5) * latFactor,
-    lng: (cellX + 0.5) * lngFactor
+    lng: (cellX + 0.5) * lngFactor,
   }
 }
 
-function getCellBounds(center: { lat: number, lng: number }, cellSizeMeters: number): L.LatLngBounds {
-  const latDelta = (cellSizeMeters / 111000) / 2
-  const lngDelta = (cellSizeMeters / (111000 * Math.cos(center.lat * Math.PI / 180))) / 2
+function getCellBounds(
+  center: { lat: number; lng: number },
+  cellSizeMeters: number,
+): L.LatLngBounds {
+  const latDelta = cellSizeMeters / 111000 / 2
+  const lngDelta = cellSizeMeters / (111000 * Math.cos((center.lat * Math.PI) / 180)) / 2
 
   return L.latLngBounds(
     [center.lat - latDelta, center.lng - lngDelta],
-    [center.lat + latDelta, center.lng + lngDelta]
+    [center.lat + latDelta, center.lng + lngDelta],
   )
 }
 
@@ -333,9 +333,9 @@ export function renderSoilPolygons(
   soilAreas: Array<{
     type: string
     geometry: L.LatLngExpression[]
-    center: { lat: number, lng: number }
+    center: { lat: number; lng: number }
   }>,
-  options: { opacity?: number } = {}
+  options: { opacity?: number } = {},
 ): void {
   container.clearLayers()
 
@@ -352,7 +352,7 @@ export function renderSoilPolygons(
       weight: 2,
       opacity: 0.9,
       smoothFactor: 1,
-      interactive: true
+      interactive: true,
     })
 
     polygon.bindPopup(`
@@ -370,12 +370,12 @@ export function renderSoilPolygons(
       color: '#fff',
       fillColor: info.color,
       fillOpacity: 0.9,
-      weight: 2
+      weight: 2,
     })
 
     centerMarker.bindTooltip(info.name, {
       permanent: false,
-      direction: 'top'
+      direction: 'top',
     })
 
     container.addLayer(centerMarker)
@@ -394,7 +394,7 @@ export function renderSoilDots(
   map: L.Map,
   container: L.LayerGroup,
   points: SoilPoint[],
-  options: { radius?: number, opacity?: number } = {}
+  options: { radius?: number; opacity?: number } = {},
 ): void {
   container.clearLayers()
 
@@ -413,12 +413,12 @@ export function renderSoilDots(
       fillColor: info.color,
       fillOpacity: opacity,
       weight: 0,
-      renderer: canvasLayer
+      renderer: canvasLayer,
     })
 
     dot.bindTooltip(info.name, {
       permanent: false,
-      direction: 'top'
+      direction: 'top',
     })
 
     container.addLayer(dot)
@@ -437,7 +437,7 @@ export function renderSoilCircles(
   map: L.Map,
   container: L.LayerGroup,
   points: SoilPoint[],
-  options: { radius?: number, fillOpacity?: number } = {}
+  options: { radius?: number; fillOpacity?: number } = {},
 ): void {
   container.clearLayers()
 
@@ -458,7 +458,7 @@ export function renderSoilCircles(
       weight: 1,
       dashArray: '5, 5',
       interactive: false,
-      renderer: canvasLayer
+      renderer: canvasLayer,
     })
 
     container.addLayer(circle)
@@ -470,10 +470,11 @@ export function renderSoilCircles(
       fillColor: info.color,
       fillOpacity: 1,
       weight: 2,
-      renderer: canvasLayer
+      renderer: canvasLayer,
     })
 
-    center.bindPopup(`
+    center.bindPopup(
+      `
       <div class="soil-intelligence-card text-center">
         <div class="pa-3">
           <div class="text-overline font-weight-bold" style="color: ${info.color}">${info.name}</div>
@@ -481,7 +482,9 @@ export function renderSoilCircles(
           <v-chip size="x-small" color="brown-darken-1" variant="flat">${info.growthImpact}</v-chip>
         </div>
       </div>
-    `, { maxWidth: 240, className: 'soil-glass-popup' })
+    `,
+      { maxWidth: 240, className: 'soil-glass-popup' },
+    )
 
     container.addLayer(center)
   }
@@ -494,12 +497,14 @@ export function renderSoilCircles(
 /**
  * Renderiza a camada de solo usando o modo especificado
  */
+type SoilArea = Parameters<typeof renderSoilPolygons>[2][number]
+
 export function renderSoilLayer(
   map: L.Map,
   container: L.LayerGroup,
-  points: SoilPoint[],
+  points: SoilPoint[] & { geometries?: SoilArea[] },
   mode: SoilRenderMode,
-  options: RenderOptions
+  options: RenderOptions,
 ): void {
   switch (mode) {
     case 'heatmap':
@@ -516,8 +521,8 @@ export function renderSoilLayer(
       break
     case 'polygons':
       // Requer dados de geometria - fallback para círculos se não tiver
-      if ((points as any).geometries) {
-        renderSoilPolygons(map, container, points as any, { opacity: options.opacity })
+      if (points.geometries) {
+        renderSoilPolygons(map, container, points.geometries, { opacity: options.opacity })
       } else {
         console.warn('Dados de geometria não disponíveis para polígonos. Usando círculos.')
         renderSoilCircles(map, container, points, { fillOpacity: options.opacity })
@@ -537,29 +542,29 @@ export const SOIL_RENDER_PRESETS = {
   minimal: {
     mode: 'dots' as SoilRenderMode,
     radius: 3,
-    opacity: 0.7
+    opacity: 0.7,
   },
   /** Balanceado para mobile */
   mobile: {
     mode: 'dots' as SoilRenderMode,
     radius: 4,
-    opacity: 0.8
+    opacity: 0.8,
   },
   /** Padrão para desktop */
   desktop: {
     mode: 'circles' as SoilRenderMode,
     radius: 600,
-    opacity: 0.12
+    opacity: 0.12,
   },
   /** Visualização de padrões regionais */
   regional: {
     mode: 'grid' as SoilRenderMode,
     cellSizeMeters: 400,
-    opacity: 0.25
+    opacity: 0.25,
   },
   /** Análise de qualidade interpolada */
   analysis: {
     mode: 'heatmap' as SoilRenderMode,
-    opacity: 0.6
-  }
+    opacity: 0.6,
+  },
 }

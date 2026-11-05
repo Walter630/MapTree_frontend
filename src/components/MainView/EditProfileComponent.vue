@@ -22,6 +22,13 @@ const form = reactive({
   password: '',
 })
 
+const persistedSummary = reactive({
+  name: '',
+  email: '',
+  organizationName: '',
+  isActive: true,
+})
+
 const currentUser = computed(() => store.user)
 
 const initials = computed(() => {
@@ -50,6 +57,13 @@ function fillForm(user: User) {
   form.password = ''
 }
 
+function fillSummary(user: User) {
+  persistedSummary.name = user.name || ''
+  persistedSummary.email = user.email || ''
+  persistedSummary.organizationName = user.organization?.name || ''
+  persistedSummary.isActive = user.isActive !== false
+}
+
 function notify(text: string, color: 'success' | 'error' | 'info' = 'info') {
   snackbarText.value = text
   snackbarColor.value = color
@@ -64,12 +78,17 @@ async function loadProfile() {
     if (data) {
       store.getUser(data)
       fillForm(data)
+      fillSummary(data)
     }
   } catch (error) {
     console.error('Erro ao carregar perfil:', error)
     if (currentUser.value) {
       fillForm(currentUser.value)
-      notify('Usando os dados salvos localmente. Não foi possível atualizar o perfil agora.', 'info')
+      fillSummary(currentUser.value)
+      notify(
+        'Usando os dados salvos localmente. Não foi possível atualizar o perfil agora.',
+        'info',
+      )
       return
     }
 
@@ -104,6 +123,7 @@ async function saveProfile() {
 
     store.getUser(updatedUser as User)
     fillForm(updatedUser as User)
+    fillSummary(updatedUser as User)
     notify('Perfil atualizado com sucesso.', 'success')
   } catch (error) {
     console.error('Erro ao salvar perfil:', error)
@@ -113,9 +133,13 @@ async function saveProfile() {
   }
 }
 
-function cancel() {
+function goHome() {
   const home = getHomeRouteByRole(router, currentUser.value?.role)
   router.push(home)
+}
+
+function cancel() {
+  goHome()
 }
 
 onMounted(loadProfile)
@@ -138,10 +162,27 @@ onMounted(loadProfile)
         </div>
       </div>
 
-      <v-chip color="green-lighten-4" text-color="green-darken-4" variant="flat" class="profile-role">
-        <v-icon start size="18">mdi-account-badge</v-icon>
-        {{ roleLabel }}
-      </v-chip>
+      <div class="profile-hero-actions">
+        <v-btn
+          class="home-button"
+          variant="outlined"
+          prepend-icon="mdi-arrow-left"
+          aria-label="Voltar para a home"
+          @click="goHome"
+        >
+          Voltar para a home
+        </v-btn>
+
+        <v-chip
+          color="green-lighten-4"
+          text-color="green-darken-4"
+          variant="flat"
+          class="profile-role"
+        >
+          <v-icon start size="18">mdi-account-badge</v-icon>
+          {{ roleLabel }}
+        </v-chip>
+      </div>
     </section>
 
     <section class="profile-content">
@@ -154,19 +195,19 @@ onMounted(loadProfile)
         <div class="account-summary">
           <div class="summary-item">
             <span>Nome</span>
-            <strong>{{ form.name || 'Não informado' }}</strong>
+            <strong>{{ persistedSummary.name || 'Não informado' }}</strong>
           </div>
           <div class="summary-item">
             <span>Email</span>
-            <strong>{{ form.email || 'Não informado' }}</strong>
+            <strong>{{ persistedSummary.email || 'Não informado' }}</strong>
           </div>
           <div class="summary-item">
             <span>Organização</span>
-            <strong>{{ currentUser?.organization?.name || 'Não vinculada' }}</strong>
+            <strong>{{ persistedSummary.organizationName || 'Não vinculada' }}</strong>
           </div>
           <div class="summary-item">
             <span>Status</span>
-            <strong>{{ currentUser?.isActive === false ? 'Inativo' : 'Ativo' }}</strong>
+            <strong>{{ persistedSummary.isActive ? 'Ativo' : 'Inativo' }}</strong>
           </div>
         </div>
       </v-card>
@@ -279,7 +320,13 @@ onMounted(loadProfile)
   display: flex;
   align-items: center;
   gap: 24px;
+  min-width: 0;
+  flex: 1 1 auto;
   max-width: 820px;
+}
+
+.profile-identity > div:last-child {
+  min-width: 0;
 }
 
 .profile-avatar {
@@ -315,6 +362,40 @@ onMounted(loadProfile)
   margin: 14px 0 0;
   color: rgba(255, 255, 255, 0.82);
   font-size: 1rem;
+}
+
+.profile-hero-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.home-button {
+  min-height: 44px;
+  padding-inline: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff !important;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.home-button:hover {
+  border-color: #d6f36d;
+  background: rgba(214, 243, 109, 0.2);
+  transform: translateY(-1px);
+}
+
+.home-button:focus-visible {
+  outline: 3px solid #d6f36d;
+  outline-offset: 3px;
 }
 
 .profile-role {
@@ -397,6 +478,13 @@ onMounted(loadProfile)
     min-height: auto;
   }
 
+  .profile-hero-actions {
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .profile-content {
     grid-template-columns: 1fr;
   }
@@ -413,6 +501,20 @@ onMounted(loadProfile)
     width: 72px !important;
     height: 72px !important;
     font-size: 1.5rem;
+  }
+
+  .profile-hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .home-button {
+    width: 100%;
+  }
+
+  .profile-role {
+    align-self: flex-start;
   }
 
   .form-grid {

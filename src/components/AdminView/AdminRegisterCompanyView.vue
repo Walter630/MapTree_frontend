@@ -1,6 +1,5 @@
 <template>
   <v-container fluid class="page-shell">
-
     <PageHeader
       title="Cadastro de Empresas"
       subtitle="Cadastre as empresas e seus dados principais."
@@ -12,11 +11,7 @@
     />
 
     <!-- CARD DO FORMULÁRIO -->
-    <v-card
-      elevation="0"
-      class="pa-8"
-      style="background: white; margin: 0 0"
-    >
+    <v-card elevation="0" class="pa-8" style="background: white; margin: 0 0">
       <v-form ref="form" v-model="valid" lazy-validation>
         <v-row>
           <!-- COLUNA 1 -->
@@ -62,7 +57,6 @@
                 placeholder="Selecione"
               ></v-select>
             </div>
-
           </v-col>
         </v-row>
 
@@ -96,11 +90,10 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
-import { type Company } from '@/plugins/apiConnect.ts'
 import { type User } from '@/plugins/apiConnect.ts'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
-export default defineComponent ({
+export default defineComponent({
   components: { PageHeader },
   data() {
     return {
@@ -116,66 +109,67 @@ export default defineComponent ({
     }
   },
 
-    mounted() {
-      this.checkIsMobile()
-      window.addEventListener('resize', this.checkIsMobile)
+  mounted() {
+    this.checkIsMobile()
+    window.addEventListener('resize', this.checkIsMobile)
 
-      // 👉 Buscar gestores
-      this.loadManagers()
-    },
-
+    // 👉 Buscar gestores
+    this.loadManagers()
+  },
 
   beforeUnmount() {
-      window.removeEventListener('resize', this.checkIsMobile)
+    window.removeEventListener('resize', this.checkIsMobile)
+  },
+  methods: {
+    checkIsMobile() {
+      this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
     },
-    methods: {
-      checkIsMobile() {
-        this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
-      },
-      goBack() {
-        this.$router.push("/admin/companies");
-      },
+    goBack() {
+      this.$router.push('/admin/companies')
+    },
 
-      async loadManagers() {
-        try {
-          const response = await this.$api.get<User[]>('/users')
-          this.managers = response.data
-        } catch (err) {
-          console.error("Erro ao carregar gestores:", err)
+    async loadManagers() {
+      try {
+        const response = await this.$api.get<User[]>('/users')
+        this.managers = response.data
+      } catch (err) {
+        console.error('Erro ao carregar gestores:', err)
+      }
+    },
+
+    async createCompany(companyData: {
+      name: string
+      taxId: string
+      isOutsourced: boolean
+      managerId: string
+      isActive: boolean
+    }) {
+      const response = await this.$api.post('/organizations', companyData)
+      return response.data
+    },
+
+    async saveCompany() {
+      try {
+        const payload = {
+          name: this.name,
+          taxId: this.taxId,
+          isOutsourced: this.isOutsourced === 'Sim',
+          managerId: this.managerId,
+          isActive: this.isActive,
         }
-      },
 
+        await this.createCompany(payload)
 
-      async createCompany(companyData: any) {
-        const response = await this.$api.post('/organizations', companyData)
-        return response.data
-      },
+        this.$router.push('/admin/companies')
+      } catch (err) {
+        console.error(err)
+      }
+    },
 
-
-      async saveCompany() {
-        try {
-          const payload = {
-            name: this.name,
-            taxId: this.taxId,
-            isOutsourced: this.isOutsourced === 'Sim',
-            managerId: this.managerId,
-            isActive: this.isActive,
-          }
-
-          await this.createCompany(payload)
-
-          this.$router.push('/admin/companies')
-        } catch (err) {
-          console.error(err)
-        }
-      },
-
-
-      cancelForm() {
-        this.$router.push("/admin/companies");
-      },
-
-    }
+    cancelForm() {
+      this.$router.push('/admin/companies')
+    },
+  },
 })
 </script>
 
@@ -194,5 +188,4 @@ export default defineComponent ({
   border: 1px solid #d0d5dd;
   border-radius: 8px;
 }
-
 </style>

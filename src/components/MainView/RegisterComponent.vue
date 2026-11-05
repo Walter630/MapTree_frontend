@@ -6,7 +6,7 @@
       <span class="logo-text">MapTree</span>
     </div>
 
-    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh;">
+    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh">
       <!-- Coluna do formulário -->
       <v-col class="form-section" cols="12" md="6">
         <div class="form-area">
@@ -41,25 +41,31 @@
 
             <p class="field-label">CPF</p>
             <v-text-field
-              v-model="formData.cpf"
+              id="cpf-input"
+              v-model="cpfInput"
               color="green"
               class="mb-3"
               hide-details
               density="comfortable"
               variant="outlined"
               placeholder="Digite seu CPF"
+              inputmode="numeric"
+              maxlength="14"
               required
             ></v-text-field>
 
             <p class="field-label">Telefone</p>
             <v-text-field
-              v-model="formData.phone"
+              id="phone-input"
+              v-model="phoneInput"
               color="green"
               class="mb-3"
               hide-details
               density="comfortable"
               variant="outlined"
               placeholder="Digite seu telefone"
+              inputmode="numeric"
+              maxlength="15"
               required
             ></v-text-field>
 
@@ -88,7 +94,9 @@
               :type="showPassword ? 'text' : 'password'"
             >
               <template #append-inner>
-                <v-icon @click="showPassword = !showPassword">{{ showPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+                <v-icon @click="showPassword = !showPassword">{{
+                  showPassword ? 'mdi-eye-off' : 'mdi-eye'
+                }}</v-icon>
               </template>
             </v-text-field>
 
@@ -97,7 +105,7 @@
               class="mb-4 register-btn"
               color="#C6F513"
               size="large"
-              style="display: flex; align-items: center; flex-direction: row;"
+              style="display: flex; align-items: center; flex-direction: row"
               append-icon="mdi-arrow-right"
               :loading="loading"
               @click="registrar"
@@ -109,8 +117,8 @@
               Já possui uma conta?
               <a
                 class="register-link"
-                style="color: blue; text-decoration: none; cursor: pointer;"
-                @click="$router.push('/login')"
+                style="color: blue; text-decoration: none; cursor: pointer"
+                @click="router.push('/login')"
               >
                 Fazer Login
               </a>
@@ -124,7 +132,6 @@
             Política de Privacidade
           </div>
         </div>
-
       </v-col>
 
       <!-- Coluna direita -->
@@ -135,7 +142,7 @@
         :style="isMobile ? 'display: none;' : 'padding: 20px; text-align: center;'"
       >
         <div class="info-text">
-          <h1>Gestão<br>inteligente de<br>vegetação</h1>
+          <h1>Gestão<br />inteligente de<br />vegetação</h1>
         </div>
         <div class="bottom-logo">MapTree</div>
       </v-col>
@@ -144,10 +151,17 @@
 </template>
 
 <script lang="ts">
+import { useRouter } from 'vue-router'
 import type { User } from '@/plugins/apiConnect.ts'
+import { onlyDigits, formatCpf, formatPhone } from '@/utils/masks'
 
 export default {
   name: 'CadastroComponent',
+
+  setup() {
+    return { router: useRouter() }
+  },
+
   data() {
     return {
       formData: {
@@ -176,6 +190,25 @@ export default {
 
   beforeUnmount() {
     window.removeEventListener('resize', this.checkMobile)
+  },
+
+  computed: {
+    cpfInput: {
+      get() {
+        return this.formData.cpf
+      },
+      set(value: string) {
+        this.formData.cpf = formatCpf(value)
+      },
+    },
+    phoneInput: {
+      get() {
+        return this.formData.phone
+      },
+      set(value: string) {
+        this.formData.phone = formatPhone(value)
+      },
+    },
   },
 
   methods: {
@@ -209,10 +242,15 @@ export default {
 
       this.loading = true
       try {
-        const response = await this.$api.post<User>('/auth/register', this.formData)
+        const payload = {
+          ...this.formData,
+          cpf: onlyDigits(this.formData.cpf),
+          phone: onlyDigits(this.formData.phone),
+        }
+        const response = await this.$api.post<User>('/auth/register', payload)
         if (response.status === 201 || response.status === 200) {
           this.notify('Cadastro realizado com sucesso! Redirecionando para o login...', 'success')
-          setTimeout(() => this.$router.push('/login'), 1200)
+          setTimeout(() => this.router.push('/login'), 1200)
         } else {
           this.notify('Não foi possível concluir o cadastro. Tente novamente.')
         }
@@ -345,7 +383,7 @@ export default {
 
 /* Seção direita */
 .info-section {
-  background-color: #C6F513;
+  background-color: #c6f513;
   display: flex;
   position: relative;
   align-items: center;

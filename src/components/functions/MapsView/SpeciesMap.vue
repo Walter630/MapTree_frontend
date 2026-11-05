@@ -103,7 +103,10 @@ export default defineComponent({
 
       allTrees.value = data.filter(
         (t) =>
-          typeof t.latitude === 'number' && typeof t.longitude === 'number' && !isNaN(t.latitude) && !isNaN(t.longitude),
+          typeof t.latitude === 'number' &&
+          typeof t.longitude === 'number' &&
+          !isNaN(t.latitude) &&
+          !isNaN(t.longitude),
       )
 
       speciesOptions.value = Array.from(new Set(allTrees.value.map((t) => t.species.commonName)))
@@ -136,7 +139,8 @@ export default defineComponent({
           return acc
         }, {})
 
-        const dominantSpecies = Object.entries(speciesCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Desconhecida'
+        const dominantSpecies =
+          Object.entries(speciesCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Desconhecida'
 
         const popupContent = `
           <strong>Espécies na localidade</strong><br/>

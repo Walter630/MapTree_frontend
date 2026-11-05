@@ -37,15 +37,16 @@ export function readDailyRouteSnapshot(date: string): DailyRouteSnapshot | null 
     if (parsed.date !== date || !Array.isArray(parsed.stops)) return null
 
     const stops = parsed.stops
-      .filter((stop): stop is DailyRouteStopSnapshot => (
-        Boolean(stop) &&
-        typeof stop.id === 'string' &&
-        Number.isInteger(stop.order) &&
-        isFiniteCoordinate(stop.latitude) &&
-        isFiniteCoordinate(stop.longitude) &&
-        Math.abs(stop.latitude) <= 90 &&
-        Math.abs(stop.longitude) <= 180
-      ))
+      .filter(
+        (stop): stop is DailyRouteStopSnapshot =>
+          Boolean(stop) &&
+          typeof stop.id === 'string' &&
+          Number.isInteger(stop.order) &&
+          isFiniteCoordinate(stop.latitude) &&
+          isFiniteCoordinate(stop.longitude) &&
+          Math.abs(stop.latitude) <= 90 &&
+          Math.abs(stop.longitude) <= 180,
+      )
       .sort((a, b) => a.order - b.order)
 
     return { date, stops, updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '' }

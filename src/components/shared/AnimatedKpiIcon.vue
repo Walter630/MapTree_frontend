@@ -16,7 +16,12 @@
     </svg>
 
     <!-- Tesoura de poda: abre e fecha -->
-    <svg v-else-if="type === 'prune'" viewBox="0 0 48 48" class="ai-svg ai-prune" aria-hidden="true">
+    <svg
+      v-else-if="type === 'prune'"
+      viewBox="0 0 48 48"
+      class="ai-svg ai-prune"
+      aria-hidden="true"
+    >
       <line x1="10" y1="36" x2="30" y2="16" class="ai-blade ai-blade-top" />
       <line x1="10" y1="12" x2="30" y2="32" class="ai-blade ai-blade-bottom" />
       <circle cx="34" cy="14" r="4" class="ai-ring" />
@@ -24,7 +29,12 @@
     </svg>
 
     <!-- Alerta: pulsa -->
-    <svg v-else-if="type === 'alert'" viewBox="0 0 48 48" class="ai-svg ai-alert" aria-hidden="true">
+    <svg
+      v-else-if="type === 'alert'"
+      viewBox="0 0 48 48"
+      class="ai-svg ai-alert"
+      aria-hidden="true"
+    >
       <path d="M24 8 L42 38 L6 38 Z" class="ai-triangle" />
       <rect x="22" y="18" width="4" height="10" rx="2" class="ai-mark" />
       <circle cx="24" cy="32" r="2.2" class="ai-mark" />
@@ -75,8 +85,13 @@ withDefaults(
   fill: #8d6e63;
 }
 @keyframes tree-sway {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
 }
 
 /* ===== Tesoura ===== */
@@ -98,12 +113,22 @@ withDefaults(
   animation: blade-bottom 2.6s ease-in-out infinite;
 }
 @keyframes blade-top {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(-12deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-12deg);
+  }
 }
 @keyframes blade-bottom {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(12deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
 }
 
 /* ===== Alerta ===== */
@@ -121,8 +146,15 @@ withDefaults(
   fill: var(--accent);
 }
 @keyframes alert-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.12); opacity: 0.8; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.8;
+  }
 }
 
 /* ===== Broto ===== */
@@ -143,12 +175,22 @@ withDefaults(
   animation: leaf-right 3.5s ease-in-out infinite;
 }
 @keyframes leaf-left {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(-6deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-6deg);
+  }
 }
 @keyframes leaf-right {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(6deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
 }
 
 /* Respeita quem prefere menos animação (acessibilidade) */

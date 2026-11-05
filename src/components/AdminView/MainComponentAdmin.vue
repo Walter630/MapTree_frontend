@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent } from 'vue'
 import type { Manager, Company as ApiCompany } from '@/plugins/apiConnect.ts'
 
 interface CompanyDisplay {
@@ -31,120 +31,132 @@ export default defineComponent({
       snackbar: false,
       snackbarText: '',
       snackbarColor: 'success',
-    };
+    }
   },
   computed: {
     totalCompanies() {
-      return this.empresas.length;
+      return this.empresas.length
     },
     totalManagers() {
-      return this.managers.length;
+      return this.managers.length
     },
   },
   methods: {
     async getCompanies() {
-      this.loading = true;
-      this.error = null;
+      this.loading = true
+      this.error = null
       try {
-        const response = await this.$api.get<ApiCompany[]>('/organizations');
-        this.empresas = response.data.map(item => {
+        const response = await this.$api.get<ApiCompany[]>('/organizations')
+        this.empresas = response.data.map((item) => {
           return {
             name: item.name,
             createdAt: item.createdAt,
             manager: item.manager?.name || 'Sem gestor',
             isActive: item.isActive,
-          };
-        });
-        this.filterRecentCompanies();
-        this.totalCompanies = this.empresas.length;
+          }
+        })
+        this.filterRecentCompanies()
+        this.totalCompanies = this.empresas.length
       } catch (e: unknown) {
-        console.error('Erro ao buscar empresas:', e);
-        this.error = 'Falha ao carregar dados das empresas.';
+        console.error('Erro ao buscar empresas:', e)
+        this.error = 'Falha ao carregar dados das empresas.'
       } finally {
-        this.loading = false;
+        this.loading = false
       }
     },
     async getManagers() {
-      this.loading = true;
-      this.error = null;
+      this.loading = true
+      this.error = null
       try {
-        const response = await this.$api.get<Manager[]>('/users');
-        this.managers = response.data;
-        this.totalManagers = this.managers.length;
+        const response = await this.$api.get<Manager[]>('/users')
+        this.managers = response.data
+        this.totalManagers = this.managers.length
       } catch (e: unknown) {
-        console.error('Erro ao buscar gestores:', e);
-        this.error = 'Falha ao carregar dados dos gestores.';
+        console.error('Erro ao buscar gestores:', e)
+        this.error = 'Falha ao carregar dados dos gestores.'
       } finally {
-        this.loading = false;
+        this.loading = false
       }
     },
     clearSearch() {
-      this.search = '';
+      this.search = ''
     },
     filterCompanies() {
-      this.empresasFiltradas = this.empresas.filter(empresa =>
-        empresa.name.toLowerCase().includes(this.search.toLowerCase())
-      );
+      this.empresasFiltradas = this.empresas.filter((empresa) =>
+        empresa.name.toLowerCase().includes(this.search.toLowerCase()),
+      )
     },
     filterRecentCompanies() {
-      this.empresasRecentes = this.empresas.filter(empresa =>
-        empresa.createdAt && empresa.createdAt >= new Date(new Date().setDate(new Date().getDate() - 7))
-      );
+      this.empresasRecentes = this.empresas.filter(
+        (empresa) =>
+          empresa.createdAt &&
+          empresa.createdAt >= new Date(new Date().setDate(new Date().getDate() - 7)),
+      )
     },
 
     /* ---------- Importação de Dados da IA ---------- */
 
     async importExternalData() {
-      this.importLoading = true;
+      this.importLoading = true
       try {
-        const response = await this.$api.post<any>('/trees/import-external');
-        this.importSuccess = true;
-        this.notify(`Importação concluída! +${response.data?.imported || 0} novas árvores.`, 'success');
-        this.getTreesCount(); 
-      } catch (e: unknown) {
-        this.notify('Falha ao importar dados.', 'error');
+        const response = await this.$api.post<{ imported?: number }>('/trees/import-external')
+        this.importSuccess = true
+        this.notify(
+          `Importação concluída! +${response.data?.imported || 0} novas árvores.`,
+          'success',
+        )
+        this.getTreesCount()
+      } catch {
+        this.notify('Falha ao importar dados.', 'error')
       } finally {
-        this.importLoading = false;
+        this.importLoading = false
       }
     },
 
     async cleanupDuplicates() {
-      if (!confirm('Deseja realmente remover TODAS as árvores duplicadas? Esta ação não pode ser desfeita.')) return;
-      
-      this.cleanupLoading = true;
+      if (
+        !confirm(
+          'Deseja realmente remover TODAS as árvores duplicadas? Esta ação não pode ser desfeita.',
+        )
+      )
+        return
+
+      this.cleanupLoading = true
       try {
-        const response = await this.$api.post<any>('/trees/cleanup');
-        this.notify(`Faxina concluída! Removidas ${response.data?.duplicatesRemoved || 0} duplicatas.`, 'success');
-        this.getTreesCount();
-      } catch (e: unknown) {
-        this.notify('Falha ao executar limpeza.', 'error');
+        const response = await this.$api.post<{ duplicatesRemoved?: number }>('/trees/cleanup')
+        this.notify(
+          `Faxina concluída! Removidas ${response.data?.duplicatesRemoved || 0} duplicatas.`,
+          'success',
+        )
+        this.getTreesCount()
+      } catch {
+        this.notify('Falha ao executar limpeza.', 'error')
       } finally {
-        this.cleanupLoading = false;
+        this.cleanupLoading = false
       }
     },
 
     async getTreesCount() {
       try {
-        const res = await this.$api.get<any[]>('/trees');
-        this.totalTrees = (res.data || []).length;
+        const res = await this.$api.get<{ id: string }[]>('/trees')
+        this.totalTrees = (res.data || []).length
       } catch (e) {
-        console.error(e);
+        console.error(e)
       }
     },
 
     notify(text: string, color = 'success') {
-      this.snackbarText = text;
-      this.snackbarColor = color;
-      this.snackbar = true;
+      this.snackbarText = text
+      this.snackbarColor = color
+      this.snackbar = true
     },
-
   },
   mounted() {
-    this.getCompanies();
-    this.getManagers();
-    this.getTreesCount();
+    this.getCompanies()
+    this.getManagers()
+    this.getTreesCount()
   },
-});
+})
 </script>
 <template>
   <v-container fluid class="page-shell">
@@ -153,8 +165,6 @@ export default defineComponent({
       <v-col cols="12" md="7">
         <div class="d-flex align-center mb-6">
           <span class="text-caption text-grey-darken-1">Meu Painel</span>
-
-
         </div>
         <p class="title-text">Olá, Administrador!</p>
         <p class="subtitle-text">Aqui está o resumo de suas operações.</p>
@@ -167,19 +177,18 @@ export default defineComponent({
           hide-details
           density="comfortable"
           variant="outlined"
-          style="max-width: 350px;"
+          style="max-width: 350px"
           prepend-inner-icon="mdi-magnify"
           clearable
           @click:append="clearSearch"
         />
-
       </v-col>
     </v-row>
 
     <!-- Cards de Resumo -->
-    <v-row style="margin-top: 25px;" class="d-flex" justify="start">
-      <v-col cols="12" md="3" >
-        <v-card class="card-resumo ">
+    <v-row style="margin-top: 25px" class="d-flex" justify="start">
+      <v-col cols="12" md="3">
+        <v-card class="card-resumo">
           <div class="card-header">
             <span>Empresas</span>
             <v-icon>mdi-domain</v-icon>
@@ -220,16 +229,16 @@ export default defineComponent({
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
             <p class="ml-3">Carregando empresas...</p>
           </div>
-          <div v-else-if="error" class="center-box" style="color: #F44336;">
+          <div v-else-if="error" class="center-box" style="color: #f44336">
             <p>{{ error }}</p>
             <v-btn small color="error" @click="getCompanies">Tentar Novamente</v-btn>
           </div>
           <div v-else class="center-box">
-            <p style="color: #000000;">Nenhuma ação realizada.</p>
+            <p style="color: #000000">Nenhuma ação realizada.</p>
           </div>
         </v-card>
       </v-col>
-      <v-col cols="12" md="6" >
+      <v-col cols="12" md="6">
         <v-card class="card-box">
           <h4 class="title-box">Empresas Cadastradas Recentemente</h4>
 
@@ -240,7 +249,7 @@ export default defineComponent({
           </div>
 
           <!-- Mensagem de Erro -->
-          <div v-else-if="error" class="center-box" style="color: #F44336;">
+          <div v-else-if="error" class="center-box" style="color: #f44336">
             <p>{{ error }}</p>
             <v-btn small color="error" @click="getCompanies">Tentar Novamente</v-btn>
           </div>
@@ -258,12 +267,8 @@ export default defineComponent({
               <v-col cols="4">Status</v-col>
             </v-row>
 
-            <div
-              v-for="(empresa, i) in empresas"
-              :key="empresa.name"
-              class="linha-empresa"
-            >
-              <v-row align="center" >
+            <div v-for="(empresa, i) in empresas" :key="empresa.name" class="linha-empresa">
+              <v-row align="center">
                 <v-col cols="4">
                   <div>{{ empresa.name }}</div>
                   <div class="data-empresa">{{ empresa.createdAt }}</div>
@@ -286,7 +291,6 @@ export default defineComponent({
           </div>
         </v-card>
       </v-col>
-
     </v-row>
 
     <!-- ===== Seção: Manutenção & IA ===== -->
@@ -328,16 +332,26 @@ export default defineComponent({
             {{ importSuccess ? 'Importado!' : 'Importar JSON IA' }}
           </v-btn>
 
-          <v-alert v-if="importError" type="error" variant="tonal" density="compact" closable class="mt-3">
+          <v-alert
+            v-if="importError"
+            type="error"
+            variant="tonal"
+            density="compact"
+            closable
+            class="mt-3"
+          >
             {{ importError }}
           </v-alert>
         </v-card>
       </v-col>
 
       <v-col cols="12" md="4">
-        <v-card class="import-card" elevation="0" style="border-color: #2196F3;">
+        <v-card class="import-card" elevation="0" style="border-color: #2196f3">
           <div class="import-card-header">
-            <div class="import-icon-wrapper" style="background: linear-gradient(135deg, #2196F3, #1976D2);">
+            <div
+              class="import-icon-wrapper"
+              style="background: linear-gradient(135deg, #2196f3, #1976d2)"
+            >
               <v-icon size="28" color="white">mdi-map-search</v-icon>
             </div>
             <div>
@@ -346,13 +360,13 @@ export default defineComponent({
             </div>
           </div>
           <v-divider class="my-3" />
-          <v-btn 
-            block 
+          <v-btn
+            block
             size="large"
-            color="blue-darken-2" 
+            color="blue-darken-2"
             variant="flat"
             prepend-icon="mdi-map"
-            to="/admin/map" 
+            to="/admin/map"
             class="import-btn"
           >
             Abrir Mapa de Riscos
@@ -361,9 +375,16 @@ export default defineComponent({
       </v-col>
 
       <v-col cols="12" md="4">
-        <v-card class="import-card" elevation="0" style="border-color: #F44336; background-color: #FFF5F5;">
+        <v-card
+          class="import-card"
+          elevation="0"
+          style="border-color: #f44336; background-color: #fff5f5"
+        >
           <div class="import-card-header">
-            <div class="import-icon-wrapper" style="background: linear-gradient(135deg, #F44336, #D32F2F);">
+            <div
+              class="import-icon-wrapper"
+              style="background: linear-gradient(135deg, #f44336, #d32f2f)"
+            >
               <v-icon size="28" color="white">mdi-database-remove</v-icon>
             </div>
             <div>
@@ -372,10 +393,10 @@ export default defineComponent({
             </div>
           </div>
           <v-divider class="my-3" />
-          <v-btn 
-            block 
+          <v-btn
+            block
             size="large"
-            color="error" 
+            color="error"
             variant="flat"
             :loading="cleanupLoading"
             prepend-icon="mdi-broom"
@@ -397,8 +418,8 @@ export default defineComponent({
 
 <style scoped>
 .card-resumo {
-  background: #F6F6F6;
-  border: 1px solid #CDCDCD;
+  background: #f6f6f6;
+  border: 1px solid #cdcdcd;
   height: 150px;
   border-radius: 8px;
   padding: 15px;
@@ -424,8 +445,8 @@ export default defineComponent({
 }
 
 .card-box {
-  background: #F6F6F6;
-  border: 1px solid #CDCDCD;
+  background: #f6f6f6;
+  border: 1px solid #cdcdcd;
   border-radius: 8px;
   padding: 20px;
   min-height: 350px;
@@ -470,8 +491,8 @@ export default defineComponent({
 
 /* ===== Seção de Importação IA ===== */
 .import-card {
-  background: #F6F6F6;
-  border: 1px solid #CDCDCD;
+  background: #f6f6f6;
+  border: 1px solid #cdcdcd;
   border-radius: 12px;
   padding: 24px;
   height: 100%;
@@ -479,7 +500,7 @@ export default defineComponent({
 }
 
 .import-card:hover {
-  border-color: #B0BEC5;
+  border-color: #b0bec5;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
@@ -497,7 +518,7 @@ export default defineComponent({
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #7B1FA2, #AB47BC);
+  background: linear-gradient(135deg, #7b1fa2, #ab47bc);
 }
 
 .import-title {
@@ -540,7 +561,7 @@ export default defineComponent({
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FF8F00, #FFB300);
+  background: linear-gradient(135deg, #ff8f00, #ffb300);
   color: white;
   display: flex;
   align-items: center;

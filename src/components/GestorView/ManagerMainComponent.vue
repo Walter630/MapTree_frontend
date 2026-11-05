@@ -32,7 +32,12 @@
           prepend-inner-icon="mdi-account-group-outline"
           class="dash-filter"
         />
-        <v-btn color="green-darken-2" class="dash-create-btn text-none" prepend-icon="mdi-map-marker-path" @click="goToCreateRoute">
+        <v-btn
+          color="green-darken-2"
+          class="dash-create-btn text-none"
+          prepend-icon="mdi-map-marker-path"
+          @click="goToCreateRoute"
+        >
           Criar rota
         </v-btn>
       </div>
@@ -46,12 +51,16 @@
           <span class="kpi-name">Árvores cadastradas</span>
         </div>
         <div class="kpi-num">{{ countTrees.toLocaleString('pt-BR') }}</div>
-        <div class="kpi-foot kpi-foot--up"><v-icon size="13">mdi-arrow-up</v-icon> cadastro ativo</div>
+        <div class="kpi-foot kpi-foot--up">
+          <v-icon size="13">mdi-arrow-up</v-icon> cadastro ativo
+        </div>
       </div>
 
       <div class="kpi">
         <div class="kpi-top">
-          <div class="kpi-ico kpi-ico--green"><v-icon color="green-darken-2">mdi-check-circle-outline</v-icon></div>
+          <div class="kpi-ico kpi-ico--green">
+            <v-icon color="green-darken-2">mdi-check-circle-outline</v-icon>
+          </div>
           <span class="kpi-name">Podas realizadas</span>
         </div>
         <div class="kpi-num">{{ countPrunings.toLocaleString('pt-BR') }}</div>
@@ -63,8 +72,12 @@
           <div class="kpi-ico kpi-ico--red"><v-icon color="red-darken-1">mdi-alert</v-icon></div>
           <span class="kpi-name">Áreas críticas</span>
         </div>
-        <div class="kpi-num" :class="{ 'text-red-darken-1': countCritical > 0 }">{{ countCritical.toLocaleString('pt-BR') }}</div>
-        <div class="kpi-foot kpi-foot--danger"><v-icon size="13">mdi-alert-circle-outline</v-icon> em risco</div>
+        <div class="kpi-num" :class="{ 'text-red-darken-1': countCritical > 0 }">
+          {{ countCritical.toLocaleString('pt-BR') }}
+        </div>
+        <div class="kpi-foot kpi-foot--danger">
+          <v-icon size="13">mdi-alert-circle-outline</v-icon> em risco
+        </div>
       </div>
 
       <div class="kpi">
@@ -86,26 +99,28 @@
             <v-icon size="20" color="green-darken-2" class="mr-2">mdi-map-outline</v-icon>
             Mapa operacional
           </div>
-          <div class="map-legend">
-            <span><i class="dot dot-crit" />Crítico</span>
-            <span><i class="dot dot-high" />Alta</span>
-            <span><i class="dot dot-med" />Média</span>
-          </div>
+
+          <v-btn
+            color="green-darken-2"
+            class="text-none"
+            size="small"
+            variant="tonal"
+            prepend-icon="mdi-arrow-expand-all"
+            @click="goToMap"
+          >
+            Abrir mapa completo
+          </v-btn>
         </div>
         <div class="map-wrap">
           <MiniMap
             ref="miniMapRef"
-            filter-status="TO_PRUNE"
-            style="height: 100%; width: 100%;"
+            :trees="trees || []"
+            :priority-ids="filteredTrees.map((tree) => tree.id)"
+            :loading="trees === null && !treeLoadFailed"
+            :failed="treeLoadFailed"
+            @select-trees="selectedMapIds = $event"
+            style="height: 100%; width: 100%"
           />
-          <v-btn
-            color="green-darken-2"
-            class="map-open-btn text-none"
-            prepend-icon="mdi-arrow-expand-all"
-            @click="goToMap"
-          >
-            Abrir rota completa
-          </v-btn>
         </div>
       </div>
 
@@ -120,6 +135,12 @@
         </div>
 
         <div class="alerts-tools">
+          <div v-if="selectedMapIds.length" class="map-selection-note">
+            <span>Seleção do mapa · {{ alertTrees.length }} prioridade(s)</span>
+            <v-btn size="x-small" variant="text" color="green-darken-3" @click="selectedMapIds = []"
+              >Limpar seleção</v-btn
+            >
+          </div>
           <v-text-field
             v-model="alertSearch"
             placeholder="Buscar por código ou coordenada"
@@ -150,21 +171,39 @@
             :key="tree.id"
             class="alert-row"
             @click="focusOnTree(tree)"
+            role="button"
+            tabindex="0"
+            @keydown.enter="focusOnTree(tree)"
+            @keydown.space.prevent="focusOnTree(tree)"
           >
             <v-avatar size="42" rounded="lg" class="alert-thumb">
-              <v-icon :color="tree.status === 'TO_PRUNE' ? 'orange-darken-2' : 'red-darken-1'">mdi-tree</v-icon>
+              <v-icon :color="tree.status === 'TO_PRUNE' ? 'orange-darken-2' : 'red-darken-1'"
+                >mdi-tree</v-icon
+              >
             </v-avatar>
             <div class="alert-info">
               <div class="alert-line1">
                 <span class="alert-code">#{{ treeCode(tree) }}</span>
-                <v-chip :color="tree.status === 'TO_PRUNE' ? 'orange' : 'red'" size="x-small" variant="flat" class="font-weight-bold">
-                  {{ tree.status === 'TO_PRUNE' ? 'Alta' : 'Crítico' }}
+                <v-chip
+                  :color="tree.status === 'TO_PRUNE' ? 'orange' : 'red'"
+                  size="x-small"
+                  variant="flat"
+                  class="font-weight-bold"
+                >
+                  {{
+                    tree.status === 'TO_PRUNE'
+                      ? 'Precisa de poda'
+                      : tree.status === 'CRITICAL'
+                        ? 'Crítico'
+                        : 'Inspecionar'
+                  }}
                 </v-chip>
               </div>
               <span class="alert-name">{{ tree.species?.commonName || 'Árvore' }}</span>
               <span class="alert-coords">
                 <v-icon size="11">mdi-map-marker</v-icon>
-                {{ (tree.lat || tree.latitude || 0).toFixed(4) }}, {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
+                {{ (tree.lat || tree.latitude || 0).toFixed(4) }},
+                {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
               </span>
             </div>
             <v-icon size="18" color="grey-lighten-1">mdi-chevron-right</v-icon>
@@ -172,7 +211,7 @@
 
           <div v-if="alertTrees.length === 0 && filteredTrees.length > 0" class="alerts-empty">
             <v-icon size="40" color="grey-lighten-1">mdi-magnify-close</v-icon>
-            <p>Nenhuma árvore para esta busca</p>
+            <p>Nenhuma prioridade para esta seleção ou busca</p>
           </div>
           <div v-else-if="filteredTrees.length === 0" class="alerts-empty">
             <v-icon size="40" color="green-lighten-2">mdi-shield-check</v-icon>
@@ -184,34 +223,13 @@
 
     <!-- ===== Linha inferior: Espécies + Podas + Relatórios ===== -->
     <div class="bottom-row">
-      <!-- Espécies por localidade -->
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">
-            <v-icon size="18" color="green-darken-2" class="mr-2">mdi-leaf</v-icon>
-            Espécies por localidade
-          </div>
-        </div>
-        <div class="species-box">
-          <div v-for="spec in topSpecies" :key="spec.id" class="species-row">
-            <div class="species-left">
-              <div class="species-dot"><v-icon size="16" color="green-darken-2">mdi-tree</v-icon></div>
-              <span class="species-nm">{{ spec.commonName || spec.scientificName }}</span>
-            </div>
-            <div class="species-right">
-              <div class="species-bar">
-                <div class="species-bar-fill" :style="{ width: speciesPercent(spec) + '%' }" />
-              </div>
-              <span class="species-qt">{{ (spec._count?.trees || 0) }}</span>
-            </div>
-          </div>
-          <div v-if="topSpecies.length === 0" class="alerts-empty">
-            <v-icon size="40" color="grey-lighten-2">mdi-leaf-off</v-icon>
-            <p>Sem dados de espécies</p>
-          </div>
-        </div>
-      </div>
-
+      <SpeciesCatalogCard
+        :species="species || []"
+        map-path="/manager/map"
+        :loading="loadingSpecies"
+        :failed="speciesLoadFailed"
+        @retry="getSpecies"
+      />
       <!-- Podas no mês -->
       <div class="panel">
         <div class="panel-head">
@@ -229,7 +247,9 @@
       <div class="panel">
         <div class="panel-head">
           <div class="panel-title">
-            <v-icon size="18" color="blue-darken-2" class="mr-2">mdi-clipboard-text-clock-outline</v-icon>
+            <v-icon size="18" color="blue-darken-2" class="mr-2"
+              >mdi-clipboard-text-clock-outline</v-icon
+            >
             Relatórios de poda recentes
           </div>
           <a class="panel-link" @click="showAllReports = true">Ver todos →</a>
@@ -245,10 +265,17 @@
               <v-icon color="white" size="16">mdi-content-cut</v-icon>
             </v-avatar>
             <div class="report-info">
-              <span class="report-nm">{{ report.tree?.species?.commonName || 'Árvore #' + report.idTree.slice(-4) }}</span>
+              <span class="report-nm">{{
+                report.tree?.species?.commonName || 'Árvore #' + report.idTree.slice(-4)
+              }}</span>
               <span class="report-dt">{{ formatDateFull(report.date) }}</span>
             </div>
-            <v-chip :color="getPruningColor(report.type)" size="x-small" variant="tonal" class="font-weight-bold">
+            <v-chip
+              :color="getPruningColor(report.type)"
+              size="x-small"
+              variant="tonal"
+              class="font-weight-bold"
+            >
               {{ report.type || 'REGULAR' }}
             </v-chip>
           </div>
@@ -264,31 +291,73 @@
     <v-dialog v-model="alertTreeDialog" max-width="460">
       <v-card v-if="selectedAlertTree" class="alert-tree-dialog rounded-xl">
         <v-card-title class="d-flex align-center pa-5">
-          <v-avatar color="red-lighten-5" class="mr-3"><v-icon color="error">mdi-tree-alert</v-icon></v-avatar>
+          <v-avatar color="red-lighten-5" class="mr-3"
+            ><v-icon color="error">mdi-tree-alert</v-icon></v-avatar
+          >
           <div>
             <p class="text-overline mb-0 text-grey-darken-1">Árvore prioritária</p>
-            <h2 class="text-h6 font-weight-bold">{{ selectedAlertTree.species?.commonName || `Árvore #${treeCode(selectedAlertTree)}` }}</h2>
+            <h2 class="text-h6 font-weight-bold">
+              {{
+                selectedAlertTree.species?.commonName || `Árvore #${treeCode(selectedAlertTree)}`
+              }}
+            </h2>
           </div>
           <v-spacer />
-          <v-btn icon="mdi-close" variant="text" aria-label="Fechar detalhes" @click="alertTreeDialog = false" />
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            aria-label="Fechar detalhes"
+            @click="alertTreeDialog = false"
+          />
         </v-card-title>
         <v-divider />
         <v-card-text class="pa-5">
           <v-alert type="warning" variant="tonal" density="comfortable" class="mb-4">
-            <strong>{{ selectedAlertTree.status === 'CRITICAL' ? 'Risco crítico' : 'Poda prioritária' }}</strong><br />
-            Esta árvore foi selecionada para intervenção. Confira a localização antes de iniciar o trabalho.
+            <strong>{{
+              selectedAlertTree.status === 'CRITICAL' ? 'Risco crítico' : 'Poda prioritária'
+            }}</strong
+            ><br />
+            Esta árvore foi selecionada para intervenção. Confira a localização antes de iniciar o
+            trabalho.
           </v-alert>
           <v-row dense>
-            <v-col cols="6"><span class="detail-label">Código</span><strong>#{{ treeCode(selectedAlertTree) }}</strong></v-col>
-            <v-col cols="6"><span class="detail-label">Status</span><v-chip size="small" color="error" variant="tonal">{{ selectedAlertTree.status }}</v-chip></v-col>
-            <v-col cols="12"><span class="detail-label">Localização</span><strong>{{ Number(selectedAlertTree.lat ?? selectedAlertTree.latitude ?? 0).toFixed(5) }}, {{ Number(selectedAlertTree.lng ?? selectedAlertTree.longitude ?? 0).toFixed(5) }}</strong></v-col>
+            <v-col cols="6"
+              ><span class="detail-label">Código</span
+              ><strong>#{{ treeCode(selectedAlertTree) }}</strong></v-col
+            >
+            <v-col cols="6"
+              ><span class="detail-label">Status</span
+              ><v-chip size="small" color="error" variant="tonal">{{
+                selectedAlertTree.status
+              }}</v-chip></v-col
+            >
+            <v-col cols="12"
+              ><span class="detail-label">Localização</span
+              ><strong
+                >{{ Number(selectedAlertTree.lat ?? selectedAlertTree.latitude ?? 0).toFixed(5) }},
+                {{
+                  Number(selectedAlertTree.lng ?? selectedAlertTree.longitude ?? 0).toFixed(5)
+                }}</strong
+              ></v-col
+            >
           </v-row>
         </v-card-text>
         <v-divider />
         <v-card-actions class="pa-4">
           <v-btn variant="text" class="text-none" @click="alertTreeDialog = false">Fechar</v-btn>
           <v-spacer />
-          <v-btn color="blue-darken-2" variant="flat" prepend-icon="mdi-map" @click="goToMap(); alertTreeDialog = false">Ver no mapa</v-btn>
+          <v-btn
+            color="blue-darken-2"
+            variant="flat"
+            prepend-icon="mdi-map"
+            @click="
+              () => {
+                goToMap()
+                alertTreeDialog = false
+              }
+            "
+            >Ver no mapa</v-btn
+          >
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -296,11 +365,15 @@
     <!-- ===== DIALOG: detalhes do relatório ===== -->
     <v-dialog v-model="reportDialog" max-width="500">
       <v-card v-if="selectedReport" class="rounded-xl overflow-hidden glass-card">
-        <div :style="`background: linear-gradient(135deg, ${getPruningHex(selectedReport.type)}, #000); padding: 24px; color: white`">
+        <div
+          :style="`background: linear-gradient(135deg, ${getPruningHex(selectedReport.type)}, #000); padding: 24px; color: white`"
+        >
           <div class="d-flex justify-space-between align-start">
             <div>
               <p class="text-overline mb-0" style="opacity: 0.8">Relatório Técnico de Poda</p>
-              <h2 class="text-h5 font-weight-bold">{{ selectedReport.tree?.species?.commonName || 'Árvore Independente' }}</h2>
+              <h2 class="text-h5 font-weight-bold">
+                {{ selectedReport.tree?.species?.commonName || 'Árvore Independente' }}
+              </h2>
               <p class="text-caption mb-0">{{ selectedReport.tree?.species?.scientificName }}</p>
             </div>
             <v-chip color="rgba(255,255,255,0.2)" variant="flat" size="small" class="text-white">
@@ -318,19 +391,30 @@
               <v-row dense>
                 <v-col cols="6">
                   <p class="text-caption text-grey-darken-1 mb-0">Técnico Responsável</p>
-                  <p class="text-body-2 font-weight-bold">{{ selectedReport.user?.name || 'Sistema IA' }}</p>
+                  <p class="text-body-2 font-weight-bold">
+                    {{ selectedReport.user?.name || 'Sistema IA' }}
+                  </p>
                 </v-col>
                 <v-col cols="6">
                   <p class="text-caption text-grey-darken-1 mb-0">Data de Execução</p>
-                  <p class="text-body-2 font-weight-bold">{{ formatDateFull(selectedReport.date) }}</p>
+                  <p class="text-body-2 font-weight-bold">
+                    {{ formatDateFull(selectedReport.date) }}
+                  </p>
                 </v-col>
                 <v-col cols="6" class="mt-2">
                   <p class="text-caption text-grey-darken-1 mb-0">Tipo de Poda</p>
-                  <v-chip :color="getPruningColor(selectedReport.type)" size="x-small" class="font-weight-bold">{{ selectedReport.type }}</v-chip>
+                  <v-chip
+                    :color="getPruningColor(selectedReport.type)"
+                    size="x-small"
+                    class="font-weight-bold"
+                    >{{ selectedReport.type }}</v-chip
+                  >
                 </v-col>
                 <v-col cols="6" class="mt-2">
                   <p class="text-caption text-grey-darken-1 mb-0">Vigor Médio</p>
-                  <p class="text-body-2 font-weight-bold text-success">{{ selectedReport.tree?.vigor || 'BOM' }}</p>
+                  <p class="text-body-2 font-weight-bold text-success">
+                    {{ selectedReport.tree?.vigor || 'BOM' }}
+                  </p>
                 </v-col>
               </v-row>
             </v-card>
@@ -350,10 +434,24 @@
               <v-icon color="grey" class="mr-3">mdi-map-search</v-icon>
               <div>
                 <p class="text-caption font-weight-bold mb-0">Coordenadas de Referência</p>
-                <p class="text-caption text-grey-darken-2">LAT: {{ selectedReport.tree?.latitude }} / LNG: {{ selectedReport.tree?.longitude }}</p>
+                <p class="text-caption text-grey-darken-2">
+                  LAT: {{ selectedReport.tree?.latitude }} / LNG:
+                  {{ selectedReport.tree?.longitude }}
+                </p>
               </div>
               <v-spacer />
-              <v-btn icon size="small" variant="text" color="primary" @click="focusOnTree(selectedReport.tree); reportDialog = false">
+              <v-btn
+                icon
+                size="small"
+                variant="text"
+                color="primary"
+                @click="
+                  () => {
+                    selectedReport && focusOnTree(selectedReport.tree)
+                    reportDialog = false
+                  }
+                "
+              >
                 <v-icon>mdi-eye</v-icon>
               </v-btn>
             </div>
@@ -375,6 +473,8 @@ import { defineComponent } from 'vue'
 import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
 import PruningChart from '@/components/functions/GraficosView/PruningChart.vue'
 import { useAuth } from '@/hooks/useAuth'
+import type { CatalogSpecies } from '@/utils/speciesDisplay'
+import SpeciesCatalogCard from '@/components/shared/SpeciesCatalogCard.vue'
 import { isTreeForPruning, prioritizeTrees } from '@/utils/treePriority'
 
 /* ===================================
@@ -401,6 +501,7 @@ interface User {
 }
 
 interface Pruning {
+  id: string
   idTree: string
   tree: Tree
   idUser: string
@@ -417,17 +518,20 @@ interface Pruning {
 export default defineComponent({
   name: 'ManagerHomeView',
 
-  components: { MiniMap, PruningChart },
+  components: { SpeciesCatalogCard, MiniMap, PruningChart },
 
   data() {
     return {
       user: null as User | null,
       trees: null as Tree[] | null,
-      species: [] as any[],
-      topSpecies: [] as any[],
+      species: [] as CatalogSpecies[],
+      loadingSpecies: true,
+      speciesLoadFailed: false,
+      treeLoadFailed: false,
+      selectedMapIds: [] as string[],
       filteredTrees: [] as Tree[],
-      prunings: [] as any[],
-      miniMapRef: null as any,
+      prunings: [] as Pruning[],
+      miniMapRef: null as { focusOn: (lat: number, lng: number) => void } | null,
 
       // Contadores
       countTrees: 0,
@@ -440,13 +544,19 @@ export default defineComponent({
       alertTreeDialog: false,
       selectedAlertTree: null as Tree | null,
       showAllReports: false,
-      selectedReport: null as any,
+      selectedReport: null as Pruning | null,
 
       // Filtros do cabeçalho (região / equipe)
       selectedRegion: 'ALL' as string,
       selectedTeam: 'ALL' as string,
-      regionOptions: [{ label: 'Todas as regiões', value: 'ALL' }] as { label: string; value: string }[],
-      teamOptions: [{ label: 'Todas as equipes', value: 'ALL' }] as { label: string; value: string }[],
+      regionOptions: [{ label: 'Todas as regiões', value: 'ALL' }] as {
+        label: string
+        value: string
+      }[],
+      teamOptions: [{ label: 'Todas as equipes', value: 'ALL' }] as {
+        label: string
+        value: string
+      }[],
 
       // Lista de alertas: busca e filtro
       alertSearch: '',
@@ -470,14 +580,20 @@ export default defineComponent({
   computed: {
     todayLabel(): string {
       const now = new Date()
-      const data = now.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+      const data = now.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
       const dia = now.toLocaleDateString('pt-BR', { weekday: 'long' })
       return `${data} · ${dia.charAt(0).toUpperCase() + dia.slice(1)}`
     },
 
     /** Lista de alertas após aplicar filtro de tipo + busca por código/coordenada */
     alertTrees(): Tree[] {
-      let list = this.filteredTrees
+      let list = this.selectedMapIds.length
+        ? this.filteredTrees.filter((tree) => this.selectedMapIds.includes(tree.id))
+        : this.filteredTrees
 
       if (this.alertFilter === 'TO_PRUNE') {
         list = list.filter((t) => t.status === 'TO_PRUNE')
@@ -491,7 +607,9 @@ export default defineComponent({
           const code = this.treeCode(t).toLowerCase()
           const lat = (t.lat || t.latitude || 0).toFixed(4)
           const lng = (t.lng || t.longitude || 0).toFixed(4)
-          return code.includes(q) || lat.includes(q) || lng.includes(q) || `${lat}, ${lng}`.includes(q)
+          return (
+            code.includes(q) || lat.includes(q) || lng.includes(q) || `${lat}, ${lng}`.includes(q)
+          )
         })
       }
 
@@ -504,13 +622,6 @@ export default defineComponent({
     treeCode(tree: Tree): string {
       const id = String(tree.id ?? '')
       return id ? id.slice(-4).toUpperCase() : '----'
-    },
-
-    /** Percentual da espécie em relação ao total de árvores (barra) */
-    speciesPercent(spec: any): number {
-      const qt = spec._count?.trees || 0
-      const total = this.countTrees || 1
-      return Math.min(Math.round((qt / total) * 100), 100)
     },
 
     goToMap() {
@@ -555,19 +666,21 @@ export default defineComponent({
       this.selectedAlertTree = tree
       this.alertTreeDialog = true
       this.$nextTick(() => {
-        if (this.miniMapRef && (tree.lat || tree.latitude)) {
-          this.miniMapRef.focusOn(tree.lat || tree.latitude, tree.lng || tree.longitude)
+        const miniMap = this.$refs.miniMapRef as
+          { focusOn?: (lat: number, lng: number) => void } | undefined
+        if (miniMap?.focusOn) {
+          miniMap.focusOn(Number(tree.lat ?? tree.latitude), Number(tree.lng ?? tree.longitude))
         }
       })
     },
 
-    formatDate(dateStr: any) {
+    formatDate(dateStr: string | Date | undefined) {
       if (!dateStr) return '-'
       const d = new Date(dateStr)
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
     },
 
-    formatDateFull(dateStr: any) {
+    formatDateFull(dateStr: string | Date | undefined) {
       if (!dateStr) return '-'
       const d = new Date(dateStr)
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -585,24 +698,33 @@ export default defineComponent({
       return '#388E3C'
     },
 
-    viewReportDetails(report: any) {
+    viewReportDetails(report: Pruning) {
       this.selectedReport = report
       this.reportDialog = true
     },
 
     /* ---------- Chamadas API ---------- */
 
-    getSpecies() {
-      this.$api
-        .get<any[]>('/species')
-        .then((response) => {
-          this.species = response.data || []
-          this.countSpecies = this.species.length
-          this.topSpecies = [...this.species]
-            .sort((a, b) => (b._count?.trees || 0) - (a._count?.trees || 0))
-            .slice(0, 5)
-        })
-        .catch((error: unknown) => console.error('Erro ao buscar espécies:', error))
+    async getSpecies() {
+      this.loadingSpecies = true
+      this.speciesLoadFailed = false
+      try {
+        const catalog = []
+        const limit = 100
+        for (let page = 1; ; page++) {
+          const { data } = await this.$api.get<CatalogSpecies[]>('/species', {
+            params: { page, limit },
+          })
+          catalog.push(...data)
+          if (data.length < limit) break
+        }
+        this.species = catalog
+        this.countSpecies = catalog.length
+      } catch {
+        this.speciesLoadFailed = true
+      } finally {
+        this.loadingSpecies = false
+      }
     },
 
     getPrunings() {
@@ -616,21 +738,29 @@ export default defineComponent({
     },
 
     getTrees() {
+      this.treeLoadFailed = false
       this.$api
         .get<Tree[]>('/trees')
         .then((response) => {
-          const allTrees = (response.data || []).map((t: any) => ({
+          const allTrees = (response.data || []).map((t) => ({
             ...t,
-            lat: Number(t.lat ?? t.latitude ?? 0),
-            lng: Number(t.lng ?? t.longitude ?? 0),
+            lat: Number(t.lat ?? t.latitude),
+            lng: Number(t.lng ?? t.longitude),
           }))
           this.trees = allTrees
           this.countTrees = allTrees.length
-          this.countCritical = allTrees.filter((t: any) => t.status === 'TO_PRUNE' || t.status === 'CRITICAL').length
-          const prioritized = prioritizeTrees(allTrees).filter((item) => isTreeForPruning(item.tree))
+          this.countCritical = allTrees.filter(
+            (t) => t.status === 'TO_PRUNE' || t.status === 'CRITICAL',
+          ).length
+          const prioritized = prioritizeTrees(allTrees).filter((item) =>
+            isTreeForPruning(item.tree),
+          )
           this.filteredTrees = prioritized.map((item) => item.tree)
         })
-        .catch((error: unknown) => console.error('Erro ao buscar árvores:', error))
+        .catch((error: unknown) => {
+          this.treeLoadFailed = true
+          console.error('Erro ao buscar árvores:', error)
+        })
     },
 
     getUser() {
@@ -647,6 +777,16 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.map-selection-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #345941;
+  margin-bottom: 8px;
+}
 /* ===== Container ===== */
 .dash {
   padding: 20px 24px 40px;
@@ -748,9 +888,15 @@ export default defineComponent({
   justify-content: center;
 }
 
-.kpi-ico--green { background: #e9f6ea; }
-.kpi-ico--red { background: #fdecec; }
-.kpi-ico--blue { background: #e7f1fb; }
+.kpi-ico--green {
+  background: #e9f6ea;
+}
+.kpi-ico--red {
+  background: #fdecec;
+}
+.kpi-ico--blue {
+  background: #e7f1fb;
+}
 
 .kpi-name {
   font-size: 0.82rem;
@@ -772,8 +918,12 @@ export default defineComponent({
   gap: 3px;
 }
 
-.kpi-foot--up { color: #2e7d32; }
-.kpi-foot--danger { color: #d32f2f; }
+.kpi-foot--up {
+  color: #2e7d32;
+}
+.kpi-foot--danger {
+  color: #d32f2f;
+}
 
 /* ===== Painéis genéricos ===== */
 .panel {
@@ -808,17 +958,21 @@ export default defineComponent({
   cursor: pointer;
 }
 
-.panel-link:hover { text-decoration: underline; }
+.panel-link:hover {
+  text-decoration: underline;
+}
 
 /* ===== Linha principal ===== */
 .main-row {
   display: grid;
-  grid-template-columns: 1.7fr 1fr;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
 
-.map-panel { height: 440px; }
+.map-panel {
+  height: auto;
+}
 
 .map-legend {
   display: flex;
@@ -840,9 +994,15 @@ export default defineComponent({
   display: inline-block;
 }
 
-.dot-crit { background: #e53935; }
-.dot-high { background: #fb8c00; }
-.dot-med { background: #fbc02d; }
+.dot-crit {
+  background: #e53935;
+}
+.dot-high {
+  background: #fb8c00;
+}
+.dot-med {
+  background: #fbc02d;
+}
 
 .map-wrap {
   position: relative;
@@ -861,7 +1021,9 @@ export default defineComponent({
 }
 
 /* ===== Alertas ===== */
-.alerts-panel { height: 440px; }
+.alerts-panel {
+  height: 440px;
+}
 
 .alerts-tools {
   padding: 12px 16px 8px;
@@ -882,8 +1044,13 @@ export default defineComponent({
   min-height: 0;
 }
 
-.alerts-list::-webkit-scrollbar { width: 4px; }
-.alerts-list::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+.alerts-list::-webkit-scrollbar {
+  width: 4px;
+}
+.alerts-list::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 4px;
+}
 
 .alert-row {
   display: flex;
@@ -895,9 +1062,13 @@ export default defineComponent({
   transition: background 0.15s ease;
 }
 
-.alert-row:hover { background: #f6f8fa; }
+.alert-row:hover {
+  background: #f6f8fa;
+}
 
-.alert-thumb { background: #f3f4f6; }
+.alert-thumb {
+  background: #f3f4f6;
+}
 
 .alert-info {
   display: flex;
@@ -948,11 +1119,10 @@ export default defineComponent({
 /* ===== Linha inferior ===== */
 .bottom-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
-.species-box,
 .reports-box {
   padding: 12px 16px;
   display: flex;
@@ -967,71 +1137,6 @@ export default defineComponent({
   height: 300px;
 }
 
-/* Espécies */
-.species-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.species-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
-}
-
-.species-dot {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: #eaf6e6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.species-nm {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #334155;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.species-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.species-bar {
-  width: 70px;
-  height: 6px;
-  background: #eef1f4;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.species-bar-fill {
-  height: 100%;
-  background: #2e7d32;
-  border-radius: 4px;
-}
-
-.species-qt {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #475569;
-  min-width: 28px;
-  text-align: right;
-}
-
 /* Relatórios */
 .report-row {
   display: flex;
@@ -1042,7 +1147,9 @@ export default defineComponent({
   transition: background 0.15s ease;
 }
 
-.report-row:hover { background: #f6f8fa; }
+.report-row:hover {
+  background: #f6f8fa;
+}
 
 .report-info {
   display: flex;
@@ -1080,16 +1187,43 @@ export default defineComponent({
   background: rgba(255, 255, 255, 0.95) !important;
 }
 
+.panel {
+  min-width: 0;
+}
+.panel-head {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dash-header > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ===== Responsivo ===== */
 @media (max-width: 1100px) {
-  .main-row { grid-template-columns: 1fr; }
-  .map-panel, .alerts-panel { height: 400px; }
-  .bottom-row { grid-template-columns: 1fr; }
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .main-row {
+    grid-template-columns: 1fr;
+  }
+  .map-panel {
+    height: auto;
+  }
+  .alerts-panel {
+    height: 400px;
+  }
+  .bottom-row {
+    grid-template-columns: 1fr;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 600px) {
-  .kpi-grid { grid-template-columns: 1fr; }
-  .dash { padding: 16px 14px 32px; }
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .dash {
+    padding: 16px 14px 32px;
+  }
 }
 </style>

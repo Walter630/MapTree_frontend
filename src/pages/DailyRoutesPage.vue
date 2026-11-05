@@ -12,10 +12,8 @@ import {
   type PrioritizedTree,
   type TreePriorityInput,
 } from '@/utils/treePriority'
-import {
-  readDailyRouteSnapshot,
-  saveDailyRouteSnapshot,
-} from '@/utils/dailyRouteStorage'
+import { readDailyRouteSnapshot, saveDailyRouteSnapshot } from '@/utils/dailyRouteStorage'
+import { groupRoute, MAX_SUGGESTED_ROUTE_RADIUS_KM } from '@/utils/dailyRoutePlanner'
 
 interface Tree extends TreePriorityInput {
   id: string
@@ -44,7 +42,11 @@ const feedback = ref('')
 // - 'pending': salvo localmente, mas alguma parada falhou no servidor
 // - 'server': todas as paradas confirmadas no servidor
 const syncState = ref<'idle' | 'local' | 'pending' | 'server'>('idle')
-const filters = reactive({ date: new Date().toISOString().slice(0, 10), urgency: 'ALL', search: '' })
+const filters = reactive({
+  date: new Date().toISOString().slice(0, 10),
+  urgency: 'ALL',
+  search: '',
+})
 
 // Paginação da lista de árvores (10 por página)
 const page = ref(1)
@@ -63,7 +65,11 @@ const filteredTrees = computed(() => {
     const urgencyMatches = filters.urgency === 'ALL' || item.urgency === filters.urgency
     const tree = item.tree
     const label = tree.species?.commonName || tree.speciesName || tree.id
-    const searchMatches = !search || `${label} ${tree.id} ${tree.latitude ?? tree.lat} ${tree.longitude ?? tree.lng}`.toLowerCase().includes(search)
+    const searchMatches =
+      !search ||
+      `${label} ${tree.id} ${tree.latitude ?? tree.lat} ${tree.longitude ?? tree.lng}`
+        .toLowerCase()
+        .includes(search)
     return urgencyMatches && searchMatches
   })
 })
@@ -83,14 +89,24 @@ watch([() => filters.search, () => filters.urgency, () => filteredTrees.value.le
 watch(pageCount, (count) => {
   if (page.value > count) page.value = count
 })
-const totalScore = computed(() => routeStops.value.reduce((sum, stop) => sum + (prioritized.value.find((item) => item.tree.id === stop.id)?.priorityScore || 0), 0))
+const totalScore = computed(() =>
+  routeStops.value.reduce(
+    (sum, stop) =>
+      sum + (prioritized.value.find((item) => item.tree.id === stop.id)?.priorityScore || 0),
+    0,
+  ),
+)
 
 const syncStateChip = computed(() => {
   switch (syncState.value) {
     case 'server':
       return { color: 'green-darken-2', icon: 'mdi-cloud-check', label: 'Confirmada no servidor' }
     case 'pending':
-      return { color: 'orange-darken-2', icon: 'mdi-cloud-alert', label: 'Pendente de sincronização' }
+      return {
+        color: 'orange-darken-2',
+        icon: 'mdi-cloud-alert',
+        label: 'Pendente de sincronização',
+      }
     case 'local':
     default:
       return { color: 'blue-grey', icon: 'mdi-cellphone-check', label: 'Salvo neste dispositivo' }
@@ -98,56 +114,15 @@ const syncStateChip = computed(() => {
 })
 
 function treeName(item: PrioritizedTree<Tree>) {
-  return item.tree.species?.commonName || item.tree.speciesName || `Árvore #${String(item.tree.id).slice(-6)}`
+  return (
+    item.tree.species?.commonName ||
+    item.tree.speciesName ||
+    `Árvore #${String(item.tree.id).slice(-6)}`
+  )
 }
 
 function coordinates(tree: Tree) {
   return `${Number(tree.latitude ?? tree.lat ?? 0).toFixed(5)}, ${Number(tree.longitude ?? tree.lng ?? 0).toFixed(5)}`
-}
-
-function coordinateDistanceKm(first: Tree, second: Tree): number {
-  const lat1 = Number(first.latitude ?? first.lat ?? 0)
-  const lng1 = Number(first.longitude ?? first.lng ?? 0)
-  const lat2 = Number(second.latitude ?? second.lat ?? 0)
-  const lng2 = Number(second.longitude ?? second.lng ?? 0)
-  const latDistance = (lat2 - lat1) * 111
-  const lngDistance = (lng2 - lng1) * 111 * Math.cos((lat1 * Math.PI) / 180)
-  return Math.sqrt(latDistance ** 2 + lngDistance ** 2)
-}
-
-function routeBlock(tree: Tree): string {
-  const latitude = Number(tree.latitude ?? tree.lat ?? 0)
-  const longitude = Number(tree.longitude ?? tree.lng ?? 0)
-  return `${Math.floor(latitude / 0.0012)}:${Math.floor(longitude / 0.0012)}`
-}
-
-function groupRoute(items: PrioritizedTree<Tree>[], limit = 20): PrioritizedTree<Tree>[] {
-  const remaining = [...items]
-  const ordered: PrioritizedTree<Tree>[] = []
-  let current = remaining.shift()
-
-  while (current && ordered.length < limit) {
-    ordered.push(current)
-    if (!remaining.length) break
-
-    const currentBlock = routeBlock(current.tree)
-    let bestIndex = 0
-    let bestScore = Number.NEGATIVE_INFINITY
-
-    remaining.forEach((candidate, index) => {
-      const sameBlockBonus = routeBlock(candidate.tree) === currentBlock ? 120 : 0
-      const proximityPenalty = coordinateDistanceKm(current!.tree, candidate.tree) * 24
-      const candidateScore = candidate.priorityScore * 1.8 + sameBlockBonus - proximityPenalty
-      if (candidateScore > bestScore) {
-        bestScore = candidateScore
-        bestIndex = index
-      }
-    })
-
-    current = remaining.splice(bestIndex, 1)[0]
-  }
-
-  return ordered
 }
 
 function toggleTree(item: PrioritizedTree<Tree>) {
@@ -163,7 +138,12 @@ function toggleTree(item: PrioritizedTree<Tree>) {
 function addAllFiltered() {
   const existing = new Set(routeStops.value.map((stop) => stop.id))
   filteredTrees.value.forEach((item) => {
-    if (!existing.has(item.tree.id)) routeStops.value.push({ id: item.tree.id, order: routeStops.value.length + 1, tree: item.tree })
+    if (!existing.has(item.tree.id))
+      routeStops.value.push({
+        id: item.tree.id,
+        order: routeStops.value.length + 1,
+        tree: item.tree,
+      })
   })
   normalizeOrder()
 }
@@ -185,9 +165,10 @@ function moveStop(index: number, direction: -1 | 1) {
 }
 
 function normalizeOrder() {
-  routeStops.value.forEach((stop, index) => { stop.order = index + 1 })
+  routeStops.value.forEach((stop, index) => {
+    stop.order = index + 1
+  })
 }
-
 
 function loadLocalRoute() {
   const saved = readDailyRouteSnapshot(filters.date)
@@ -214,7 +195,8 @@ async function loadTrees() {
     trees.value = response.data || []
     loadLocalRoute()
   } catch {
-    errorMessage.value = 'Não foi possível carregar as árvores. Verifique sua conexão e tente novamente.'
+    errorMessage.value =
+      'Não foi possível carregar as árvores. Verifique sua conexão e tente novamente.'
   } finally {
     loading.value = false
   }
@@ -343,7 +325,10 @@ function openFullRouteOnGoogleMaps() {
 /* ----- Mini-mapa da rota (Leaflet próprio, simples) ----- */
 function ensureRouteMap() {
   if (routeMap || !routeMapEl.value) return
-  routeMap = L.map(routeMapEl.value, { zoomControl: true, attributionControl: false }).setView([-5.2434, -38.1276], 13)
+  routeMap = L.map(routeMapEl.value, { zoomControl: true, attributionControl: false }).setView(
+    [-5.2434, -38.1276],
+    13,
+  )
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19,
@@ -387,13 +372,26 @@ function renderRouteOnMiniMap() {
   routeMap.fitBounds(L.latLngBounds(points).pad(0.25))
 }
 
-watch(routeStops, () => {
-  nextTick(renderRouteOnMiniMap)
-}, { deep: true })
+watch(
+  routeStops,
+  () => {
+    nextTick(renderRouteOnMiniMap)
+  },
+  { deep: true },
+)
 
 function useSuggestedRoute() {
-  const suggested = groupRoute(filteredTrees.value, 20)
-  routeStops.value = suggested.map((item, index) => ({ id: item.tree.id, order: index + 1, tree: item.tree }))
+  const suggested = groupRoute(filteredTrees.value, 20, MAX_SUGGESTED_ROUTE_RADIUS_KM)
+  routeStops.value = suggested.map((item, index) => ({
+    id: item.tree.id,
+    order: index + 1,
+    tree: item.tree,
+  }))
+  const excludedCount = filteredTrees.value.length - suggested.length
+  feedback.value =
+    excludedCount > 0
+      ? `${suggested.length} paradas sugeridas. ${excludedCount} árvore(s) fora do raio de ${MAX_SUGGESTED_ROUTE_RADIUS_KM} km ou sem coordenadas ficaram de fora (incluindo o limite de 20 paradas); selecione-as manualmente se necessário.`
+      : ''
 }
 
 function organizeSelectedRoute() {
@@ -401,22 +399,33 @@ function organizeSelectedRoute() {
     .map((stop) => prioritized.value.find((item) => item.tree.id === stop.id))
     .filter((item): item is PrioritizedTree<Tree> => Boolean(item))
   const ordered = groupRoute(selected, selected.length)
-  routeStops.value = ordered.map((item, index) => ({ id: item.tree.id, order: index + 1, tree: item.tree }))
+  routeStops.value = ordered.map((item, index) => ({
+    id: item.tree.id,
+    order: index + 1,
+    tree: item.tree,
+  }))
 }
 
-watch(() => filters.date, () => {
-  routeStops.value = []
-  syncState.value = 'idle'
-  loadLocalRoute()
-})
+watch(
+  () => filters.date,
+  () => {
+    routeStops.value = []
+    syncState.value = 'idle'
+    loadLocalRoute()
+  },
+)
 
 // Qualquer edição das paradas após salvar invalida a confirmação anterior:
 // a rota passa a estar apenas "local" até um novo "Salvar rota" bem-sucedido.
-watch(routeStops, () => {
-  if (syncState.value === 'server' || syncState.value === 'pending') {
-    syncState.value = 'local'
-  }
-}, { deep: true })
+watch(
+  routeStops,
+  () => {
+    if (syncState.value === 'server' || syncState.value === 'pending') {
+      syncState.value = 'local'
+    }
+  },
+  { deep: true },
+)
 
 onMounted(async () => {
   await loadTrees()
@@ -439,12 +448,28 @@ onBeforeUnmount(() => {
     <PageHeader
       title="Rotas diárias de poda"
       subtitle="Selecione árvores próximas, agrupe por região e revise o trajeto pelas ruas no mapa."
-      :breadcrumbs="[{ text: 'Meu Painel', to: isManager ? '/manager' : '/user' }, { text: 'Rotas diárias' }]"
+      :breadcrumbs="[
+        { text: 'Meu Painel', to: isManager ? '/manager' : '/user' },
+        { text: 'Rotas diárias' },
+      ]"
     />
     <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-6 route-page-actions">
       <div class="d-flex flex-wrap align-center ga-2">
-        <v-btn variant="tonal" color="blue-darken-2" prepend-icon="mdi-map" :disabled="!routeStops.length" @click="openRouteOnMap">Ver rota no mapa</v-btn>
-        <v-btn color="green-darken-2" prepend-icon="mdi-content-save" :loading="saving" @click="saveRoute">Salvar rota</v-btn>
+        <v-btn
+          variant="tonal"
+          color="blue-darken-2"
+          prepend-icon="mdi-map"
+          :disabled="!routeStops.length"
+          @click="openRouteOnMap"
+          >Ver rota no mapa</v-btn
+        >
+        <v-btn
+          color="green-darken-2"
+          prepend-icon="mdi-content-save"
+          :loading="saving"
+          @click="saveRoute"
+          >Salvar rota</v-btn
+        >
       </div>
       <!-- Estado de sincronização: distingue claramente o que está só no dispositivo
            do que foi confirmado no servidor. Não apresenta dado local como persistido. -->
@@ -460,8 +485,12 @@ onBeforeUnmount(() => {
       </v-chip>
     </div>
 
-    <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-4">{{ errorMessage }}</v-alert>
-    <v-alert v-if="feedback" type="info" variant="tonal" closable class="mb-4">{{ feedback }}</v-alert>
+    <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-4">{{
+      errorMessage
+    }}</v-alert>
+    <v-alert v-if="feedback" type="info" variant="tonal" closable class="mb-4">{{
+      feedback
+    }}</v-alert>
 
     <v-row>
       <v-col cols="12" lg="7">
@@ -469,28 +498,77 @@ onBeforeUnmount(() => {
           <v-card-item>
             <template #prepend><v-icon color="green-darken-2">mdi-filter-variant</v-icon></template>
             <v-card-title>Árvores que precisam de ação</v-card-title>
-            <v-card-subtitle>{{ pendingTrees.length }} pendências ordenadas por urgência</v-card-subtitle>
+            <v-card-subtitle
+              >{{ pendingTrees.length }} pendências ordenadas por urgência</v-card-subtitle
+            >
           </v-card-item>
           <v-divider />
           <v-card-text>
             <v-row dense>
-              <v-col cols="12" sm="4"><v-text-field v-model="filters.date" type="date" label="Dia da rota" variant="outlined" density="comfortable" /></v-col>
-              <v-col cols="12" sm="3"><v-select v-model="filters.urgency" label="Urgência" :items="[{ title: 'Todas', value: 'ALL' }, { title: 'Urgente', value: 'CRITICAL' }, { title: 'Prioridade alta', value: 'HIGH' }]" variant="outlined" density="comfortable" /></v-col>
-              <v-col cols="12" sm="5"><v-text-field v-model="filters.search" label="Buscar espécie, código ou coordenada" prepend-inner-icon="mdi-magnify" clearable variant="outlined" density="comfortable" /></v-col>
+              <v-col cols="12" sm="4"
+                ><v-text-field
+                  v-model="filters.date"
+                  type="date"
+                  label="Dia da rota"
+                  variant="outlined"
+                  density="comfortable"
+              /></v-col>
+              <v-col cols="12" sm="3"
+                ><v-select
+                  v-model="filters.urgency"
+                  label="Urgência"
+                  :items="[
+                    { title: 'Todas', value: 'ALL' },
+                    { title: 'Urgente', value: 'CRITICAL' },
+                    { title: 'Prioridade alta', value: 'HIGH' },
+                  ]"
+                  variant="outlined"
+                  density="comfortable"
+              /></v-col>
+              <v-col cols="12" sm="5"
+                ><v-text-field
+                  v-model="filters.search"
+                  label="Buscar espécie, código ou coordenada"
+                  prepend-inner-icon="mdi-magnify"
+                  clearable
+                  variant="outlined"
+                  density="comfortable"
+              /></v-col>
             </v-row>
             <div class="suggestion-banner mb-4">
               <div class="d-flex align-center">
-                <v-avatar color="green-darken-2" size="40" class="mr-3"><v-icon color="white">mdi-auto-fix</v-icon></v-avatar>
+                <v-avatar color="green-darken-2" size="40" class="mr-3"
+                  ><v-icon color="white">mdi-auto-fix</v-icon></v-avatar
+                >
                 <div class="flex-grow-1">
                   <p class="text-subtitle-2 font-weight-bold mb-1">Sugestão inteligente pronta</p>
-                  <p class="text-caption mb-0 text-grey-darken-2">Prioriza urgência e mantém as paradas próximas para reduzir deslocamentos entre ruas/quarteirões.</p>
+                  <p class="text-caption mb-0 text-grey-darken-2">
+                    Prioriza urgência e sugere paradas em um raio máximo de
+                    {{ MAX_SUGGESTED_ROUTE_RADIUS_KM }} km do primeiro ponto.
+                  </p>
                 </div>
-                <v-btn color="green-darken-2" variant="flat" class="suggestion-button text-none" prepend-icon="mdi-auto-fix" @click="useSuggestedRoute">Usar sugestão</v-btn>
+                <v-btn
+                  color="green-darken-2"
+                  variant="flat"
+                  class="suggestion-button text-none"
+                  prepend-icon="mdi-auto-fix"
+                  @click="useSuggestedRoute"
+                  >Usar sugestão</v-btn
+                >
               </div>
             </div>
             <div class="d-flex flex-wrap justify-space-between align-center mb-3 ga-2">
-              <span class="text-caption text-grey-darken-1">{{ filteredTrees.length }} resultado(s)</span>
-              <v-btn size="small" variant="text" color="green-darken-2" prepend-icon="mdi-plus-box-multiple" @click="addAllFiltered">Adicionar resultados</v-btn>
+              <span class="text-caption text-grey-darken-1"
+                >{{ filteredTrees.length }} resultado(s)</span
+              >
+              <v-btn
+                size="small"
+                variant="text"
+                color="green-darken-2"
+                prepend-icon="mdi-plus-box-multiple"
+                @click="addAllFiltered"
+                >Adicionar resultados</v-btn
+              >
             </div>
 
             <v-progress-linear v-if="loading" indeterminate color="green" class="mb-3" />
@@ -500,13 +578,31 @@ onBeforeUnmount(() => {
             </div>
             <template v-else>
               <v-list lines="two" class="pa-0">
-                <v-list-item v-for="item in paginatedTrees" :key="item.tree.id" class="tree-row mb-2" :class="{ 'tree-row--selected': selectedIds.has(item.tree.id) }" @click="toggleTree(item)">
+                <v-list-item
+                  v-for="item in paginatedTrees"
+                  :key="item.tree.id"
+                  class="tree-row mb-2"
+                  :class="{ 'tree-row--selected': selectedIds.has(item.tree.id) }"
+                  @click="toggleTree(item)"
+                >
                   <template #prepend>
-                    <v-checkbox-btn :model-value="selectedIds.has(item.tree.id)" color="green-darken-2" @click.stop="toggleTree(item)" />
+                    <v-checkbox-btn
+                      :model-value="selectedIds.has(item.tree.id)"
+                      color="green-darken-2"
+                      @click.stop="toggleTree(item)"
+                    />
                   </template>
-                  <v-list-item-title class="font-weight-bold">{{ treeName(item) }}</v-list-item-title>
-                  <v-list-item-subtitle>{{ item.reason }} · {{ coordinates(item.tree) }}</v-list-item-subtitle>
-                  <template #append><v-chip size="small" :color="urgencyColor(item.urgency)" variant="tonal">{{ urgencyLabel(item.urgency) }}</v-chip></template>
+                  <v-list-item-title class="font-weight-bold">{{
+                    treeName(item)
+                  }}</v-list-item-title>
+                  <v-list-item-subtitle
+                    >{{ item.reason }} · {{ coordinates(item.tree) }}</v-list-item-subtitle
+                  >
+                  <template #append
+                    ><v-chip size="small" :color="urgencyColor(item.urgency)" variant="tonal">{{
+                      urgencyLabel(item.urgency)
+                    }}</v-chip></template
+                  >
                 </v-list-item>
               </v-list>
 
@@ -531,9 +627,20 @@ onBeforeUnmount(() => {
           <v-card-item>
             <template #prepend><v-icon color="blue-darken-2">mdi-route</v-icon></template>
             <v-card-title>Rota de {{ filters.date.split('-').reverse().join('/') }}</v-card-title>
-            <v-card-subtitle>{{ selectedCount }} paradas · pontuação {{ totalScore }}</v-card-subtitle>
+            <v-card-subtitle
+              >{{ selectedCount }} paradas · pontuação {{ totalScore }}</v-card-subtitle
+            >
             <template #append>
-              <v-btn v-if="routeStops.length > 1" size="small" variant="tonal" color="blue-darken-2" prepend-icon="mdi-call-split" class="text-none" @click="organizeSelectedRoute">Agrupar por proximidade</v-btn>
+              <v-btn
+                v-if="routeStops.length > 1"
+                size="small"
+                variant="tonal"
+                color="blue-darken-2"
+                prepend-icon="mdi-call-split"
+                class="text-none"
+                @click="organizeSelectedRoute"
+                >Agrupar por proximidade</v-btn
+              >
             </template>
           </v-card-item>
           <v-divider />
@@ -549,30 +656,94 @@ onBeforeUnmount(() => {
 
             <div v-if="routeStops.length === 0" class="empty-state">
               <v-icon size="48" color="blue-lighten-2">mdi-map-marker-path</v-icon>
-              <p class="text-body-2 mt-2 mb-0">Selecione árvores à esquerda para criar a sequência.</p>
+              <p class="text-body-2 mt-2 mb-0">
+                Selecione árvores à esquerda para criar a sequência.
+              </p>
             </div>
             <v-list v-else lines="two" class="pa-0">
-              <v-list-item v-for="(stop, index) in routeStops" :key="stop.id" class="route-stop mb-2">
-                <template #prepend><v-avatar color="blue-lighten-5" size="32"><v-icon color="blue-darken-3" size="18">mdi-map-marker</v-icon><span class="route-number">{{ index + 1 }}</span></v-avatar></template>
-                <v-list-item-title class="font-weight-bold">{{ stop.tree.species?.commonName || stop.tree.speciesName || `Árvore #${stop.id.slice(-6)}` }}</v-list-item-title>
+              <v-list-item
+                v-for="(stop, index) in routeStops"
+                :key="stop.id"
+                class="route-stop mb-2"
+              >
+                <template #prepend
+                  ><v-avatar color="blue-lighten-5" size="32"
+                    ><v-icon color="blue-darken-3" size="18">mdi-map-marker</v-icon
+                    ><span class="route-number">{{ index + 1 }}</span></v-avatar
+                  ></template
+                >
+                <v-list-item-title class="font-weight-bold">{{
+                  stop.tree.species?.commonName ||
+                  stop.tree.speciesName ||
+                  `Árvore #${stop.id.slice(-6)}`
+                }}</v-list-item-title>
                 <v-list-item-subtitle>{{ coordinates(stop.tree) }}</v-list-item-subtitle>
                 <template #append>
                   <div class="d-flex align-center">
-                    <v-btn icon="mdi-chevron-up" size="x-small" variant="text" :disabled="index === 0" @click="moveStop(index, -1)" />
-                    <v-btn icon="mdi-chevron-down" size="x-small" variant="text" :disabled="index === routeStops.length - 1" @click="moveStop(index, 1)" />
-                    <v-btn icon="mdi-navigation-variant" size="x-small" variant="text" color="blue-darken-2" aria-label="Abrir navegação no Google Maps" @click="openExternalNavigation(stop)" />
-                    <v-btn icon="mdi-close" size="x-small" variant="text" color="error" aria-label="Remover parada" @click="removeStop(index)" />
+                    <v-btn
+                      icon="mdi-chevron-up"
+                      size="x-small"
+                      variant="text"
+                      :disabled="index === 0"
+                      @click="moveStop(index, -1)"
+                    />
+                    <v-btn
+                      icon="mdi-chevron-down"
+                      size="x-small"
+                      variant="text"
+                      :disabled="index === routeStops.length - 1"
+                      @click="moveStop(index, 1)"
+                    />
+                    <v-btn
+                      icon="mdi-navigation-variant"
+                      size="x-small"
+                      variant="text"
+                      color="blue-darken-2"
+                      aria-label="Abrir navegação no Google Maps"
+                      @click="openExternalNavigation(stop)"
+                    />
+                    <v-btn
+                      icon="mdi-close"
+                      size="x-small"
+                      variant="text"
+                      color="error"
+                      aria-label="Remover parada"
+                      @click="removeStop(index)"
+                    />
                   </div>
                 </template>
               </v-list-item>
             </v-list>
-            <div class="d-flex flex-wrap align-center justify-space-between ga-2">
-              <v-alert v-if="routeStops.length" type="success" variant="tonal" density="compact" class="mt-4 flex-grow-1 mb-0">
-                <strong>{{ selectedCount }} paradas prontas.</strong> Veja a linha e a sequência no mapa antes de iniciar o trabalho.
+            <div v-if="routeStops.length" class="route-ready-footer">
+              <v-alert
+                type="success"
+                variant="tonal"
+                density="compact"
+                class="route-ready-alert mb-0"
+              >
+                <template #prepend><v-icon>mdi-check-circle-outline</v-icon></template>
+                <strong>{{ selectedCount }} paradas prontas.</strong>
+                <span class="route-ready-copy"
+                  >Revise a sequência no mapa antes de iniciar o trabalho.</span
+                >
               </v-alert>
-              <div v-if="routeStops.length" class="d-flex flex-wrap ga-2 mt-4">
-                <v-btn color="blue-darken-2" variant="flat" class="text-none" prepend-icon="mdi-map-marker-path" @click="openRouteOnMap">Abrir no mapa</v-btn>
-                <v-btn color="green-darken-2" variant="flat" class="text-none" prepend-icon="mdi-google-maps" @click="openFullRouteOnGoogleMaps">Abrir no Google Maps</v-btn>
+              <div class="route-ready-actions">
+                <v-btn
+                  color="blue-darken-2"
+                  variant="flat"
+                  class="text-none"
+                  prepend-icon="mdi-map-marker-path"
+                  @click="openRouteOnMap"
+                  >Abrir no mapa</v-btn
+                >
+                <v-btn
+                  color="green-darken-2"
+                  variant="flat"
+                  class="text-none"
+                  prepend-icon="mdi-google-maps"
+                  @click="openFullRouteOnGoogleMaps"
+                  >Abrir no Google Maps</v-btn
+                >
               </div>
             </div>
           </v-card-text>
@@ -594,6 +765,27 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   cursor: pointer;
   transition: 0.2s ease;
+}
+.route-ready-footer {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.route-ready-alert {
+  width: 100%;
+  border-radius: 12px;
+}
+.route-ready-copy {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.route-ready-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .tree-row:hover,
 .tree-row--selected {
@@ -652,6 +844,16 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
   z-index: 1;
   pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .route-ready-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .route-ready-actions :deep(.v-btn) {
+    width: 100%;
+  }
 }
 </style>
 

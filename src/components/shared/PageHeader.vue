@@ -1,21 +1,18 @@
 <template>
   <div class="page-header mb-6">
     <!-- Breadcrumbs -->
-    <div v-if="breadcrumbs.length" class="d-flex align-center mb-4">
+    <div v-if="breadcrumbs.length" class="d-flex flex-wrap align-center mb-4">
       <template v-for="(crumb, i) in breadcrumbs" :key="i">
         <span
           class="breadcrumb-item text-caption d-inline-flex align-center"
           :class="{
             'breadcrumb-link text-grey-darken-1': i < breadcrumbs.length - 1,
-            'breadcrumb-current font-weight-bold text-indigo-darken-4': i === breadcrumbs.length - 1,
+            'breadcrumb-current font-weight-bold text-indigo-darken-4':
+              i === breadcrumbs.length - 1,
           }"
-          @click="crumb.to ? $router.push(crumb.to) : null"
+          @click="crumb.to ? router.push(crumb.to) : null"
         >
-          <v-icon
-            v-if="getBreadcrumbIcon(crumb)"
-            size="14"
-            class="breadcrumb-icon mr-1"
-          >
+          <v-icon v-if="getBreadcrumbIcon(crumb)" size="14" class="breadcrumb-icon mr-1">
             {{ getBreadcrumbIcon(crumb) }}
           </v-icon>
           {{ crumb.text }}
@@ -34,7 +31,7 @@
         variant="outlined"
         density="comfortable"
         class="mr-4 back-btn"
-        @click="$router.back()"
+        @click="router.back()"
       />
       <div>
         <h2 class="text-h5 font-weight-bold text-indigo-darken-4">{{ title }}</h2>
@@ -45,6 +42,8 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
+
 interface Breadcrumb {
   text: string
   to?: string
@@ -64,6 +63,8 @@ withDefaults(
     showBackButton: true,
   },
 )
+
+const router = useRouter()
 
 const routeIconMap: Record<string, string> = {
   '/admin': 'mdi-view-dashboard',
@@ -118,7 +119,9 @@ function getBreadcrumbIcon(crumb: Breadcrumb) {
 }
 
 .breadcrumb-icon {
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .breadcrumb-item:hover {
@@ -144,5 +147,4 @@ function getBreadcrumbIcon(crumb: Breadcrumb) {
   border-radius: 8px;
   border: 1px solid #d9d9d9;
 }
-
 </style>

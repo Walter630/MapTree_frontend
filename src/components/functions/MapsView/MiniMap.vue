@@ -1,383 +1,338 @@
-<script lang="ts">
-import { defineComponent, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as L from 'leaflet'
+import { HeatLayer } from 'leaflet.heat'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { apiConnect } from '@/plugins/apiConnect'
+import { speciesIcon } from '@/utils/speciesDisplay'
+import { buildTreeDensityCells, isValidGeoPoint } from '@/utils/treeDensity'
 
-/* ===================================
-   TIPOS
-=================================== */
-
-interface ApiTree {
+interface DashboardTree {
   id: string
-  age: string
   latitude?: number
   longitude?: number
   lat?: number
   lng?: number
   status: string
-  species?: {
-    id: string
-    commonName: string
-    scientificName: string
-    family: string
-    description: string
+  species?: { commonName?: string }
+}
+const props = withDefaults(
+  defineProps<{
+    trees?: DashboardTree[]
+    priorityIds?: string[]
+    loading?: boolean
+    failed?: boolean
+  }>(),
+  { trees: () => [], priorityIds: () => [] },
+)
+const emit = defineEmits<{ 'select-trees': [ids: string[]] }>()
+const container = ref<HTMLElement>()
+const mode = ref<'priority' | 'density'>('priority')
+const validTrees = computed(() =>
+  props.trees.filter((tree) =>
+    isValidGeoPoint(tree.latitude ?? tree.lat, tree.longitude ?? tree.lng),
+  ),
+)
+const prioritySet = computed(() => new Set(props.priorityIds))
+const priorities = computed(() => validTrees.value.filter((tree) => prioritySet.value.has(tree.id)))
+const displayedTrees = computed(() =>
+  mode.value === 'priority' ? priorities.value : validTrees.value,
+)
+const sectors = computed(
+  () =>
+    buildTreeDensityCells(
+      priorities.value.map((tree) => ({
+        latitude: tree.latitude ?? tree.lat!,
+        longitude: tree.longitude ?? tree.lng!,
+      })),
+      'status',
+    ).length,
+)
+let map: L.Map | undefined
+let cluster: L.MarkerClusterGroup | undefined
+let heat: HeatLayer | undefined
+let observer: ResizeObserver | undefined
+const markers = new Map<string, L.Marker>()
+const markerIds = new WeakMap<L.Marker, string>()
+const statusLabels: Record<string, string> = {
+  NORMAL: 'Normal',
+  TO_PRUNE: 'Precisa de poda',
+  CRITICAL: 'Crítico',
+  UNDER_OBSERVATION: 'Em observação',
+  PRUNED: 'Podada',
+}
+
+function render() {
+  if (!map || !cluster) return
+  cluster.clearLayers()
+  markers.clear()
+  if (heat && map.hasLayer(heat as unknown as L.Layer)) map.removeLayer(heat as unknown as L.Layer)
+  for (const tree of displayedTrees.value) {
+    const name = tree.species?.commonName || 'Espécie não identificada'
+    const color =
+      tree.status === 'CRITICAL'
+        ? '#b93d43'
+        : prioritySet.value.has(tree.id)
+          ? '#b66b20'
+          : '#347451'
+    const marker = L.marker([tree.latitude ?? tree.lat!, tree.longitude ?? tree.lng!], {
+      title: name,
+      alt: name,
+      icon: L.divIcon({
+        html: `<span style="display:grid;place-items:center;width:28px;height:28px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 5px #0003">${speciesIcon(name)}</span>`,
+        iconSize: [28, 28],
+        className: 'dashboard-tree-marker',
+      }),
+    })
+    const content = document.createElement('div')
+    const heading = document.createElement('strong')
+    heading.textContent = name
+    const status = document.createElement('p')
+    status.textContent = statusLabels[tree.status] || tree.status
+    content.append(heading, status)
+    marker.bindPopup(content)
+    marker.on('click', () => emit('select-trees', [tree.id]))
+    markerIds.set(marker, tree.id)
+    markers.set(tree.id, marker)
+    cluster.addLayer(marker)
+  }
+  if (mode.value === 'density' && validTrees.value.length) {
+    if (!heat)
+      heat = new HeatLayer([], {
+        radius: 38,
+        blur: 22,
+        minOpacity: 0.42,
+        max: 1,
+        gradient: { 0.2: '#268650', 0.5: '#cfcc43', 0.75: '#f49c32', 1: '#b62c42' },
+      })
+    heat.setLatLngs(
+      validTrees.value.map((tree) => [tree.latitude ?? tree.lat!, tree.longitude ?? tree.lng!, 1]),
+    )
+    map.addLayer(heat as unknown as L.Layer)
+  }
+  if (displayedTrees.value.length) {
+    map.fitBounds(
+      L.latLngBounds(
+        displayedTrees.value.map((tree) => [
+          tree.latitude ?? tree.lat!,
+          tree.longitude ?? tree.lng!,
+        ]),
+      ),
+      { padding: [30, 30], maxZoom: 16, animate: false },
+    )
   }
 }
 
-interface TreeOnMap {
-  id: string
-  latitude: number
-  longitude: number
-  status: string
-  speciesName: string
-  nearPowerLine: boolean
+function focusOn(latitude: number, longitude: number) {
+  if (!map || !cluster || !isValidGeoPoint(latitude, longitude)) return
+  map.setView([latitude, longitude], 18)
+  for (const marker of markers.values()) {
+    if (marker.getLatLng().distanceTo([latitude, longitude]) < 2) {
+      cluster.zoomToShowLayer(marker, () => marker.openPopup())
+      break
+    }
+  }
 }
-
-/* ===================================
-   CORREÇÃO ÍCONE PADRÃO LEAFLET
-=================================== */
-
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+defineExpose({ focusOn })
+watch([displayedTrees, mode], render)
+watch(mode, () => emit('select-trees', []))
+onMounted(() => {
+  if (!container.value) return
+  map = L.map(container.value, { scrollWheelZoom: false, maxZoom: 19 }).setView(
+    [-3.7319, -38.5267],
+    13,
+  )
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 19,
+  }).addTo(map)
+  cluster = L.markerClusterGroup({
+    maxClusterRadius: 35,
+    showCoverageOnHover: false,
+    disableClusteringAtZoom: 17,
+    iconCreateFunction: (group: L.MarkerCluster) =>
+      L.divIcon({
+        html: `<span style="display:grid;place-items:center;width:34px;height:34px;border:2px solid #e2ebe5;border-radius:50%;background:#476355;color:#fff;font-weight:700;font-size:12px">${group.getChildCount()}</span>`,
+        className: 'dashboard-tree-marker',
+        iconSize: [34, 34],
+      }),
+  })
+  cluster.on('clusterclick', (event: L.LeafletEvent) => {
+    const selectedCluster = (event as L.LeafletEvent & { layer: L.MarkerCluster }).layer
+    emit(
+      'select-trees',
+      selectedCluster
+        .getAllChildMarkers()
+        .map((marker: L.Marker) => markerIds.get(marker)!)
+        .filter(Boolean),
+    )
+  })
+  map.addLayer(cluster)
+  observer = new ResizeObserver(() => map?.invalidateSize({ pan: false }))
+  observer.observe(container.value)
+  render()
 })
-
-/* ===================================
-   CONSTANTES
-=================================== */
-
-const POWER_LINE_DISTANCE_METERS = 15
-const DEFAULT_LAT = -3.7319
-const DEFAULT_LNG = -38.5267
-const DEFAULT_ZOOM = 15
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-const SIMULATED_POWER_LINES: [number, number][][] = [
-  [[-3.7327, -38.5270], [-3.7335, -38.5255], [-3.7342, -38.5240], [-3.7350, -38.5225]],
-  [[-3.7310, -38.5280], [-3.7320, -38.5260], [-3.7330, -38.5245]],
-]
-
-/* ===================================
-   COMPONENTE
-=================================== */
-
-export default defineComponent({
-  name: 'MiniMap',
-
-  props: {
-    filterStatus: {
-      type: String,
-      default: 'ALL',
-    },
-  },
-
-  emits: ['tree-count', 'danger-count'],
-
-  setup(props, { emit }) {
-    let map: L.Map | null = null
-    let treeClusterGroup: L.MarkerClusterGroup | null = null
-    let powerLinesLayer: L.LayerGroup | null = null
-    let refreshInterval: ReturnType<typeof setInterval> | null = null
-
-    const trees = ref<TreeOnMap[]>([])
-    const loadingTrees = ref(false)
-    const containerReady = ref(false)
-
-    const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-      const R = 6371000
-      const toRad = (v: number) => (v * Math.PI) / 180
-      const dLat = toRad(lat2 - lat1)
-      const dLng = toRad(lng2 - lng1)
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    }
-
-    const distancePointToSegment = (pLat: number, pLng: number, aLat: number, aLng: number, bLat: number, bLng: number): number => {
-      const dx = bLng - aLng
-      const dy = bLat - aLat
-      if (dx === 0 && dy === 0) return haversineDistance(pLat, pLng, aLat, aLng)
-      const t = Math.max(0, Math.min(1, ((pLng - aLng) * dx + (pLat - aLat) * dy) / (dx * dx + dy * dy)))
-      return haversineDistance(pLat, pLng, aLat + t * dy, aLng + t * dx)
-    }
-
-    const checkNearPowerLine = (lat: number, lng: number): boolean => {
-      for (const line of SIMULATED_POWER_LINES) {
-        for (let i = 0; i < line.length - 1; i++) {
-          const segA = line[i]!
-          const segB = line[i + 1]!
-          if (distancePointToSegment(lat, lng, segA[0], segA[1], segB[0], segB[1]) < POWER_LINE_DISTANCE_METERS) return true
-        }
-      }
-      return false
-    }
-
-    const STATUS_CONFIG: Record<string, { emoji: string; color: string; label: string }> = {
-      NORMAL: { emoji: '🌳', color: '#4CAF50', label: 'Normal' },
-      TO_PRUNE: { emoji: '✂️', color: '#FF9800', label: 'Para Podar' },
-      UNDER_OBSERVATION: { emoji: '👁️', color: '#FFC107', label: 'Observação' },
-      PRUNED: { emoji: '🌿', color: '#66BB6A', label: 'Podada' },
-      CRITICAL: { emoji: '💣', color: '#D32F2F', label: 'RISCO CRÍTICO' },
-    }
-
-    const getCfg = (status: string, danger: boolean): { emoji: string; color: string; label: string } => {
-      if (status === 'CRITICAL') return STATUS_CONFIG.CRITICAL!
-      if (danger) return { emoji: '⚠️', color: '#FF3B3B', label: 'Risco Fiação' }
-      return (STATUS_CONFIG[status] ?? STATUS_CONFIG.NORMAL)!
-    }
-
-    const createTreeIcon = (status: string, danger: boolean): L.DivIcon => {
-      const cfg = getCfg(status, danger)
-      return L.divIcon({
-        html: `<div style="
-          background:${cfg.color};border:2px solid #fff;border-radius:50%;
-          width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-          font-size:${(danger || status === 'CRITICAL') ? '14' : '12'}px;box-shadow:0 2px 6px rgba(0,0,0,0.3);
-          ${(danger || status === 'CRITICAL') ? 'animation:pulse 1.2s infinite;' : ''}
-        ">${cfg.emoji}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-        className: 'mini-map-icon',
-      })
-    }
-
-    const fetchTrees = async () => {
-      loadingTrees.value = true
-      try {
-        const res = await apiConnect.get<ApiTree[]>('/trees')
-        const apiTrees = res.data || []
-        const parsedTrees: TreeOnMap[] = apiTrees
-          .filter((t: ApiTree) => (t.latitude ?? t.lat) != null && (t.longitude ?? t.lng) != null)
-          .map((t: ApiTree) => ({
-            id: t.id,
-            latitude: Number(t.latitude ?? t.lat),
-            longitude: Number(t.longitude ?? t.lng),
-            status: t.status || 'NORMAL',
-            speciesName: t.species?.commonName || 'Espécie desconhecida',
-            nearPowerLine: checkNearPowerLine(Number(t.latitude), Number(t.longitude)),
-          }))
-
-        trees.value = parsedTrees
-        const dangerCount = trees.value.filter(t => t.nearPowerLine).length
-        emit('tree-count', trees.value.length)
-        emit('danger-count', dangerCount)
-      } catch (err) {
-        console.error('Erro ao buscar árvores:', err)
-        trees.value = []
-      } finally {
-        loadingTrees.value = false
-      }
-    }
-
-    const renderTrees = () => {
-      if (!treeClusterGroup || !map) return
-      treeClusterGroup.clearLayers()
-      const bounds = L.latLngBounds([])
-
-      const filtered = props.filterStatus === 'ALL'
-        ? trees.value
-        : props.filterStatus === 'PRIORITY'
-          ? trees.value.filter(t => t.status === 'TO_PRUNE' || t.status === 'CRITICAL' || t.nearPowerLine)
-          : props.filterStatus === 'DANGER'
-            ? trees.value.filter(t => t.nearPowerLine)
-            : trees.value.filter(t => t.status === props.filterStatus)
-
-      filtered.forEach((t) => {
-        if (isNaN(t.latitude) || isNaN(t.longitude)) return
-        const icon = createTreeIcon(t.status, t.nearPowerLine)
-        const marker = L.marker([t.latitude, t.longitude], { icon })
-        const cfg = getCfg(t.status, t.nearPowerLine)
-        const popupTreeId = encodeURIComponent(String(t.id)).replace(/[^a-zA-Z0-9_-]/g, '_')
-
-        marker.bindPopup(`
-          <div id="popup-${popupTreeId}" style="min-width:180px;font-family:system-ui,sans-serif;font-size:12px;">
-            <div style="background:${cfg.color};color:#fff;padding:8px 10px;border-radius:8px 8px 0 0;margin:-16px -16px 8px -16px;">
-              <div style="font-size:14px;font-weight:700;">${cfg.emoji} ${escapeHtml(t.speciesName)}</div>
-            </div>
-            <div style="padding:0 2px 4px;">
-              <p style="margin:3px 0;"><b>Status:</b> ${cfg.label || escapeHtml(t.status)}</p>
-              <p style="margin:3px 0;"><b>Fiação:</b> ${t.nearPowerLine ? '<span style="color:#D32F2F;font-weight:700;">PRÓXIMO ⚠️</span>' : '<span style="color:#4CAF50">Seguro</span>'}</p>
-            </div>
-          </div>
-        `, { maxWidth: 220 })
-
-        treeClusterGroup!.addLayer(marker)
-        bounds.extend([t.latitude, t.longitude])
-      })
-
-      // SE HOUVER ÁRVORES MUITO DISTANTES, AJUSTA O ZOOM AUTOMATICAMENTE
-      if (filtered.length > 0 && props.filterStatus !== 'ALL') {
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
-      }
-    }
-
-    const drawPowerLines = () => {
-      if (!powerLinesLayer) return
-      powerLinesLayer.clearLayers()
-      SIMULATED_POWER_LINES.forEach((line) => {
-        const polyline = L.polyline(line, { color: '#E53935', weight: 3, dashArray: '8, 6', opacity: 0.7 })
-        powerLinesLayer!.addLayer(polyline)
-      })
-    }
-
-    const refreshData = async () => {
-      await fetchTrees()
-      renderTrees()
-    }
-
-    const focusOn = (lat: number, lng: number) => {
-      if (!map) return
-      map.setView([lat, lng], 18, { animate: true, duration: 1 })
-      
-      // Tenta encontrar o marcador para abrir o popup
-      if (treeClusterGroup) {
-        treeClusterGroup.eachLayer((layer: L.Layer) => {
-          if (layer instanceof L.Marker) {
-            const pos = layer.getLatLng()
-            if (Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lng) < 0.0001) {
-              layer.openPopup()
-            }
-          }
-        })
-      }
-    }
-
-    watch(() => props.filterStatus, () => renderTrees())
-
-    const initMap = () => {
-      if (!document.getElementById('mini-map-container')) return
-
-      map = L.map('mini-map-container', {
-        zoomControl: true,
-        attributionControl: false,
-        dragging: true,
-        scrollWheelZoom: true,
-      }).setView([DEFAULT_LAT, DEFAULT_LNG], DEFAULT_ZOOM)
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(map)
-
-      treeClusterGroup = L.markerClusterGroup({
-        maxClusterRadius: 30,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false,
-        disableClusteringAtZoom: 17,
-        iconCreateFunction: (cluster: L.MarkerCluster) => {
-          const count = cluster.getChildCount()
-          return L.divIcon({
-            html: `<div style="
-              background:linear-gradient(135deg,#1B5E20,#4CAF50);
-              color:#fff;font-weight:800;font-size:12px;
-              border-radius:50%;width:100%;height:100%;
-              display:flex;align-items:center;justify-content:center;
-              box-shadow:0 4px 12px rgba(0,0,0,0.4);
-              border:2px solid rgba(255,255,255,0.9);
-            ">${count}</div>`,
-            className: 'mini-map-cluster',
-            iconSize: [35, 35],
-          })
-        },
-      })
-      map.addLayer(treeClusterGroup)
-
-      powerLinesLayer = L.layerGroup().addTo(map)
-      drawPowerLines()
-
-      containerReady.value = true
-      fetchTrees().then(() => renderTrees())
-      refreshInterval = setInterval(refreshData, 60000)
-    }
-
-    onMounted(() => {
-      nextTick(() => initMap())
-    })
-
-    onUnmounted(() => {
-      if (refreshInterval) clearInterval(refreshInterval)
-      map?.remove()
-    })
-
-    return { trees, loadingTrees, containerReady, focusOn }
-  },
+onUnmounted(() => {
+  observer?.disconnect()
+  map?.remove()
+  map = undefined
 })
 </script>
 
 <template>
   <div class="mini-map-wrapper">
-    <div id="mini-map-container" class="mini-map-container" />
-    <div v-if="loadingTrees" class="mini-map-loading">
-      <v-progress-circular indeterminate color="primary" size="24" width="2" />
+    <div class="operation-summary">
+      <strong v-if="failed">Não foi possível atualizar o inventário.</strong>
+      <strong v-else-if="loading">Carregando visão operacional…</strong>
+      <strong v-else-if="mode === 'priority'"
+        >{{ priorities.length }} árvore(s) precisam de atenção em {{ sectors }} setor(es)</strong
+      >
+      <strong v-else>{{ validTrees.length }} árvore(s) com localização no inventário</strong>
+      <small v-if="!failed">{{
+        mode === 'priority'
+          ? 'Setores de referência de 250 m · selecione um ponto ou grupo para filtrar a lista.'
+          : 'A cor indica concentração. Selecione um ponto para consultar suas prioridades.'
+      }}</small>
+      <small v-if="!failed && !loading && priorityIds.length > priorities.length"
+        >{{ priorityIds.length - priorities.length }} prioridade(s) sem localização válida
+        permanecem na lista.</small
+      >
+      <div class="map-mode" role="group" aria-label="Visualização do mapa">
+        <button type="button" :aria-pressed="mode === 'priority'" @click="mode = 'priority'">
+          Prioridades
+        </button>
+        <button type="button" :aria-pressed="mode === 'density'" @click="mode = 'density'">
+          Concentração de árvores
+        </button>
+      </div>
+    </div>
+    <div class="map-content">
+      <div ref="container" class="mini-map-container" aria-label="Mapa do inventário de árvores" />
+      <div v-if="!loading && !failed && !displayedTrees.length" class="map-empty" role="status">
+        {{
+          mode === 'priority'
+            ? 'Nenhuma prioridade com localização para exibir.'
+            : 'Nenhuma árvore com localização para exibir.'
+        }}
+      </div>
+    </div>
+    <div class="operation-legend">
+      <template v-if="mode === 'priority'"
+        ><span><i class="critical-dot" />Crítico</span
+        ><span><i class="priority-dot" />Outras prioridades</span
+        ><span>Grupos indicam quantidade</span></template
+      >
+      <template v-else
+        ><span class="heat-scale" aria-hidden="true" />Menor → maior concentração</template
+      >
     </div>
   </div>
 </template>
 
 <style scoped>
 .mini-map-wrapper {
-  position: relative;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  min-height: 200px;
-  border-radius: 8px;
-  overflow: hidden;
+  min-height: 380px;
 }
-
+.operation-summary {
+  padding: 12px 16px;
+  background: #e5eee8;
+  color: #264b38;
+}
+.operation-summary strong {
+  display: block;
+  font-size: 0.85rem;
+}
+.operation-summary small {
+  display: block;
+  font-size: 0.72rem;
+  margin-top: 4px;
+  color: #4b6255;
+}
+.map-mode {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  margin-top: 10px;
+  background: #d4e1d9;
+  border-radius: 8px;
+}
+.map-mode button {
+  padding: 7px 10px;
+  font-size: 0.74rem;
+  border-radius: 6px;
+  color: #365443;
+}
+.map-mode button[aria-pressed='true'] {
+  background: #2d6048;
+  color: #fff;
+}
+.map-mode button:focus-visible {
+  outline: 2px solid #183f2b;
+  outline-offset: 2px;
+}
+.map-content {
+  position: relative;
+  min-height: 220px;
+  flex: 1;
+}
 .mini-map-container {
   width: 100%;
   height: 100%;
-}
-
-.mini-map-loading {
   position: absolute;
   inset: 0;
+}
+.map-empty {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: #f4f6efed;
+  padding: 10px;
+  font-size: 0.8rem;
+  text-align: center;
+  z-index: 500;
+  border-radius: 8px;
+}
+.operation-legend {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.8);
-  z-index: 1000;
+  gap: 14px;
+  padding: 8px 16px;
+  background: #edf2ee;
+  font-size: 0.7rem;
+  color: #485c50;
 }
-
-:deep(.mini-map-icon),
-:deep(.mini-map-cluster) {
-  background: none !important;
-  border: none !important;
+.operation-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
-
-:deep(.leaflet-control-zoom) {
-  border: none !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
-  border-radius: 6px !important;
+.operation-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
-
-:deep(.leaflet-control-zoom a) {
-  border-radius: 0 !important;
+.critical-dot {
+  background: #b93d43;
 }
-
-:deep(.leaflet-control-zoom a:first-child) {
-  border-radius: 6px 6px 0 0 !important;
+.priority-dot {
+  background: #b66b20;
 }
-
-:deep(.leaflet-control-zoom a:last-child) {
-  border-radius: 0 0 6px 6px !important;
+.heat-scale {
+  width: 70px;
+  height: 7px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #268650, #cfcc43, #f49c32, #b62c42);
 }
-
-@keyframes pulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,59,59,0.6); }
-  50% { transform: scale(1.1); box-shadow: 0 0 10px 4px rgba(255,59,59,0.25); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,59,59,0); }
+:deep(.dashboard-tree-marker) {
+  border: 0;
+  background: transparent;
 }
 </style>

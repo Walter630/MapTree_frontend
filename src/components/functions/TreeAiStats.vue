@@ -9,7 +9,8 @@
             <p class="text-overline hero-label">Análise de IA</p>
             <p class="hero-height mt-2 mb-0">
               <v-icon size="15" class="mr-1">mdi-arrow-expand-vertical</v-icon>
-              {{ heightLabel }} <span>altura atual</span><span class="mx-1">·</span>{{ wireHeightLabel }} <span>fiação</span>
+              {{ heightLabel }} <span>altura atual</span><span class="mx-1">·</span
+              >{{ wireHeightLabel }} <span>fiação</span>
             </p>
           </div>
           <div class="d-flex flex-column align-end">
@@ -70,256 +71,362 @@
       </v-btn>
 
       <div v-if="showDetails" class="technical-details">
-      <!-- Aviso quando a predição está ausente/incompleta: evita exibir zeros
+        <!-- Aviso quando a predição está ausente/incompleta: evita exibir zeros
            e defaults como se fossem resultado da análise. -->
-      <v-alert
-        v-if="!hasValidPrediction"
-        type="info"
-        variant="tonal"
-        density="compact"
-        icon="mdi-information-outline"
-        class="mb-5"
-        rounded="lg"
-      >
-        <span class="font-weight-medium">Dados de análise incompletos para esta árvore. Os valores abaixo podem não refletir uma previsão real.</span>
-      </v-alert>
-      <!-- ===== Progresso Altura vs Fio ===== -->
-      <div class="section-block mb-6">
-        <div class="section-header">
-          <v-icon size="20" class="mr-2" color="blue-darken-1">mdi-arrow-expand-vertical</v-icon>
-          <span class="section-title">Altura vs Fiação Elétrica</span>
-        </div>
-
-        <div class="height-progress-container mt-3">
-          <div class="height-labels d-flex justify-space-between mb-1">
-            <span class="text-caption font-weight-bold">
-              {{ (data.aiPrediction?.estimated_height_m || 0).toFixed(1) }}m
-              <span class="text-grey-darken-1 font-weight-regular">(Atual)</span>
-            </span>
-            <span class="text-caption font-weight-bold">
-              {{ (data.aiPrediction?.wire_height_m || 6.5).toFixed(1) }}m
-              <span class="text-grey-darken-1 font-weight-regular">(Fiação)</span>
-            </span>
+        <v-alert
+          v-if="!hasValidPrediction"
+          type="info"
+          variant="tonal"
+          density="compact"
+          icon="mdi-information-outline"
+          class="mb-5"
+          rounded="lg"
+        >
+          <span class="font-weight-medium"
+            >Dados de análise incompletos para esta árvore. Os valores abaixo podem não refletir uma
+            previsão real.</span
+          >
+        </v-alert>
+        <!-- ===== Progresso Altura vs Fio ===== -->
+        <div class="section-block mb-6">
+          <div class="section-header">
+            <v-icon size="20" class="mr-2" color="blue-darken-1">mdi-arrow-expand-vertical</v-icon>
+            <span class="section-title">Altura vs Fiação Elétrica</span>
           </div>
 
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: heightPercent + '%' }" :class="`fill-${riskClass}`">
-              <div class="progress-glow" />
+          <div class="height-progress-container mt-3">
+            <div class="height-labels d-flex justify-space-between mb-1">
+              <span class="text-caption font-weight-bold">
+                {{ (data.aiPrediction?.estimated_height_m || 0).toFixed(1) }}m
+                <span class="text-grey-darken-1 font-weight-regular">(Atual)</span>
+              </span>
+              <span class="text-caption font-weight-bold">
+                {{ (data.aiPrediction?.wire_height_m || 6.5).toFixed(1) }}m
+                <span class="text-grey-darken-1 font-weight-regular">(Fiação)</span>
+              </span>
             </div>
-            <div class="progress-wire-marker" :style="{ left: '100%' }">
-              <v-icon size="14" color="amber-darken-3">mdi-flash</v-icon>
+
+            <div class="progress-track">
+              <div
+                class="progress-fill"
+                :style="{ width: heightPercent + '%' }"
+                :class="`fill-${riskClass}`"
+              >
+                <div class="progress-glow" />
+              </div>
+              <div class="progress-wire-marker" :style="{ left: '100%' }">
+                <v-icon size="14" color="amber-darken-3">mdi-flash</v-icon>
+              </div>
             </div>
+
+            <p class="text-caption text-center mt-2 text-grey-darken-1">
+              <strong>{{ heightPercent.toFixed(0) }}%</strong> da altura da fiação
+            </p>
           </div>
 
-          <p class="text-caption text-center mt-2 text-grey-darken-1">
-            <strong>{{ heightPercent.toFixed(0) }}%</strong> da altura da fiação
-          </p>
-        </div>
-
-        <!-- ===== Métricas em grid ===== -->
-        <v-row class="mt-4" dense>
-          <v-col cols="6" sm="3">
-            <div class="metric-card">
-              <v-icon size="24" :color="(data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'red' : 'green'">
-                {{ (data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'mdi-alert-octagon' : 'mdi-check-circle' }}
-              </v-icon>
-              <p class="metric-value" :class="(data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'text-red' : 'text-green'">
-                {{ (data.aiPrediction?.will_reach_wire || heightPercent >= 90) ? 'SIM' : 'NÃO' }}
-              </p>
-              <p class="metric-label">Alcançará fiação</p>
-            </div>
-          </v-col>
-
-          <v-col cols="6" sm="3">
-            <div class="metric-card">
-              <v-icon size="24" color="indigo">mdi-calendar-clock</v-icon>
-              <p class="metric-value">{{ heightPercent >= 100 ? 'ALCANÇADO' : (data.aiPrediction?.days_to_wire ? data.aiPrediction.days_to_wire.toLocaleString() : 'N/A') }}</p>
-              <p class="metric-label">Dias até a fiação</p>
-            </div>
-          </v-col>
-
-          <v-col cols="6" sm="3">
-            <div class="metric-card">
-              <v-icon size="24" color="deep-purple">mdi-calendar-month</v-icon>
-              <p class="metric-value">{{ heightPercent >= 100 ? '0.0' : (data.aiPrediction?.months_to_wire?.toFixed(1) || '0.0') }}</p>
-              <p class="metric-label">Meses estimados</p>
-            </div>
-          </v-col>
-
-          <v-col cols="6" sm="3">
-            <div class="metric-card">
-              <v-icon size="24" color="teal">mdi-ruler</v-icon>
-              <p class="metric-value">{{ remainingMeters }}m</p>
-              <p class="metric-label">Faltam para o fio</p>
-            </div>
-          </v-col>
-        </v-row>
-      </div>
-
-      <v-divider class="mb-6" />
-
-      <div class="section-block mb-6">
-        <div class="section-header mb-4">
-          <v-icon size="22" class="mr-2" color="green-darken-1">mdi-brain</v-icon>
-          <span class="section-title">Análise da Inteligência Artificial</span>
-        </div>
-
-        <v-row dense>
-          <!-- Copa -->
-          <v-col cols="12" sm="6">
-            <div class="insight-card-v2">
-              <div class="insight-header">
-                <div class="insight-badge canopy-badge">
-                  <v-icon size="20" color="white">{{ canopyIcon }}</v-icon>
-                </div>
-                <span class="insight-label">Geometria da Copa</span>
-              </div>
-              <div class="insight-main mt-3">
-                <div class="d-flex align-center justify-space-between mb-1">
-                  <h3 class="insight-value">{{ canopyLabel }}</h3>
-                  <span class="text-caption text-grey-darken-1">L/A: {{ (data.aiPrediction?.canopy?.ratio_width_height || 0).toFixed(2) }}</span>
-                </div>
-                <p class="text-caption text-grey mb-0">Formato estimado via processamento de imagem e espécie.</p>
-              </div>
-            </div>
-          </v-col>
-
-          <!-- Fibonacci / R -->
-          <v-col cols="12" sm="6">
-            <div class="insight-card-v2">
-              <div class="insight-header">
-                <div class="insight-badge r-badge">
-                  <v-icon size="20" color="white">mdi-chart-bell-curve-cumulative</v-icon>
-                </div>
-                <span class="insight-label">Confiança da Previsão</span>
-              </div>
-              <div class="insight-main mt-3">
-                <div class="d-flex align-center justify-space-between mb-2">
-                  <h3 class="insight-value">{{ ((data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100).toFixed(0) }}%</h3>
-                  <v-chip size="x-small" color="blue-lighten-4" variant="flat" class="text-blue-darken-4 font-weight-bold">Ajuste IA</v-chip>
-                </div>
-                <div class="modern-progress mb-2">
-                  <div class="modern-progress-fill" :style="{ width: ((data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100) + '%' }" />
-                </div>
-                <p class="text-caption r-desc">
-                  O quanto a IA está confiante nesta previsão. Quanto maior, mais precisa é a estimativa.
-                </p>
-              </div>
-            </div>
-          </v-col>
-        </v-row>
-      </div>
-
-      <!-- ===== Histórico Biométrico (Medições Reais) ===== -->
-      <div v-if="data.measurements && data.measurements.length > 0" class="section-block mb-6">
-        <v-divider class="mb-6" />
-        <div class="section-header mb-3">
-          <v-icon size="20" class="mr-2" color="blue-grey-darken-2">mdi-history</v-icon>
-          <span class="section-title">Histórico Biométrico</span>
-        </div>
-
-        <div class="measurement-timeline">
-          <div v-for="m in data.measurements.slice(0, 3)" :key="m.id" class="measurement-log-item">
-            <div class="log-date">{{ formatDate(m.date) }}</div>
-            <div class="log-values">
-              <span class="mr-3">📏 <strong>{{ m.height.toFixed(2) }}m</strong> <small>(Alt)</small></span>
-              <span>🌳 <strong>{{ m.canopyWidth.toFixed(2) }}m</strong> <small>(Copa)</small></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== Solo (Inteligência Integrada) ===== -->
-      <template v-if="soilInfo">
-        <v-divider class="mb-6" />
-
-        <div class="section-block">
-          <div class="section-header mb-4">
-            <v-icon size="20" class="mr-2" color="brown-darken-1">mdi-terraform</v-icon>
-            <span class="section-title">Inteligência de Solo & Terreno</span>
-            <v-chip v-if="!data.soil" size="x-small" variant="tonal" color="brown" class="ml-auto font-weight-bold">
-              ESTIMATIVA REGIONAL (EMBRAPA)
-            </v-chip>
-          </div>
-
-          <!-- Growth & Definition Card -->
-          <div class="soil-analysis-banner mb-5" :style="{ borderLeft: `6px solid ${soilMarkerColor}`, background: `${soilMarkerColor}08` }">
-            <div class="d-flex justify-space-between align-center mb-1">
-              <span class="text-overline font-weight-bold" style="color: #444">Expectativa de Crescimento</span>
-              <v-chip size="x-small" :color="soilMarkerColor" class="font-weight-bold" variant="flat">
-                {{ soilGrowthLabel }}
-              </v-chip>
-            </div>
-            <p class="text-body-2 mb-0" style="color: #333; font-weight: 500;">{{ soilDefinition }}</p>
-          </div>
-
-          <v-row dense>
-            <!-- Argila -->
-            <v-col cols="12" sm="6">
-              <div class="soil-metric-item">
-                <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
-                  <span>Argila</span>
-                  <span>{{ data.soil?.clay ? data.soil.clay.toFixed(1) + '%' : (soilInfo?.typicalClay || 60) + '% (Típica)' }}</span>
-                </div>
-                <v-progress-linear
-                  :model-value="data.soil?.clay || soilInfo?.typicalClay || 60"
-                  height="6"
-                  rounded
-                  :color="soilMarkerColor"
-                  bg-color="grey-lighten-4"
-                />
-              </div>
-            </v-col>
-            <!-- pH -->
-            <v-col cols="12" sm="6">
-              <div class="soil-metric-item">
-                <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
-                  <span>pH</span>
-                  <span>{{ data.soil?.ph ? data.soil.ph.toFixed(1) : (soilInfo?.typicalPh || 6.5) + ' (Típico)' }}</span>
-                </div>
-                <v-progress-linear
-                  :model-value="(data.soil?.ph || soilInfo?.typicalPh || 6.5) * 11"
-                  height="6"
-                  rounded
-                  :color="soilMarkerColor"
-                  bg-color="grey-lighten-4"
-                />
-              </div>
-            </v-col>
-          </v-row>
-
+          <!-- ===== Métricas em grid ===== -->
           <v-row class="mt-4" dense>
             <v-col cols="6" sm="3">
               <div class="metric-card">
-                <v-icon size="20" color="brown-darken-2">mdi-arrow-collapse-down</v-icon>
-                <p class="metric-value">{{ data.soil?.depth ? data.soil.depth.toFixed(1) + 'm' : '1.5m (Est.)' }}</p>
-                <p class="metric-label">Profundidade</p>
+                <v-icon
+                  size="24"
+                  :color="
+                    data.aiPrediction?.will_reach_wire || heightPercent >= 90 ? 'red' : 'green'
+                  "
+                >
+                  {{
+                    data.aiPrediction?.will_reach_wire || heightPercent >= 90
+                      ? 'mdi-alert-octagon'
+                      : 'mdi-check-circle'
+                  }}
+                </v-icon>
+                <p
+                  class="metric-value"
+                  :class="
+                    data.aiPrediction?.will_reach_wire || heightPercent >= 90
+                      ? 'text-red'
+                      : 'text-green'
+                  "
+                >
+                  {{ data.aiPrediction?.will_reach_wire || heightPercent >= 90 ? 'SIM' : 'NÃO' }}
+                </p>
+                <p class="metric-label">Alcançará fiação</p>
               </div>
             </v-col>
+
             <v-col cols="6" sm="3">
               <div class="metric-card">
-                <v-icon size="20" color="orange-darken-3">mdi-slope-downhill</v-icon>
-                <p class="metric-value">{{ data.soil?.inclination ? data.soil.inclination.toFixed(0) + '°' : '8° (Suave)' }}</p>
-                <p class="metric-label">Inclinação</p>
+                <v-icon size="24" color="indigo">mdi-calendar-clock</v-icon>
+                <p class="metric-value">
+                  {{
+                    heightPercent >= 100
+                      ? 'ALCANÇADO'
+                      : data.aiPrediction?.days_to_wire
+                        ? data.aiPrediction.days_to_wire.toLocaleString()
+                        : 'N/A'
+                  }}
+                </p>
+                <p class="metric-label">Dias até a fiação</p>
               </div>
             </v-col>
+
             <v-col cols="6" sm="3">
               <div class="metric-card">
-                <v-icon size="24" :color="soilQualityColor">{{ soilQualityIcon }}</v-icon>
-                <p class="metric-value text-caption" :class="`text-${soilQualityColor}`">{{ soilQualityLabel }}</p>
-                <p class="metric-label">Qualidade</p>
+                <v-icon size="24" color="deep-purple">mdi-calendar-month</v-icon>
+                <p class="metric-value">
+                  {{
+                    heightPercent >= 100
+                      ? '0.0'
+                      : data.aiPrediction?.months_to_wire?.toFixed(1) || '0.0'
+                  }}
+                </p>
+                <p class="metric-label">Meses estimados</p>
               </div>
             </v-col>
+
             <v-col cols="6" sm="3">
               <div class="metric-card">
-                <v-icon size="20" color="green-darken-2">mdi-leaf-circle</v-icon>
-                <p class="metric-value">{{ ((data.soil?.coverage || 0.6) * 100).toFixed(0) }}%</p>
-                <p class="metric-label">Cobertura</p>
+                <v-icon size="24" color="teal">mdi-ruler</v-icon>
+                <p class="metric-value">{{ remainingMeters }}m</p>
+                <p class="metric-label">Faltam para o fio</p>
               </div>
             </v-col>
           </v-row>
         </div>
-      </template>
+
+        <v-divider class="mb-6" />
+
+        <div class="section-block mb-6">
+          <div class="section-header mb-4">
+            <v-icon size="22" class="mr-2" color="green-darken-1">mdi-brain</v-icon>
+            <span class="section-title">Análise da Inteligência Artificial</span>
+          </div>
+
+          <v-row dense>
+            <!-- Copa -->
+            <v-col cols="12" sm="6">
+              <div class="insight-card-v2">
+                <div class="insight-header">
+                  <div class="insight-badge canopy-badge">
+                    <v-icon size="20" color="white">{{ canopyIcon }}</v-icon>
+                  </div>
+                  <span class="insight-label">Geometria da Copa</span>
+                </div>
+                <div class="insight-main mt-3">
+                  <div class="d-flex align-center justify-space-between mb-1">
+                    <h3 class="insight-value">{{ canopyLabel }}</h3>
+                    <span class="text-caption text-grey-darken-1"
+                      >L/A:
+                      {{ (data.aiPrediction?.canopy?.ratio_width_height || 0).toFixed(2) }}</span
+                    >
+                  </div>
+                  <p class="text-caption text-grey mb-0">
+                    Formato estimado via processamento de imagem e espécie.
+                  </p>
+                </div>
+              </div>
+            </v-col>
+
+            <!-- Fibonacci / R -->
+            <v-col cols="12" sm="6">
+              <div class="insight-card-v2">
+                <div class="insight-header">
+                  <div class="insight-badge r-badge">
+                    <v-icon size="20" color="white">mdi-chart-bell-curve-cumulative</v-icon>
+                  </div>
+                  <span class="insight-label">Confiança da Previsão</span>
+                </div>
+                <div class="insight-main mt-3">
+                  <div class="d-flex align-center justify-space-between mb-2">
+                    <h3 class="insight-value">
+                      {{
+                        ((data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100).toFixed(
+                          0,
+                        )
+                      }}%
+                    </h3>
+                    <v-chip
+                      size="x-small"
+                      color="blue-lighten-4"
+                      variant="flat"
+                      class="text-blue-darken-4 font-weight-bold"
+                      >Ajuste IA</v-chip
+                    >
+                  </div>
+                  <div class="modern-progress mb-2">
+                    <div
+                      class="modern-progress-fill"
+                      :style="{
+                        width:
+                          (data.aiPrediction?.fibonacci_info?.growth_modifier || 0) * 100 + '%',
+                      }"
+                    />
+                  </div>
+                  <p class="text-caption r-desc">
+                    O quanto a IA está confiante nesta previsão. Quanto maior, mais precisa é a
+                    estimativa.
+                  </p>
+                </div>
+              </div>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- ===== Histórico Biométrico (Medições Reais) ===== -->
+        <div v-if="data.measurements && data.measurements.length > 0" class="section-block mb-6">
+          <v-divider class="mb-6" />
+          <div class="section-header mb-3">
+            <v-icon size="20" class="mr-2" color="blue-grey-darken-2">mdi-history</v-icon>
+            <span class="section-title">Histórico Biométrico</span>
+          </div>
+
+          <div class="measurement-timeline">
+            <div
+              v-for="m in data.measurements.slice(0, 3)"
+              :key="m.id"
+              class="measurement-log-item"
+            >
+              <div class="log-date">{{ formatDate(m.date) }}</div>
+              <div class="log-values">
+                <span class="mr-3"
+                  >📏 <strong>{{ m.height.toFixed(2) }}m</strong> <small>(Alt)</small></span
+                >
+                <span
+                  >🌳 <strong>{{ m.canopyWidth.toFixed(2) }}m</strong> <small>(Copa)</small></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Solo (Inteligência Integrada) ===== -->
+        <template v-if="soilInfo">
+          <v-divider class="mb-6" />
+
+          <div class="section-block">
+            <div class="section-header mb-4">
+              <v-icon size="20" class="mr-2" color="brown-darken-1">mdi-terraform</v-icon>
+              <span class="section-title">Inteligência de Solo & Terreno</span>
+              <v-chip
+                v-if="!data.soil"
+                size="x-small"
+                variant="tonal"
+                color="brown"
+                class="ml-auto font-weight-bold"
+              >
+                ESTIMATIVA REGIONAL (EMBRAPA)
+              </v-chip>
+            </div>
+
+            <!-- Growth & Definition Card -->
+            <div
+              class="soil-analysis-banner mb-5"
+              :style="{
+                borderLeft: `6px solid ${soilMarkerColor}`,
+                background: `${soilMarkerColor}08`,
+              }"
+            >
+              <div class="d-flex justify-space-between align-center mb-1">
+                <span class="text-overline font-weight-bold" style="color: #444"
+                  >Expectativa de Crescimento</span
+                >
+                <v-chip
+                  size="x-small"
+                  :color="soilMarkerColor"
+                  class="font-weight-bold"
+                  variant="flat"
+                >
+                  {{ soilGrowthLabel }}
+                </v-chip>
+              </div>
+              <p class="text-body-2 mb-0" style="color: #333; font-weight: 500">
+                {{ soilDefinition }}
+              </p>
+            </div>
+
+            <v-row dense>
+              <!-- Argila -->
+              <v-col cols="12" sm="6">
+                <div class="soil-metric-item">
+                  <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
+                    <span>Argila</span>
+                    <span>{{
+                      data.soil?.clay
+                        ? data.soil.clay.toFixed(1) + '%'
+                        : (soilInfo?.typicalClay || 60) + '% (Típica)'
+                    }}</span>
+                  </div>
+                  <v-progress-linear
+                    :model-value="data.soil?.clay || soilInfo?.typicalClay || 60"
+                    height="6"
+                    rounded
+                    :color="soilMarkerColor"
+                    bg-color="grey-lighten-4"
+                  />
+                </div>
+              </v-col>
+              <!-- pH -->
+              <v-col cols="12" sm="6">
+                <div class="soil-metric-item">
+                  <div class="d-flex justify-space-between text-caption font-weight-bold mb-1">
+                    <span>pH</span>
+                    <span>{{
+                      data.soil?.ph
+                        ? data.soil.ph.toFixed(1)
+                        : (soilInfo?.typicalPh || 6.5) + ' (Típico)'
+                    }}</span>
+                  </div>
+                  <v-progress-linear
+                    :model-value="(data.soil?.ph || soilInfo?.typicalPh || 6.5) * 11"
+                    height="6"
+                    rounded
+                    :color="soilMarkerColor"
+                    bg-color="grey-lighten-4"
+                  />
+                </div>
+              </v-col>
+            </v-row>
+
+            <v-row class="mt-4" dense>
+              <v-col cols="6" sm="3">
+                <div class="metric-card">
+                  <v-icon size="20" color="brown-darken-2">mdi-arrow-collapse-down</v-icon>
+                  <p class="metric-value">
+                    {{ data.soil?.depth ? data.soil.depth.toFixed(1) + 'm' : '1.5m (Est.)' }}
+                  </p>
+                  <p class="metric-label">Profundidade</p>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="metric-card">
+                  <v-icon size="20" color="orange-darken-3">mdi-slope-downhill</v-icon>
+                  <p class="metric-value">
+                    {{
+                      data.soil?.inclination ? data.soil.inclination.toFixed(0) + '°' : '8° (Suave)'
+                    }}
+                  </p>
+                  <p class="metric-label">Inclinação</p>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="metric-card">
+                  <v-icon size="24" :color="soilQualityColor">{{ soilQualityIcon }}</v-icon>
+                  <p class="metric-value text-caption" :class="`text-${soilQualityColor}`">
+                    {{ soilQualityLabel }}
+                  </p>
+                  <p class="metric-label">Qualidade</p>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="metric-card">
+                  <v-icon size="20" color="green-darken-2">mdi-leaf-circle</v-icon>
+                  <p class="metric-value">{{ ((data.soil?.coverage || 0.6) * 100).toFixed(0) }}%</p>
+                  <p class="metric-label">Cobertura</p>
+                </div>
+              </v-col>
+            </v-row>
+          </div>
+        </template>
       </div>
     </v-card-text>
   </v-card>
@@ -355,8 +462,7 @@ export default defineComponent({
       const p = this.data.aiPrediction
       if (!p || typeof p !== 'object') return false
       return (
-        Number.isFinite(Number(p.estimated_height_m)) ||
-        Number.isFinite(Number(p.wire_height_m))
+        Number.isFinite(Number(p.estimated_height_m)) || Number.isFinite(Number(p.wire_height_m))
       )
     },
 
@@ -371,7 +477,7 @@ export default defineComponent({
         MODERATE: 'moderate',
         CRITICAL: 'critical',
         TO_PRUNE: 'critical',
-        UNDER_OBSERVATION: 'observation'
+        UNDER_OBSERVATION: 'observation',
       }
       return map[s] || 'normal'
     },
@@ -386,7 +492,7 @@ export default defineComponent({
         MODERATE: 'Risco Moderado',
         CRITICAL: 'RISCO CRÍTICO',
         TO_PRUNE: 'Poda Necessária',
-        UNDER_OBSERVATION: 'Em Observação'
+        UNDER_OBSERVATION: 'Em Observação',
       }
       return map[s] || 'Análise de IA'
     },
@@ -534,7 +640,7 @@ export default defineComponent({
       return getSoilInfo(typeKey).color
     },
 
-    soilInfo(): any {
+    soilInfo(): ReturnType<typeof getSoilInfo> {
       const typeKey = this.data.soil?.soilType || this.data.soil?.quality || 'LATOSSOLO_VERMELHO'
       return getSoilInfo(typeKey)
     },
@@ -545,7 +651,7 @@ export default defineComponent({
         EXCELLENT: 'Vigor Excelente',
         GOOD: 'Saúde Estável',
         POOR: 'Saúde Debilitada',
-        DEAD: 'Espécime Morto'
+        DEAD: 'Espécime Morto',
       }
       return map[this.data.vigor] || 'Vigor Desconhecido'
     },
@@ -599,7 +705,10 @@ export default defineComponent({
   font-size: 0.75rem;
   font-weight: 700;
 }
-.hero-height span { color: rgba(255, 255, 255, 0.68); font-weight: 500; }
+.hero-height span {
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 500;
+}
 
 /* ============ HERO HEADER ============ */
 .card-hero {
@@ -621,19 +730,25 @@ export default defineComponent({
 }
 
 .hero-normal {
-  background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
 }
-.hero-normal .hero-glow { background: #4CAF50; }
+.hero-normal .hero-glow {
+  background: #4caf50;
+}
 
 .hero-moderate {
-  background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
 }
-.hero-moderate .hero-glow { background: #FF9800; }
+.hero-moderate .hero-glow {
+  background: #ff9800;
+}
 
 .hero-critical {
-  background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%);
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
 }
-.hero-critical .hero-glow { background: #F44336; }
+.hero-critical .hero-glow {
+  background: #f44336;
+}
 
 .hero-content {
   position: relative;
@@ -670,28 +785,40 @@ export default defineComponent({
 
 .risk-normal {
   background: rgba(76, 175, 80, 0.15);
-  color: #2E7D32;
+  color: #2e7d32;
 }
 
 .risk-moderate {
   background: rgba(255, 152, 0, 0.15);
-  color: #E65100;
+  color: #e65100;
 }
 
 .risk-critical {
   background: rgba(244, 67, 54, 0.15);
-  color: #C62828;
+  color: #c62828;
   animation: badgePulseCritical 1.5s ease-in-out infinite;
 }
 
 @keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
 }
 
 @keyframes badgePulseCritical {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.3); }
-  50% { transform: scale(1.05); box-shadow: 0 0 12px 4px rgba(244, 67, 54, 0.15); }
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px 4px rgba(244, 67, 54, 0.15);
+  }
 }
 
 /* ============ BODY ============ */
@@ -766,7 +893,7 @@ export default defineComponent({
 
 /* ============ AI ALERT ============ */
 .ai-alert {
-  border-left: 4px solid #FF8F00 !important;
+  border-left: 4px solid #ff8f00 !important;
 }
 
 /* ============ SECTIONS ============ */
@@ -809,21 +936,27 @@ export default defineComponent({
 }
 
 @keyframes shimmer {
-  0% { opacity: 0; }
-  50% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .fill-normal {
-  background: linear-gradient(90deg, #66BB6A, #43A047);
+  background: linear-gradient(90deg, #66bb6a, #43a047);
 }
 
 .fill-moderate {
-  background: linear-gradient(90deg, #FFB74D, #FB8C00);
+  background: linear-gradient(90deg, #ffb74d, #fb8c00);
 }
 
 .fill-critical {
-  background: linear-gradient(90deg, #EF5350, #C62828);
+  background: linear-gradient(90deg, #ef5350, #c62828);
 }
 
 .progress-wire-marker {
@@ -835,8 +968,8 @@ export default defineComponent({
   justify-content: center;
   width: 24px;
   height: 24px;
-  background: #FFF8E1;
-  border: 2px solid #FFB300;
+  background: #fff8e1;
+  border: 2px solid #ffb300;
   border-radius: 50%;
   z-index: 2;
 }
@@ -881,7 +1014,9 @@ export default defineComponent({
   border-radius: 16px;
   padding: 16px;
   height: 100%;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
@@ -995,7 +1130,7 @@ export default defineComponent({
   padding: 12px 16px;
   border-radius: 4px 12px 12px 4px;
   border: 1px solid #f1f5f9;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 .soil-metric-item {

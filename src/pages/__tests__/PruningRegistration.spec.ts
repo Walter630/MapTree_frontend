@@ -19,17 +19,33 @@ vi.mock('@/plugins/apiConnect', () => ({
 import PruningRegistration from '../PruningRegistration.vue'
 
 // jsdom não implementa APIs usadas por componentes Vuetify (spinner de loading e overlay do select).
-globalThis.ResizeObserver = globalThis.ResizeObserver || class {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
+globalThis.ResizeObserver =
+  globalThis.ResizeObserver ||
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
 // @ts-expect-error jsdom não define visualViewport, usado pelo overlay do VSelect
-globalThis.visualViewport = globalThis.visualViewport || { addEventListener() {}, removeEventListener() {}, width: 0, height: 0 }
+globalThis.visualViewport = globalThis.visualViewport || {
+  addEventListener() {},
+  removeEventListener() {},
+  width: 0,
+  height: 0,
+}
 
 const vuetify = createVuetify({ components, directives })
 
-const route = { path: '/user/podas/nova', fullPath: '/user/podas/nova', params: {}, query: {}, hash: '', name: undefined, meta: {}, matched: [] }
+const route = {
+  path: '/user/podas/nova',
+  fullPath: '/user/podas/nova',
+  params: {},
+  query: {},
+  hash: '',
+  name: undefined,
+  meta: {},
+  matched: [],
+}
 
 const trees = [
   { id: 'tree-0001', species: { commonName: 'Ipê' }, latitude: -3.7, longitude: -38.5 },
@@ -63,7 +79,7 @@ describe('PruningRegistration', () => {
 
   async function fillAndSubmit(wrapper: ReturnType<typeof mountPage>['wrapper']) {
     const vm = wrapper.vm as unknown as {
-      form: { idTree: string, type: string, date: string, observations: string }
+      form: { idTree: string; type: string; date: string; observations: string }
       submit: () => Promise<void>
     }
     vm.form.idTree = 'tree-0001'
@@ -116,7 +132,11 @@ describe('PruningRegistration', () => {
 
     await fillAndSubmit(wrapper)
 
-    const vm = wrapper.vm as unknown as { showSuccess: boolean, showError: boolean, errorMessage: string }
+    const vm = wrapper.vm as unknown as {
+      showSuccess: boolean
+      showError: boolean
+      errorMessage: string
+    }
     expect(vm.showSuccess).toBe(false)
     expect(vm.showError).toBe(true)
     expect(vm.errorMessage).toBe('Sua sessão expirou. Entre novamente.')

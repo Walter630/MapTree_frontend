@@ -40,7 +40,9 @@
             <span class="kpi-label">Áreas Críticas</span>
             <AnimatedKpiIcon type="alert" :color="countCritical > 0 ? '#d32f2f' : '#9e9e9e'" />
           </div>
-          <div class="kpi-value" :class="{ 'text-error': countCritical > 0 }">{{ countCritical }}</div>
+          <div class="kpi-value" :class="{ 'text-error': countCritical > 0 }">
+            {{ countCritical }}
+          </div>
           <div class="kpi-subtitle">Em risco</div>
         </v-card>
       </v-col>
@@ -85,11 +87,7 @@
           </div>
 
           <div class="risk-map-container">
-            <MiniMap
-              ref="miniMapRef"
-              filter-status="PRIORITY"
-              style="height: 100%; width: 100%;"
-            />
+            <MiniMap ref="miniMapRef" filter-status="PRIORITY" style="height: 100%; width: 100%" />
             <div class="risk-overlay-badge">
               <v-chip color="error" size="small" variant="flat" class="font-weight-bold">
                 <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
@@ -121,7 +119,9 @@
               </div>
               <div>
                 <p class="risk-list-title mb-0">Lista de Alertas</p>
-                <p class="risk-list-subtitle mb-0">{{ alertTrees.length }} de {{ filteredTrees.length }} árvores</p>
+                <p class="risk-list-subtitle mb-0">
+                  {{ alertTrees.length }} de {{ filteredTrees.length }} árvores
+                </p>
               </div>
             </div>
           </div>
@@ -163,27 +163,38 @@
               <div class="d-flex align-center">
                 <div
                   class="risk-indicator mr-3"
-                  :class="tree.status === 'TO_PRUNE' ? 'risk-indicator--warn' : 'risk-indicator--crit'"
+                  :class="
+                    tree.status === 'TO_PRUNE' ? 'risk-indicator--warn' : 'risk-indicator--crit'
+                  "
                 >
-                  <v-icon size="18" :color="tree.status === 'TO_PRUNE' ? 'orange-darken-2' : 'error'">
+                  <v-icon
+                    size="18"
+                    :color="tree.status === 'TO_PRUNE' ? 'orange-darken-2' : 'error'"
+                  >
                     {{ tree.status === 'TO_PRUNE' ? 'mdi-content-cut' : 'mdi-alert-circle' }}
                   </v-icon>
                 </div>
                 <div class="flex-grow-1">
-                  <div class="d-flex align-center" style="gap: 6px;">
+                  <div class="d-flex align-center" style="gap: 6px">
                     <span class="risk-item-code">#{{ treeCode(tree) }}</span>
-                    <span class="risk-item-title">{{ tree.status === 'TO_PRUNE' ? 'Poda Urgente' : 'Risco Crítico' }}</span>
+                    <span class="risk-item-title">{{
+                      tree.status === 'TO_PRUNE' ? 'Poda Urgente' : 'Risco Crítico'
+                    }}</span>
                   </div>
                   <p class="risk-item-coords mb-0">
                     <v-icon size="11" class="mr-1">mdi-map-marker</v-icon>
-                    {{ (tree.lat || tree.latitude || 0).toFixed(4) }}, {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
+                    {{ (tree.lat || tree.latitude || 0).toFixed(4) }},
+                    {{ (tree.lng || tree.longitude || 0).toFixed(4) }}
                   </p>
                 </div>
                 <v-icon size="16" color="grey-lighten-1">mdi-chevron-right</v-icon>
               </div>
             </v-card>
 
-            <div v-if="alertTrees.length === 0 && filteredTrees.length > 0" class="text-center py-6 empty-state">
+            <div
+              v-if="alertTrees.length === 0 && filteredTrees.length > 0"
+              class="text-center py-6 empty-state"
+            >
               <v-icon size="40" color="grey-lighten-1">mdi-magnify-close</v-icon>
               <p class="text-body-2 text-grey mt-2">Nenhuma árvore encontrada para esta busca</p>
             </div>
@@ -200,17 +211,13 @@
     <v-row dense>
       <!-- Espécies por localidade -->
       <v-col cols="12" md="6">
-        <v-card flat class="pa-4 section-card overflow-hidden" style="height: 380px;">
+        <v-card flat class="pa-4 section-card overflow-hidden" style="height: 380px">
           <p class="section-title">
             <v-icon class="mr-2" color="green">mdi-leaf-maple</v-icon>
             Espécies por localidade
           </p>
-          <div class="species-list-container" style="max-height: 300px; overflow-y: auto;">
-            <div
-              v-for="spec in topSpecies"
-              :key="spec.id"
-              class="species-item"
-            >
+          <div class="species-list-container" style="max-height: 300px; overflow-y: auto">
+            <div v-for="spec in topSpecies" :key="spec.id" class="species-item">
               <div class="species-icon">
                 <v-icon color="green-darken-1" size="22">mdi-tree</v-icon>
               </div>
@@ -241,10 +248,17 @@
               <v-icon class="mr-2" color="blue-darken-2">mdi-clipboard-text-clock-outline</v-icon>
               Últimos Relatórios de Poda
             </p>
-            <v-btn variant="text" color="primary" size="small" rounded="pill" @click="showAllReports = true">Ver Todos</v-btn>
+            <v-btn
+              variant="text"
+              color="primary"
+              size="small"
+              rounded="pill"
+              @click="showAllReports = true"
+              >Ver Todos</v-btn
+            >
           </div>
 
-          <div class="reports-scroll-container" style="max-height: 300px; overflow-y: auto;">
+          <div class="reports-scroll-container" style="max-height: 300px; overflow-y: auto">
             <v-list lines="two" bg-color="transparent" class="pa-0">
               <v-list-item
                 v-for="report in prunings.slice(0, 5)"
@@ -261,7 +275,7 @@
                 <v-list-item-title class="text-subtitle-2 font-weight-bold">
                   {{ report.tree?.species?.commonName || 'Árvore #' + report.idTree.slice(-4) }}
                 </v-list-item-title>
-                
+
                 <v-list-item-subtitle class="text-caption d-flex align-center mt-1">
                   <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
                   {{ report.tree?.latitude?.toFixed(4) }}, {{ report.tree?.longitude?.toFixed(4) }}
@@ -271,13 +285,18 @@
                 </v-list-item-subtitle>
 
                 <template #append>
-                  <v-chip :color="getPruningColor(report.type)" size="x-small" variant="tonal" class="font-weight-bold">
+                  <v-chip
+                    :color="getPruningColor(report.type)"
+                    size="x-small"
+                    variant="tonal"
+                    class="font-weight-bold"
+                  >
                     {{ report.type || 'REGULAR' }}
                   </v-chip>
                 </template>
               </v-list-item>
             </v-list>
-            
+
             <div v-if="prunings.length === 0" class="text-center py-12">
               <v-icon color="grey-lighten-3" size="64">mdi-clipboard-off-outline</v-icon>
               <p class="text-body-2 text-grey mt-2">Nenhum relatório pendente</p>
@@ -287,46 +306,92 @@
       </v-col>
     </v-row>
 
-      <v-dialog v-model="alertTreeDialog" max-width="460">
-        <v-card v-if="selectedAlertTree" class="alert-tree-dialog rounded-xl">
-          <v-card-title class="d-flex align-center pa-5">
-            <v-avatar color="red-lighten-5" class="mr-3"><v-icon color="error">mdi-tree-alert</v-icon></v-avatar>
-            <div>
-              <p class="text-overline mb-0 text-grey-darken-1">Árvore prioritária</p>
-              <h2 class="text-h6 font-weight-bold">{{ selectedAlertTree.species?.commonName || `Árvore #${treeCode(selectedAlertTree)}` }}</h2>
-            </div>
-            <v-spacer />
-            <v-btn icon="mdi-close" variant="text" aria-label="Fechar detalhes" @click="alertTreeDialog = false" />
-          </v-card-title>
-          <v-divider />
-          <v-card-text class="pa-5">
-            <v-alert type="warning" variant="tonal" density="comfortable" class="mb-4">
-              <strong>{{ selectedAlertTree.status === 'CRITICAL' ? 'Risco crítico' : 'Poda prioritária' }}</strong><br />
-              Esta árvore foi selecionada para intervenção. Confira a localização antes de iniciar o trabalho.
-            </v-alert>
-            <v-row dense>
-              <v-col cols="6"><span class="detail-label">Código</span><strong>#{{ treeCode(selectedAlertTree) }}</strong></v-col>
-              <v-col cols="6"><span class="detail-label">Status</span><v-chip size="small" color="error" variant="tonal">{{ selectedAlertTree.status }}</v-chip></v-col>
-              <v-col cols="12"><span class="detail-label">Localização</span><strong>{{ Number(selectedAlertTree.lat ?? selectedAlertTree.latitude ?? 0).toFixed(5) }}, {{ Number(selectedAlertTree.lng ?? selectedAlertTree.longitude ?? 0).toFixed(5) }}</strong></v-col>
-            </v-row>
-          </v-card-text>
-          <v-divider />
-          <v-card-actions class="pa-4">
-            <v-btn variant="text" class="text-none" @click="alertTreeDialog = false">Fechar</v-btn>
-            <v-spacer />
-            <v-btn color="blue-darken-2" variant="flat" prepend-icon="mdi-map" @click="goToMap(); alertTreeDialog = false">Ver no mapa</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+    <v-dialog v-model="alertTreeDialog" max-width="460">
+      <v-card v-if="selectedAlertTree" class="alert-tree-dialog rounded-xl">
+        <v-card-title class="d-flex align-center pa-5">
+          <v-avatar color="red-lighten-5" class="mr-3"
+            ><v-icon color="error">mdi-tree-alert</v-icon></v-avatar
+          >
+          <div>
+            <p class="text-overline mb-0 text-grey-darken-1">Árvore prioritária</p>
+            <h2 class="text-h6 font-weight-bold">
+              {{
+                selectedAlertTree.species?.commonName || `Árvore #${treeCode(selectedAlertTree)}`
+              }}
+            </h2>
+          </div>
+          <v-spacer />
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            aria-label="Fechar detalhes"
+            @click="alertTreeDialog = false"
+          />
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-5">
+          <v-alert type="warning" variant="tonal" density="comfortable" class="mb-4">
+            <strong>{{
+              selectedAlertTree.status === 'CRITICAL' ? 'Risco crítico' : 'Poda prioritária'
+            }}</strong
+            ><br />
+            Esta árvore foi selecionada para intervenção. Confira a localização antes de iniciar o
+            trabalho.
+          </v-alert>
+          <v-row dense>
+            <v-col cols="6"
+              ><span class="detail-label">Código</span
+              ><strong>#{{ treeCode(selectedAlertTree) }}</strong></v-col
+            >
+            <v-col cols="6"
+              ><span class="detail-label">Status</span
+              ><v-chip size="small" color="error" variant="tonal">{{
+                selectedAlertTree.status
+              }}</v-chip></v-col
+            >
+            <v-col cols="12"
+              ><span class="detail-label">Localização</span
+              ><strong
+                >{{ Number(selectedAlertTree.lat ?? selectedAlertTree.latitude ?? 0).toFixed(5) }},
+                {{
+                  Number(selectedAlertTree.lng ?? selectedAlertTree.longitude ?? 0).toFixed(5)
+                }}</strong
+              ></v-col
+            >
+          </v-row>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions class="pa-4">
+          <v-btn variant="text" class="text-none" @click="alertTreeDialog = false">Fechar</v-btn>
+          <v-spacer />
+          <v-btn
+            color="blue-darken-2"
+            variant="flat"
+            prepend-icon="mdi-map"
+            @click="
+              () => {
+                goToMap()
+                alertTreeDialog = false
+              }
+            "
+            >Ver no mapa</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
-      <!-- ===== DIALOG DE DETALHES DO RELATÓRIO (PREMIUM) ===== -->
+    <!-- ===== DIALOG DE DETALHES DO RELATÓRIO (PREMIUM) ===== -->
     <v-dialog v-model="reportDialog" max-width="500">
       <v-card v-if="selectedReport" class="rounded-xl overflow-hidden glass-card">
-        <div :style="`background: linear-gradient(135deg, ${getPruningHex(selectedReport.type)}, #000); padding: 24px; color: white`">
+        <div
+          :style="`background: linear-gradient(135deg, ${getPruningHex(selectedReport.type)}, #000); padding: 24px; color: white`"
+        >
           <div class="d-flex justify-space-between align-start">
             <div>
               <p class="text-overline mb-0" style="opacity: 0.8">Relatório Técnico de Poda</p>
-              <h2 class="text-h5 font-weight-bold">{{ selectedReport.tree?.species?.commonName || 'Árvore Independente' }}</h2>
+              <h2 class="text-h5 font-weight-bold">
+                {{ selectedReport.tree?.species?.commonName || 'Árvore Independente' }}
+              </h2>
               <p class="text-caption mb-0">{{ selectedReport.tree?.species?.scientificName }}</p>
             </div>
             <v-chip color="rgba(255,255,255,0.2)" variant="flat" size="small" class="text-white">
@@ -345,19 +410,30 @@
               <v-row dense>
                 <v-col cols="6">
                   <p class="text-caption text-grey-darken-1 mb-0">Técnico Responsável</p>
-                  <p class="text-body-2 font-weight-bold">{{ selectedReport.user?.name || 'Sistema IA' }}</p>
+                  <p class="text-body-2 font-weight-bold">
+                    {{ selectedReport.user?.name || 'Sistema IA' }}
+                  </p>
                 </v-col>
                 <v-col cols="6">
                   <p class="text-caption text-grey-darken-1 mb-0">Data de Execução</p>
-                  <p class="text-body-2 font-weight-bold">{{ formatDateFull(selectedReport.date) }}</p>
+                  <p class="text-body-2 font-weight-bold">
+                    {{ formatDateFull(selectedReport.date) }}
+                  </p>
                 </v-col>
                 <v-col cols="6" class="mt-2">
                   <p class="text-caption text-grey-darken-1 mb-0">Tipo de Poda</p>
-                  <v-chip :color="getPruningColor(selectedReport.type)" size="x-small" class="font-weight-bold">{{ selectedReport.type }}</v-chip>
+                  <v-chip
+                    :color="getPruningColor(selectedReport.type)"
+                    size="x-small"
+                    class="font-weight-bold"
+                    >{{ selectedReport.type }}</v-chip
+                  >
                 </v-col>
                 <v-col cols="6" class="mt-2">
                   <p class="text-caption text-grey-darken-1 mb-0">Vigor Médio</p>
-                  <p class="text-body-2 font-weight-bold text-success">{{ selectedReport.tree?.vigor || 'BOM' }}</p>
+                  <p class="text-body-2 font-weight-bold text-success">
+                    {{ selectedReport.tree?.vigor || 'BOM' }}
+                  </p>
                 </v-col>
               </v-row>
             </v-card>
@@ -377,10 +453,24 @@
               <v-icon color="grey" class="mr-3">mdi-map-search</v-icon>
               <div>
                 <p class="text-caption font-weight-bold mb-0">Coordenadas de Referência</p>
-                <p class="text-caption text-grey-darken-2">LAT: {{ selectedReport.tree?.latitude }} / LNG: {{ selectedReport.tree?.longitude }}</p>
+                <p class="text-caption text-grey-darken-2">
+                  LAT: {{ selectedReport.tree?.latitude }} / LNG:
+                  {{ selectedReport.tree?.longitude }}
+                </p>
               </div>
               <v-spacer />
-              <v-btn icon size="small" variant="text" color="primary" @click="focusOnTree(selectedReport.tree); reportDialog = false">
+              <v-btn
+                icon
+                size="small"
+                variant="text"
+                color="primary"
+                @click="
+                  () => {
+                    selectedReport && focusOnTree(selectedReport.tree)
+                    reportDialog = false
+                  }
+                "
+              >
                 <v-icon>mdi-eye</v-icon>
               </v-btn>
             </div>
@@ -399,6 +489,7 @@
 </template>
 
 <script lang="ts">
+import type { CatalogSpecies } from '@/utils/speciesDisplay'
 import { defineComponent } from 'vue'
 import MiniMap from '@/components/functions/MapsView/MiniMap.vue'
 import PruningChart from '@/components/functions/GraficosView/PruningChart.vue'
@@ -411,6 +502,7 @@ import { isTreeForPruning, prioritizeTrees } from '@/utils/treePriority'
 =================================== */
 
 interface Tree {
+  vigor?: string
   id: string
   age: Date
   lat?: number
@@ -429,6 +521,7 @@ interface User {
 }
 
 interface Pruning {
+  id: string
   idTree: string
   tree: Tree
   idUser: string
@@ -436,15 +529,6 @@ interface Pruning {
   date: Date
   observations: string
   type: 'LIGHT' | 'MODERATE' | 'HEAVY'
-}
-
-interface Species {
-  id: string
-  commonName: string
-  scientificName: string
-  family: string
-  description: string
-  trees: Tree[]
 }
 
 interface ReportHeader {
@@ -465,11 +549,11 @@ export default defineComponent({
     return {
       user: null as User | null,
       trees: null as Tree[] | null,
-      species: [] as any[],
-      topSpecies: [] as any[],
+      species: [] as CatalogSpecies[],
+      topSpecies: [] as CatalogSpecies[],
       filteredTrees: [] as Tree[],
-      prunings: [] as any[],
-      miniMapRef: null as any,
+      prunings: [] as Pruning[],
+      miniMapRef: null as { focusOn: (lat: number, lng: number) => void } | null,
 
       // Contadores
       countTrees: 0,
@@ -482,7 +566,7 @@ export default defineComponent({
       alertTreeDialog: false,
       selectedAlertTree: null as Tree | null,
       showAllReports: false,
-      selectedReport: null as any,
+      selectedReport: null as Pruning | null,
 
       // Lista de alertas: busca e filtro
       alertSearch: '',
@@ -528,10 +612,7 @@ export default defineComponent({
           const lat = (t.lat || t.latitude || 0).toFixed(4)
           const lng = (t.lng || t.longitude || 0).toFixed(4)
           return (
-            code.includes(q) ||
-            lat.includes(q) ||
-            lng.includes(q) ||
-            `${lat}, ${lng}`.includes(q)
+            code.includes(q) || lat.includes(q) || lng.includes(q) || `${lat}, ${lng}`.includes(q)
           )
         })
       }
@@ -556,18 +637,21 @@ export default defineComponent({
       this.alertTreeDialog = true
       this.$nextTick(() => {
         if (this.miniMapRef && (tree.lat || tree.latitude)) {
-          this.miniMapRef.focusOn(tree.lat || tree.latitude, tree.lng || tree.longitude)
+          this.miniMapRef.focusOn(
+            Number(tree.lat ?? tree.latitude),
+            Number(tree.lng ?? tree.longitude),
+          )
         }
       })
     },
 
-    formatDate(dateStr: any) {
+    formatDate(dateStr: string | Date | undefined) {
       if (!dateStr) return '-'
       const d = new Date(dateStr)
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
     },
 
-    formatDateFull(dateStr: any) {
+    formatDateFull(dateStr: string | Date | undefined) {
       if (!dateStr) return '-'
       const d = new Date(dateStr)
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -585,7 +669,7 @@ export default defineComponent({
       return '#388E3C'
     },
 
-    viewReportDetails(report: any) {
+    viewReportDetails(report: Pruning) {
       this.selectedReport = report
       this.reportDialog = true
     },
@@ -594,7 +678,7 @@ export default defineComponent({
 
     getSpecies() {
       this.$api
-        .get<any[]>('/species')
+        .get<CatalogSpecies[]>('/species')
         .then((response) => {
           this.species = response.data || []
           this.countSpecies = this.species.length
@@ -620,16 +704,20 @@ export default defineComponent({
       this.$api
         .get<Tree[]>('/trees')
         .then((response) => {
-          const allTrees = (response.data || []).map((t: any) => ({
+          const allTrees = (response.data || []).map((t) => ({
             ...t,
             lat: Number(t.lat ?? t.latitude ?? 0),
-            lng: Number(t.lng ?? t.longitude ?? 0)
+            lng: Number(t.lng ?? t.longitude ?? 0),
           }))
           this.trees = allTrees
           this.countTrees = allTrees.length
           // Conta árvores críticas (perigo de fiação ou status crítico)
-          this.countCritical = allTrees.filter((t: any) => t.status === 'TO_PRUNE' || t.status === 'CRITICAL').length
-          const prioritized = prioritizeTrees(allTrees).filter((item) => isTreeForPruning(item.tree))
+          this.countCritical = allTrees.filter(
+            (t) => t.status === 'TO_PRUNE' || t.status === 'CRITICAL',
+          ).length
+          const prioritized = prioritizeTrees(allTrees).filter((item) =>
+            isTreeForPruning(item.tree),
+          )
           this.filteredTrees = prioritized.map((item) => item.tree)
         })
         .catch((error: unknown) => console.error('Erro ao buscar árvores:', error))

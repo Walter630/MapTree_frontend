@@ -10,7 +10,8 @@ const snackbarTimeout = ref(2000)
 const email = ref('')
 
 function isValidEmail(value: string): boolean {
-  const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+  const re =
+    /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
   return re.test(String(value).toLowerCase())
 }
 
@@ -37,17 +38,23 @@ function cancel() {
   <v-container class="login-container" fluid>
     <v-row>
       <v-col cols="12">
-        <v-card class="form-card" flat style="max-width: 400px; margin: 0 auto;">
+        <v-card class="form-card" flat style="max-width: 400px; margin: 0 auto">
           <v-card-title>Recuperar Senha</v-card-title>
           <v-card-text class="text-center">
             <p>Insira o seu email cadastrado para receber o código de verificação.</p>
-            <v-text-field v-model="email" placeholder="Digite o email de registro" required :rules="[v => isValidEmail(v) || 'Email inválido']" />
+            <v-text-field
+              v-model="email"
+              placeholder="Digite o email de registro"
+              required
+              :rules="[(v) => isValidEmail(v) || 'Email inválido']"
+            />
 
-            <v-btn block color="#C6F513" :disabled="!email" @click="sendVerificationCode">Proximo <v-icon right>mdi-arrow-right</v-icon></v-btn>
-            <v-btn block color="black" style="margin-top: 10px;" @click="cancel">Cancelar</v-btn>
-
+            <v-btn block color="#C6F513" :disabled="!email" @click="sendVerificationCode"
+              >Proximo <v-icon right>mdi-arrow-right</v-icon></v-btn
+            >
+            <v-btn block color="black" style="margin-top: 10px" @click="cancel">Cancelar</v-btn>
           </v-card-text>
-          <div class="terms-privacy" style="margin-top: 20px; margin-bottom: 20px;">
+          <div class="terms-privacy" style="margin-top: 20px; margin-bottom: 20px">
             Termos e Condições
             <v-icon small>mdi-circle-small</v-icon>
             Política de Privacidade

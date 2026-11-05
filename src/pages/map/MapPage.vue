@@ -25,7 +25,9 @@ export default defineComponent({
 }
 
 @media (max-width: 1039px) {
-  .full-map-page { height: calc(100dvh - 56px); }
+  .full-map-page {
+    height: calc(100dvh - 56px);
+  }
 }
 
 /* Remove padding do v-main para esta página */

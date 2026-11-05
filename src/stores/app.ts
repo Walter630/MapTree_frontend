@@ -46,7 +46,7 @@ export const useAppStore = defineStore('app', {
     logout() {
       this.user = null
       // Limpa dados sensíveis se houver
-    }
+    },
   },
 
   /* ---------- Getters ---------- */

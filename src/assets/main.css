@@ -82,3 +82,58 @@
     min-height: calc(100dvh - 56px);
   }
 }
+
+/* Evita que conteúdos longos forcem a largura do layout de páginas. */
+.v-application__wrap,
+.v-main,
+.page-shell {
+  min-width: 0;
+}
+.page-header {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .page-shell .v-card-title,
+  .page-shell .v-card-subtitle {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .page-shell .v-card-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Superfícies suaves para a visão operacional dos dashboards. */
+.v-application .v-container.dash {
+  background: #e6ece7;
+}
+.v-application .v-container.dash .panel {
+  background: #f3f5ef;
+  border-color: #cdd8cf;
+  box-shadow: 0 2px 8px #294c3810;
+}
+.v-application .v-container.dash .panel-head {
+  background: #dfe9e1;
+  border-bottom-color: #cdd8cf;
+}
+.v-application .v-container.dash .kpi {
+  background: #edf3ed;
+  border-color: #c8d8cb;
+  border-top: 3px solid #6a9278;
+}
+.v-application .v-container.dash .kpi--danger {
+  background: #f5ebe6;
+  border-top-color: #bc7666;
+}
+.v-application .v-container.dash .catalog {
+  background: #eff3ed;
+  border-color: #cdd8cf;
+}
+.v-application .v-container.dash .catalog-header {
+  background: #dfe9e1;
+  border-radius: 16px 16px 0 0;
+}
+.v-application .v-container.dash .alert-row:hover {
+  background: #dfece1;
+}

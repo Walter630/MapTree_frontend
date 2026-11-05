@@ -85,18 +85,19 @@
                 <span>ou</span>
               </div>
 
-              <v-btn block class="mb-3 google-btn" size="large" @click="loginWithGoogle">
-                <img
-                  alt="Google Icon"
-                  class="mr-2"
-                  height="22"
-                  src="https://www.svgrepo.com/show/475656/google-color.svg"
-                  width="22"
-                />
-                Continuar com Google
-              </v-btn>
+              <div
+                v-if="googleEnabled"
+                ref="googleButton"
+                class="google-button-frame mb-3"
+                :class="{ 'google-button-frame--loading': loading }"
+                :aria-busy="loading"
+                aria-label="Entrar com Google"
+              />
+              <p v-if="!googleEnabled" class="social-hint mb-3">
+                Login com Google indisponível: configure o Client ID da aplicação.
+              </p>
 
-              <v-btn block class="mb-4 facebook-btn" size="large" @click="loginFacebook">
+              <v-btn block class="mb-4 facebook-btn" size="large" disabled @click="loginFacebook">
                 <img
                   class="mr-2"
                   height="20"
@@ -109,16 +110,11 @@
 
               <div class="text-center mt-6">
                 Não possui uma conta?
-                <a
-                  class="register-link"
-                  @click="$router.push('/register')"
-                  >Cadastre-se</a>
+                <a class="register-link" @click="$router.push('/register')">Cadastre-se</a>
               </div>
             </v-form>
           </div>
         </div>
-
-
 
         <!-- Termos no rodapé -->
         <div class="terms-footer">
@@ -148,6 +144,7 @@
 import { defineComponent } from 'vue'
 import facebookLogo from '@/assets/facebook-logo.png'
 import { type LoginRequest, type LoginResponse } from '@/plugins/apiConnect.ts'
+import { isGoogleAuthEnabled, renderGoogleButton } from '@/plugins/googleAuth'
 
 export default defineComponent({
   name: 'LoginComponent',
@@ -159,6 +156,8 @@ export default defineComponent({
       valid: false,
       isMobile: false,
       loading: false,
+      isUnmounted: false,
+      googleButtonCleanup: null as (() => void) | null,
       feedback: {
         show: false,
         message: '',
@@ -169,9 +168,12 @@ export default defineComponent({
   mounted() {
     this.checkIsMobile()
     window.addEventListener('resize', this.checkIsMobile)
+    void this.mountGoogleButton()
   },
   beforeUnmount() {
     window.removeEventListener('resize', this.checkIsMobile)
+    this.isUnmounted = true
+    this.googleButtonCleanup?.()
   },
   methods: {
     checkIsMobile() {
@@ -181,6 +183,21 @@ export default defineComponent({
       this.feedback.message = message
       this.feedback.type = type
       this.feedback.show = true
+    },
+    async mountGoogleButton() {
+      if (!this.googleEnabled) return
+      const container = this.$refs.googleButton as HTMLElement | undefined
+      if (!container) return
+      try {
+        const cleanup = await renderGoogleButton(container, (credential) => {
+          void this.loginWithGoogle(credential)
+        })
+        if (this.isUnmounted) cleanup()
+        else this.googleButtonCleanup = cleanup
+      } catch (error) {
+        console.error('Google button initialization failed:', error)
+        this.notify(this.getLoginErrorMessage(error))
+      }
     },
     async login() {
       // Limpa feedback anterior
@@ -218,6 +235,12 @@ export default defineComponent({
       const err = error as {
         response?: { status?: number; data?: { message?: string | string[] } }
         code?: string
+        isAxiosError?: boolean
+      }
+
+      // Erros do fluxo do Google (sem resposta HTTP): indisponível/cancelado.
+      if (!err.response && !err.isAxiosError && error instanceof Error) {
+        return error.message
       }
 
       // Sem resposta do servidor (offline / API fora do ar)
@@ -231,7 +254,10 @@ export default defineComponent({
 
       // Mensagens mais amigáveis para os casos comuns
       if (status === 401 || status === 400) {
-        return 'E-mail ou senha incorretos. Verifique seus dados e tente novamente.'
+        return (
+          msgText ||
+          'Credenciais rejeitadas. E-mail ou senha incorretos — verifique seus dados e tente novamente.'
+        )
       }
       if (status === 404) {
         return 'E-mail não cadastrado.'
@@ -245,13 +271,32 @@ export default defineComponent({
 
       return msgText || 'Não foi possível fazer login. Tente novamente.'
     },
-    loginWithGoogle() {
-      // Lógica de login com Google aqui
-      console.log('Login com Google')
+    async loginWithGoogle(credential: string) {
+      this.feedback.show = false
+
+      if (!credential || this.loading) {
+        return
+      }
+
+      this.loading = true
+      try {
+        // O backend precisa validar a credencial e emitir a sessão MapTree.
+        const response = await this.$api.post<LoginResponse>('/auth/google', { credential })
+
+        if (response.data) {
+          this.$api.setToken(response.data.accessToken)
+          this.$store.setUser(response.data.user)
+          this.$router.push(`/${response.data.user.role.toLowerCase()}`)
+        }
+      } catch (error) {
+        console.error('Google login failed:', error)
+        this.notify(this.getLoginErrorMessage(error))
+      } finally {
+        this.loading = false
+      }
     },
     loginFacebook() {
-      // Lógica de login com Facebook aqui
-      console.log('Login com Facebook')
+      this.notify('Login com Facebook indisponível no momento.')
     },
     showTerms() {
       console.log('Mostrar Termos e Condições')
@@ -265,6 +310,9 @@ export default defineComponent({
   computed: {
     getFacebookLogo() {
       return facebookLogo
+    },
+    googleEnabled(): boolean {
+      return isGoogleAuthEnabled()
     },
   },
 })
@@ -428,6 +476,14 @@ export default defineComponent({
   letter-spacing: 0.3px;
 }
 
+/* Dica abaixo dos botões sociais indisponíveis */
+.social-hint {
+  font-size: 0.8rem;
+  color: #888;
+  text-align: center;
+  margin-top: -4px;
+}
+
 /* Ajustes nos botões sociais */
 .google-btn {
   background-color: #fff !important;
@@ -435,6 +491,20 @@ export default defineComponent({
   color: #333 !important;
   text-transform: none !important;
   font-weight: 500 !important;
+}
+
+.google-button-frame {
+  display: flex;
+  min-height: 44px;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+  transition: opacity 0.2s ease;
+}
+
+.google-button-frame--loading {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .facebook-btn {

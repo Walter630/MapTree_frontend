@@ -2,7 +2,12 @@
   <!-- ===== Desktop AppBar ===== -->
   <v-app-bar v-if="!isMobile" color="white" flat height="68" class="appbar-desktop">
     <div class="appbar-content">
-      <button type="button" class="logo-container" aria-label="Ir para o painel inicial" @click="goToHome()">
+      <button
+        type="button"
+        class="logo-container"
+        aria-label="Ir para o painel inicial"
+        @click="goToHome()"
+      >
         <img :src="logoSrc" alt="Logo MapTree" class="logo-img" @error="onLogoError" />
       </button>
 
@@ -18,7 +23,12 @@
               :aria-current="isActive(item.to) ? 'page' : undefined"
               @click="goTo(item.to)"
             >
-              <v-icon size="21" class="nav-icon-3d" :color="isActive(item.to) ? green : 'grey-darken-2'">{{ item.icon }}</v-icon>
+              <v-icon
+                size="21"
+                class="nav-icon-3d"
+                :color="isActive(item.to) ? green : 'grey-darken-2'"
+                >{{ item.icon }}</v-icon
+              >
               <span class="nav-label">{{ item.title }}</span>
             </v-btn>
           </template>
@@ -44,7 +54,12 @@
 
         <v-menu min-width="230px">
           <template #activator="{ props }">
-            <v-btn v-bind="props" variant="text" class="user-menu-trigger text-none" aria-label="Abrir menu do usuário">
+            <v-btn
+              v-bind="props"
+              variant="text"
+              class="user-menu-trigger text-none"
+              aria-label="Abrir menu do usuário"
+            >
               <v-avatar size="36" class="user-avatar">
                 <img src="@/assets/Logomaptreeverde.png" alt="" class="avatar-img" />
               </v-avatar>
@@ -61,8 +76,23 @@
               <p class="text-subtitle-2 font-weight-bold mb-0">{{ user?.name || 'Usuário' }}</p>
               <p class="text-caption mt-1 mb-3">{{ user?.email }}</p>
               <v-divider class="mb-2" />
-              <v-btn block variant="text" prepend-icon="mdi-account-edit" class="text-none" @click="editAccount">Editar perfil</v-btn>
-              <v-btn block variant="text" color="error" prepend-icon="mdi-logout" class="text-none" @click="logout">Sair da conta</v-btn>
+              <v-btn
+                block
+                variant="text"
+                prepend-icon="mdi-account-edit"
+                class="text-none"
+                @click="editAccount"
+                >Editar perfil</v-btn
+              >
+              <v-btn
+                block
+                variant="text"
+                color="error"
+                prepend-icon="mdi-logout"
+                class="text-none"
+                @click="logout"
+                >Sair da conta</v-btn
+              >
             </v-card-text>
           </v-card>
         </v-menu>
@@ -85,8 +115,13 @@
         <img
           src="@/assets/LogomaptreeHeaderpng.png"
           alt="Logo MapTree"
-          style="height: 40px; max-width: 100%;"
-          @click="goToHome(); drawer = false"
+          style="height: 40px; max-width: 100%"
+          @click="
+            () => {
+              goToHome()
+              drawer = false
+            }
+          "
         />
       </div>
 
@@ -100,20 +135,19 @@
           :title="item.title"
           :active="isActive(item.to)"
           :color="isActive(item.to) ? 'green-darken-1' : undefined"
-          @click="goTo(item.to); drawer = false"
+          @click="
+            () => {
+              goTo(item.to)
+              drawer = false
+            }
+          "
           class="mb-1"
         />
       </v-list>
 
       <template v-slot:append>
         <div class="pa-4">
-          <v-btn
-            block
-            variant="tonal"
-            color="grey"
-            prepend-icon="mdi-logout"
-            @click="logout"
-          >
+          <v-btn block variant="tonal" color="grey" prepend-icon="mdi-logout" @click="logout">
             Sair
           </v-btn>
         </div>
@@ -121,27 +155,14 @@
     </v-navigation-drawer>
 
     <!-- AppBar Mobile -->
-    <v-app-bar
-      color="white"
-      flat
-      class="appbar-mobile"
-      elevation="1"
-    >
-      <v-btn
-        icon
-        variant="text"
-        @click="drawer = !drawer"
-      >
+    <v-app-bar color="white" flat class="appbar-mobile" elevation="1">
+      <v-btn icon variant="text" @click="drawer = !drawer">
         <v-icon>mdi-menu</v-icon>
       </v-btn>
 
       <!-- Logo centralizada -->
       <div class="logo-mobile" @click="goToHome()">
-        <img
-          src="@/assets/LogomaptreeHeaderpng.png"
-          alt="MapTree"
-          style="height: 32px;"
-        />
+        <img src="@/assets/LogomaptreeHeaderpng.png" alt="MapTree" style="height: 32px" />
       </div>
 
       <v-spacer />
@@ -203,6 +224,7 @@ const MENUS: Record<string, MenuItem[]> = {
   ],
   USER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
+    { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/user/trees/new' },
     { title: 'Podas', icon: 'mdi-content-cut', to: '/user/podas' },
     { title: 'Rota do dia', icon: 'mdi-map-marker-path', to: '/user/routes/daily' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
@@ -348,7 +370,9 @@ export default {
   overflow-x: auto;
   scrollbar-width: none;
 }
-.desktop-nav::-webkit-scrollbar { display: none; }
+.desktop-nav::-webkit-scrollbar {
+  display: none;
+}
 .nav-item {
   min-width: 0;
   border-radius: 10px;
@@ -361,9 +385,14 @@ export default {
 }
 .nav-icon-3d {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.16));
-  transition: filter 0.2s ease, transform 0.2s ease;
+  transition:
+    filter 0.2s ease,
+    transform 0.2s ease;
 }
-.nav-icon-3d:hover { filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22)); transform: translateY(-1px); }
+.nav-icon-3d:hover {
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22));
+  transform: translateY(-1px);
+}
 .appbar-actions {
   display: flex;
   align-items: center;
@@ -381,31 +410,89 @@ export default {
   background: transparent;
   cursor: pointer;
 }
-.logo-img { max-width: 146px; max-height: 46px; object-fit: contain; filter: saturate(1.2) brightness(1.03); transition: transform 0.2s; }
-.logo-img:hover { transform: scale(1.03); }
-.user-menu-trigger { display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 10px; }
-.user-menu-trigger:hover { background: #f6f8f0; }
-.user-avatar { background-color: #c1e328; }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; }
-.user-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; color: #1f2933; }
+.logo-img {
+  max-width: 146px;
+  max-height: 46px;
+  object-fit: contain;
+  filter: saturate(1.2) brightness(1.03);
+  transition: transform 0.2s;
+}
+.logo-img:hover {
+  transform: scale(1.03);
+}
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+.user-menu-trigger:hover {
+  background: #f6f8f0;
+}
+.user-avatar {
+  background-color: #c1e328;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  color: #1f2933;
+}
 
-.mobile-drawer { z-index: 1400 !important; }
-.appbar-mobile { z-index: 1200 !important; border-bottom: 1px solid #e8edda !important; }
-.logo-mobile { display: flex; align-items: center; cursor: pointer; }
+.mobile-drawer {
+  z-index: 1400 !important;
+}
+.appbar-mobile {
+  z-index: 1200 !important;
+  border-bottom: 1px solid #e8edda !important;
+}
+.logo-mobile {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
 
 @media (max-width: 1280px) {
-  .appbar-content { padding: 0 14px; gap: 8px; }
-  .desktop-nav { justify-content: flex-start; }
-  .nav-label { display: none; }
-  .nav-item { padding: 0 9px; }
-  .logo-container { width: 125px; }
-  .logo-img { max-width: 125px; }
-  .user-name { max-width: 100px; }
+  .appbar-content {
+    padding: 0 14px;
+    gap: 8px;
+  }
+  .desktop-nav {
+    justify-content: flex-start;
+  }
+  .nav-label {
+    display: none;
+  }
+  .nav-item {
+    padding: 0 9px;
+  }
+  .logo-container {
+    width: 125px;
+  }
+  .logo-img {
+    max-width: 125px;
+  }
+  .user-name {
+    max-width: 100px;
+  }
 }
 
 @media (max-width: 420px) {
-  .appbar-mobile :deep(.v-toolbar__content) { padding: 0 8px; }
-  .logo-mobile img { max-width: 140px; height: 30px !important; object-fit: contain; }
+  .appbar-mobile :deep(.v-toolbar__content) {
+    padding: 0 8px;
+  }
+  .logo-mobile img {
+    max-width: 140px;
+    height: 30px !important;
+    object-fit: contain;
+  }
 }
 </style>
-
