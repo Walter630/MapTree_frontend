@@ -1,3 +1,4 @@
+import { apiConnect } from '@/plugins/apiConnect'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -35,6 +36,7 @@ describe('router role guard', () => {
   beforeEach(() => {
     mockStore.user = { role: 'USER' }
     mockStore.logout.mockClear()
+    vi.mocked(apiConnect.isAuthenticated).mockReturnValue(true)
     vi.resetModules()
   })
 
@@ -66,6 +68,28 @@ describe('router role guard', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.path).toBe('/user/reports')
+    expect(mockStore.logout).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    '/admin',
+    '/manager/routes/daily',
+    '/user/podas',
+    '/edit-account',
+    '/nova-pagina',
+    '/dashboard-previews',
+  ])('exige sessão em %s', async (path) => {
+    vi.mocked(apiConnect.isAuthenticated).mockReturnValue(false)
+    const { default: router } = await import('../index')
+    await router.push(path)
+    expect(router.currentRoute.value.path).toBe('/login')
+  })
+  it('falha fechada quando não consegue validar o perfil da sessão', async () => {
+    mockStore.user = null
+    vi.mocked(apiConnect.get).mockRejectedValue(new Error('offline'))
+    const { default: router } = await import('../index')
+    await router.push('/admin')
+    expect(router.currentRoute.value.path).toBe('/login')
     expect(mockStore.logout).not.toHaveBeenCalled()
   })
 })

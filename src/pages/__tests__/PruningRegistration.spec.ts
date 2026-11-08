@@ -107,7 +107,7 @@ describe('PruningRegistration', () => {
     expect(payload).toMatchObject({
       idTree: 'tree-0001',
       type: 'LIGHT',
-      date: '2024-05-10',
+      date: '2024-05-10T12:00:00-03:00',
       observations: 'Limpeza básica',
     })
   })

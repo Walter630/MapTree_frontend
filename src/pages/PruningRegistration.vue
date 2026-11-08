@@ -10,6 +10,15 @@
       ]"
     />
 
+    <v-alert type="info" variant="tonal" class="mb-5"
+      >Está atendendo uma rota? Registre o serviço na própria parada, com a árvore já
+      selecionada.<v-btn
+        class="ml-2"
+        variant="text"
+        :to="`${route.path.startsWith('/admin') ? '/admin' : route.path.startsWith('/manager') ? '/manager' : '/user'}/routes/daily`"
+        >Abrir rota diária</v-btn
+      ></v-alert
+    >
     <v-row>
       <!-- Formulário Principal -->
       <v-col cols="12" lg="8">
@@ -28,7 +37,7 @@
               <!-- Árvore -->
               <v-col cols="12" md="6">
                 <label class="field-label">Árvore <span class="required">*</span></label>
-                <v-select
+                <v-autocomplete
                   v-model="form.idTree"
                   :items="trees"
                   item-title="displayName"
@@ -101,8 +110,8 @@
               }}</span>
             </div>
             <div class="text-caption text-grey-darken-1 ml-7">
-              Lat: {{ Number(selectedTree.latitude).toFixed(4) }}<br />
-              Lng: {{ Number(selectedTree.longitude).toFixed(4) }}
+              Identificação: {{ selectedTree.id }}<br />
+              {{ treeCoordinates(selectedTree) }}
             </div>
           </div>
 
@@ -175,12 +184,14 @@
 <script setup lang="ts">
 import type { TreeApiRecord } from '@/types/treeApi'
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { localDate, treeIdentity, treeCoordinates } from '@/utils/pruningWorkflow'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
 import { getApiErrorMessage } from '@/utils/apiError'
 
 const router = useRouter()
+const route = useRoute()
 
 // Refs
 const formRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
@@ -198,7 +209,7 @@ const loadingTrees = ref(true)
 const form = ref({
   idTree: '',
   type: '',
-  date: new Date().toISOString().split('T')[0],
+  date: localDate(),
   observations: '',
 })
 
@@ -238,10 +249,13 @@ const loadTrees = async () => {
     const response = await apiConnect.get<TreeApiRecord[]>('/trees')
     trees.value = (response.data || []).map((tree) => ({
       ...tree,
-      displayName: tree.species?.commonName
-        ? `${tree.species.commonName} (#${tree.id.slice(-4)})`
-        : `Árvore #${tree.id.slice(-4)}`,
+      displayName: `${treeIdentity(tree)} · ${treeCoordinates(tree)}`,
     }))
+    if (
+      typeof route.query.treeId === 'string' &&
+      trees.value.some((tree) => tree.id === route.query.treeId)
+    )
+      form.value.idTree = route.query.treeId
   } catch (error) {
     console.error('Erro ao carregar árvores:', error)
   } finally {
@@ -250,6 +264,7 @@ const loadTrees = async () => {
 }
 
 const submit = async () => {
+  if (submitting.value) return
   showValidation.value = true
 
   const validation = await formRef.value?.validate()
@@ -261,7 +276,7 @@ const submit = async () => {
     await apiConnect.post('/pruning', {
       idTree: form.value.idTree,
       type: form.value.type,
-      date: form.value.date,
+      date: `${form.value.date}T12:00:00-03:00`,
       observations: form.value.observations,
     })
 

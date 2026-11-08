@@ -38,7 +38,10 @@ export function isValidGeoPoint(latitude: unknown, longitude: unknown): latitude
   )
 }
 
-function categoryFor(tree: TreeDensityInput, dimension: TreeDensityDimension): string {
+export function getTreeDensityCategory(
+  tree: TreeDensityInput,
+  dimension: TreeDensityDimension,
+): string {
   switch (dimension) {
     case 'species':
       return tree.speciesName?.trim() || 'Espécie não identificada'
@@ -61,6 +64,30 @@ function categoryFor(tree: TreeDensityInput, dimension: TreeDensityDimension): s
 
 export function estimateCrownAreaM2(canopyWidthMeters: number): number {
   return Math.PI * (canopyWidthMeters / 2) ** 2
+}
+
+export function getTreeDensityHeatPoints(
+  trees: readonly TreeDensityInput[],
+  dimension: TreeDensityDimension,
+  selectedCategory = 'all',
+): [latitude: number, longitude: number, intensity: number][] {
+  const points: [number, number, number][] = []
+  for (const tree of trees) {
+    if (!isValidGeoPoint(tree.latitude, tree.longitude)) continue
+    if (selectedCategory !== 'all' && getTreeDensityCategory(tree, dimension) !== selectedCategory)
+      continue
+
+    const intensity =
+      dimension === 'nests'
+        ? Number(tree.nestCount)
+        : dimension === 'canopy'
+          ? estimateCrownAreaM2(Math.max(0, Number(tree.canopyWidthMeters)))
+          : 1
+    if (Number.isFinite(intensity) && intensity > 0) {
+      points.push([tree.latitude, tree.longitude, intensity])
+    }
+  }
+  return points
 }
 
 export function buildTreeDensityCells(
@@ -107,7 +134,7 @@ export function buildTreeDensityCells(
   for (const tree of trees) {
     const { latitude, longitude } = tree
     if (!isValidGeoPoint(latitude, longitude)) continue
-    const category = categoryFor(tree, dimension)
+    const category = getTreeDensityCategory(tree, dimension)
     if (selectedCategory !== 'all' && category !== selectedCategory) continue
     if (dimension === 'nests' && (!Number.isFinite(tree.nestCount) || Number(tree.nestCount) <= 0))
       continue
@@ -215,7 +242,7 @@ export function getTreeDensityCategories(
             dimension !== 'canopy' ||
             (Number.isFinite(tree.canopyWidthMeters) && Number(tree.canopyWidthMeters) > 0),
         )
-        .map((tree) => categoryFor(tree, dimension)),
+        .map((tree) => getTreeDensityCategory(tree, dimension)),
     ),
   ].sort((a, b) => a.localeCompare(b))
 }
@@ -225,7 +252,7 @@ export function countTreesBySpecies(
 ): Array<{ name: string; count: number }> {
   const counts = new Map<string, number>()
   for (const tree of trees) {
-    const name = tree.speciesName?.trim() || 'Espécie não identificada'
+    const name = getTreeDensityCategory(tree, 'species')
     counts.set(name, (counts.get(name) || 0) + 1)
   }
   return [...counts.entries()]

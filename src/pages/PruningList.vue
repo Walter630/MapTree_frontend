@@ -2,8 +2,8 @@
   <v-container fluid class="page-shell">
     <PageHeader
       title="Podas"
-      subtitle="Gerencie Todas As Podas De Vegetação Próxima À Rede Elétrica"
-      :breadcrumbs="[{ text: 'Meu Painel', to: '/user' }, { text: '#Podas' }]"
+      subtitle="Consulte o serviço realizado, a árvore atendida e a parada da rota."
+      :breadcrumbs="[{ text: 'Meu Painel', to: homeBase }, { text: '#Podas' }]"
     />
 
     <!-- Botão Nova Poda -->
@@ -14,7 +14,7 @@
       elevation="0"
       @click="createPruning"
     >
-      Nova Poda
+      Registrar poda pela rota
     </v-btn>
 
     <!-- Cards de Resumo -->
@@ -30,27 +30,27 @@
         </v-card>
       </v-col>
       <v-col cols="6" md="4">
-        <v-card class="kpi-card" :class="{ 'kpi-card--warning': stats.pending > 0 }" flat>
+        <v-card class="kpi-card" :class="{ 'kpi-card--warning': stats.uniqueTrees > 0 }" flat>
           <div class="kpi-header">
-            <span class="kpi-label">Pendentes</span>
-            <v-icon size="20" :color="stats.pending > 0 ? 'warning' : 'grey'"
+            <span class="kpi-label">Árvores atendidas</span>
+            <v-icon size="20" :color="stats.uniqueTrees > 0 ? 'warning' : 'grey'"
               >mdi-clock-alert</v-icon
             >
           </div>
-          <div class="kpi-value" :class="{ 'text-warning': stats.pending > 0 }">
-            {{ stats.pending }}
+          <div class="kpi-value" :class="{ 'text-warning': stats.uniqueTrees > 0 }">
+            {{ stats.uniqueTrees }}
           </div>
-          <div class="kpi-subtitle">Aguardando</div>
+          <div class="kpi-subtitle">Árvores distintas</div>
         </v-card>
       </v-col>
       <v-col cols="12" md="4">
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
-            <span class="kpi-label">Taxa de Conclusão</span>
+            <span class="kpi-label">Últimos 30 dias</span>
             <v-icon size="20" color="success">mdi-check-circle</v-icon>
           </div>
-          <div class="kpi-value text-success">{{ stats.completionRate }}%</div>
-          <div class="kpi-subtitle">{{ stats.completed }} concluídas</div>
+          <div class="kpi-value text-success">{{ stats.recent }}</div>
+          <div class="kpi-subtitle">Serviços registrados no período</div>
         </v-card>
       </v-col>
     </v-row>
@@ -81,7 +81,7 @@
           <div class="d-flex align-center">
             <v-icon size="18" color="green-darken-2" class="mr-2">mdi-tree</v-icon>
             <span class="text-body-2">
-              {{ item.tree?.species?.commonName || 'Árvore #' + (item.idTree?.slice(-4) || '—') }}
+              {{ treeDisplayName(item) }}
             </span>
           </div>
         </template>
@@ -161,6 +161,19 @@
         </header>
 
         <v-card-text class="details-content">
+          <v-alert v-if="selectedPruning.schedule" type="info" variant="tonal" class="mb-4">
+            Parada {{ selectedPruning.schedule.routeOrder || '—' }} da rota de
+            {{ formatDate(selectedPruning.schedule.plannedDate) }}.
+            <v-btn
+              variant="text"
+              size="small"
+              :to="`${homeBase}/routes/daily?date=${new Date(selectedPruning.schedule.plannedDate).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })}`"
+              >Ver rota</v-btn
+            >
+          </v-alert>
+          <p v-if="selectedPruning.user?.name" class="mb-4 text-body-2">
+            Serviço registrado por {{ selectedPruning.user.name }}.
+          </p>
           <section class="details-section" aria-labelledby="pruning-info-heading">
             <h3 id="pruning-info-heading" class="details-section__title">
               Informações do registro
@@ -245,11 +258,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
 
 const router = useRouter()
+const route = useRoute()
+const homeBase = computed(() =>
+  route.path.startsWith('/admin')
+    ? '/admin'
+    : route.path.startsWith('/manager')
+      ? '/manager'
+      : '/user',
+)
 
 // State
 const prunings = ref<PruningRecord[]>([])
@@ -272,6 +293,8 @@ interface PruningRecord {
   date?: string | Date | null
   observations?: string | null
   tree?: TreeLocation | null
+  user?: { id?: string; name?: string }
+  schedule?: { id: string; plannedDate: string; routeOrder?: number } | null
 }
 
 // Headers da tabela
@@ -287,15 +310,16 @@ const headers = [
 // Stats computadas
 const stats = computed(() => {
   const total = prunings.value.length
-  const completed = prunings.value.filter((p) => p.type === 'HEAVY').length // HEAVY = poda completa
-  const pending = total - completed
-  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0
-
-  return { total, completed, pending, completionRate }
+  const uniqueTrees = new Set(prunings.value.map((record) => record.idTree).filter(Boolean)).size
+  const since = Date.now() - 30 * 86400000
+  const recent = prunings.value.filter(
+    (record) => record.date && new Date(record.date).getTime() >= since,
+  ).length
+  return { total, uniqueTrees, recent }
 })
 
 // Métodos
-const createPruning = () => router.push('/user/podas/nova')
+const createPruning = () => router.push(`${homeBase.value}/routes/daily`)
 
 const viewDetails = (item: PruningRecord) => {
   selectedPruning.value = item
@@ -344,9 +368,8 @@ const coordinatesDisplay = (tree?: TreeLocation | null) =>
 
 const treeDisplayName = (pruning: PruningRecord) => {
   const commonName = pruning.tree?.species?.commonName?.trim()
-  if (commonName) return commonName
   const id = pruning.idTree?.trim()
-  return id ? `Árvore #${id.slice(-4)}` : 'Árvore sem identificação'
+  return `${commonName || 'Árvore'}${id ? ` · #${id}` : ' · identificação não informada'}`
 }
 
 const observationDisplay = (observations?: string | null) =>
@@ -355,8 +378,15 @@ const observationDisplay = (observations?: string | null) =>
 const loadPrunings = async () => {
   loading.value = true
   try {
-    const response = await apiConnect.get<PruningRecord[]>('/pruning')
-    prunings.value = response.data || []
+    const records: PruningRecord[] = []
+    for (let page = 1; ; page++) {
+      const { data } = await apiConnect.get<PruningRecord[]>('/pruning', {
+        params: { page, limit: 100 },
+      })
+      records.push(...data)
+      if (data.length < 100) break
+    }
+    prunings.value = records
   } catch (error: unknown) {
     console.error('Erro ao carregar podas:', error)
     const apiError = error as { response?: { data?: { message?: string } } }

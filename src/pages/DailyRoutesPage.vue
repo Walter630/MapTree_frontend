@@ -5,6 +5,13 @@ import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { apiConnect } from '@/plugins/apiConnect'
 import PageHeader from '@/components/shared/PageHeader.vue'
+import PruningExecutionDialog from '@/components/pruning/PruningExecutionDialog.vue'
+import {
+  localDate,
+  pruningTypeLabel,
+  treeCoordinates,
+  type RoutePruning,
+} from '@/utils/pruningWorkflow'
 import {
   prioritizeTrees,
   urgencyColor,
@@ -25,17 +32,90 @@ interface RouteStop {
   id: string
   order: number
   tree: Tree
+  scheduleId?: string
+  status?: string
+  pruning?: RoutePruning
 }
 
 const route = useRoute()
 const router = useRouter()
-const isManager = computed(() => route.path.startsWith('/manager'))
+const homeBase = computed(() =>
+  route.path.startsWith('/admin')
+    ? '/admin'
+    : route.path.startsWith('/manager')
+      ? '/manager'
+      : '/user',
+)
 const trees = ref<Tree[]>([])
 const routeStops = ref<RouteStop[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const feedback = ref('')
+const planning = ref(true)
+const pruningDialog = ref(false)
+const activeStop = ref<RouteStop | null>(null)
+const completedCount = computed(
+  () => routeStops.value.filter((stop) => stop.status === 'COMPLETED').length,
+)
+const nextPendingStop = computed(() => routeStops.value.find((stop) => stop.status !== 'COMPLETED'))
+const hasNextStop = computed(() =>
+  routeStops.value.some((stop) => stop.id !== activeStop.value?.id && stop.status !== 'COMPLETED'),
+)
+interface ServerStop {
+  id: string
+  treeId: string
+  routeOrder?: number
+  status: string
+  tree: Tree
+  prunings?: RoutePruning[]
+  userId?: string
+  type: string
+}
+
+function startPruning(stop: RouteStop) {
+  if (stop.status === 'COMPLETED') return
+  activeStop.value = stop
+  pruningDialog.value = true
+}
+function pruningSaved(pruning: RoutePruning, next: boolean) {
+  const stop = activeStop.value
+  if (!stop) return
+  stop.status = 'COMPLETED'
+  stop.pruning = pruning
+  feedback.value = `Poda salva para a árvore #${stop.id}. ${completedCount.value} de ${routeStops.value.length} paradas concluídas.`
+  activeStop.value = null
+  if (next && nextPendingStop.value) {
+    const upcoming = nextPendingStop.value
+    nextTick(() => startPruning(upcoming))
+  }
+}
+async function loadServerRoute() {
+  const requestedDate = filters.date
+  try {
+    const { data } = await apiConnect.get<ServerStop[]>('/scheduling', {
+      params: { date: requestedDate, mine: 'true' },
+    })
+    if (requestedDate !== filters.date) return
+    const stops = data.filter((stop) => stop.type === 'PRUNING' && stop.status !== 'CANCELLED')
+    if (stops.length) {
+      routeStops.value = stops.map((stop, index) => ({
+        id: stop.treeId,
+        order: stop.routeOrder || index + 1,
+        tree: stop.tree,
+        scheduleId: stop.id,
+        status: stop.status,
+        pruning: stop.prunings?.[0],
+      }))
+      syncState.value = 'server'
+      planning.value = false
+    }
+  } catch {
+    errorMessage.value =
+      'Não foi possível conferir a rota e as podas no servidor. Atualize antes de registrar um serviço.'
+  }
+}
+
 // Estado de sincronização da rota salva:
 // - 'idle': ainda não salvou nesta sessão
 // - 'local': salvo apenas neste dispositivo (snapshot), sem servidor ainda
@@ -43,7 +123,10 @@ const feedback = ref('')
 // - 'server': todas as paradas confirmadas no servidor
 const syncState = ref<'idle' | 'local' | 'pending' | 'server'>('idle')
 const filters = reactive({
-  date: new Date().toISOString().slice(0, 10),
+  date:
+    typeof route.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date)
+      ? route.query.date
+      : localDate(),
   urgency: 'ALL',
   search: '',
 })
@@ -122,13 +205,14 @@ function treeName(item: PrioritizedTree<Tree>) {
 }
 
 function coordinates(tree: Tree) {
-  return `${Number(tree.latitude ?? tree.lat ?? 0).toFixed(5)}, ${Number(tree.longitude ?? tree.lng ?? 0).toFixed(5)}`
+  return treeCoordinates(tree)
 }
 
 function toggleTree(item: PrioritizedTree<Tree>) {
+  if (saving.value) return
   const index = routeStops.value.findIndex((stop) => stop.id === item.tree.id)
   if (index >= 0) {
-    routeStops.value.splice(index, 1)
+    void removeStop(index)
   } else {
     routeStops.value.push({ id: item.tree.id, order: routeStops.value.length + 1, tree: item.tree })
   }
@@ -136,6 +220,7 @@ function toggleTree(item: PrioritizedTree<Tree>) {
 }
 
 function addAllFiltered() {
+  if (saving.value) return
   const existing = new Set(routeStops.value.map((stop) => stop.id))
   filteredTrees.value.forEach((item) => {
     if (!existing.has(item.tree.id))
@@ -148,7 +233,20 @@ function addAllFiltered() {
   normalizeOrder()
 }
 
-function removeStop(index: number) {
+async function removeStop(index: number) {
+  const stop = routeStops.value[index]
+  if (!stop || saving.value || stop.status === 'COMPLETED') return
+  if (stop.scheduleId) {
+    saving.value = true
+    try {
+      await apiConnect.patch(`/scheduling/${stop.scheduleId}/status`, { status: 'CANCELLED' })
+    } catch {
+      feedback.value = 'Não foi possível remover a parada. Tente novamente.'
+      return
+    } finally {
+      saving.value = false
+    }
+  }
   routeStops.value.splice(index, 1)
   normalizeOrder()
 }
@@ -194,6 +292,7 @@ async function loadTrees() {
     const response = await apiConnect.get<Tree[]>('/trees')
     trees.value = response.data || []
     loadLocalRoute()
+    await loadServerRoute()
   } catch {
     errorMessage.value =
       'Não foi possível carregar as árvores. Verifique sua conexão e tente novamente.'
@@ -208,6 +307,7 @@ async function saveRoute() {
     return
   }
 
+  if (saving.value) return
   saving.value = true
   feedback.value = ''
   syncState.value = 'local'
@@ -232,19 +332,27 @@ async function saveRoute() {
   // que exige treeId SINGULAR e descarta campos não declarados (treeIds/stops/status)
   // por causa do ValidationPipe com whitelist. O payload antigo (treeIds/stops) caía
   // em 400 sempre. Por isso enviamos UMA solicitação de agendamento POR PARADA.
-  // A data planejada vira um ISO com horário fixo (08:00) para satisfazer @IsDate.
-  const plannedDate = new Date(`${filters.date}T08:00:00`).toISOString()
+  // Dia planejado no fuso da operação.
+  const plannedDate = new Date(`${filters.date}T08:00:00-03:00`).toISOString()
   const results = await Promise.allSettled(
     routeStops.value.map((stop) =>
-      apiConnect.post('/scheduling', {
+      apiConnect.post<ServerStop>('/scheduling', {
         treeId: stop.id,
         type: 'PRUNING',
         plannedDate,
         notes: `Rota diária ordem ${stop.order}`,
+        routeOrder: stop.order,
       }),
     ),
   )
 
+  results.forEach((result, index) => {
+    const stop = routeStops.value[index]
+    if (result.status === 'fulfilled' && stop) {
+      stop.scheduleId = result.value.data.id
+      stop.status = result.value.data.status
+    }
+  })
   const failed = results.filter((r) => r.status === 'rejected').length
   saving.value = false
 
@@ -252,7 +360,9 @@ async function saveRoute() {
   // Qualquer falha mantém o estado "pendente de sincronização" e permite nova tentativa.
   if (failed === 0) {
     syncState.value = 'server'
-    feedback.value = 'Rota confirmada no servidor e disponível no mapa.'
+    planning.value = false
+    feedback.value =
+      'Rota salva. Use Registrar poda na parada atendida; a árvore já está selecionada.'
   } else {
     syncState.value = 'pending'
     const total = routeStops.value.length
@@ -263,7 +373,7 @@ async function saveRoute() {
 
 function openRouteOnMap() {
   router.push({
-    path: isManager.value ? '/manager/map' : '/user/mapUser',
+    path: homeBase.value === '/user' ? '/user/mapUser' : `${homeBase.value}/map`,
     query: { routeDate: filters.date },
   })
 }
@@ -358,15 +468,23 @@ function renderRouteOnMiniMap() {
     L.polyline(points, { color: '#1565c0', weight: 4, opacity: 0.7 }).addTo(routeLayer)
   }
 
-  // Marcadores numerados
-  points.forEach((p, index) => {
+  // O número corresponde à parada original, mesmo quando há coordenadas ausentes.
+  routeStops.value.forEach((stop) => {
+    const lat = Number(stop.tree.latitude ?? stop.tree.lat)
+    const lng = Number(stop.tree.longitude ?? stop.tree.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
     const marker = L.divIcon({
       className: 'route-stop-pin',
-      html: `<span>${index + 1}</span>`,
+      html: `<span style="background:${stop.status === 'COMPLETED' ? '#2e7d32' : '#1565c0'}">${stop.order}</span>`,
       iconSize: [26, 26],
       iconAnchor: [13, 13],
     })
-    L.marker(p, { icon: marker }).addTo(routeLayer!)
+    L.marker([lat, lng], { icon: marker, title: `Parada ${stop.order} · Árvore #${stop.id}` })
+      .on('click', () => {
+        if (stop.scheduleId && stop.status !== 'COMPLETED' && !errorMessage.value)
+          startPruning(stop)
+      })
+      .addTo(routeLayer!)
   })
 
   routeMap.fitBounds(L.latLngBounds(points).pad(0.25))
@@ -381,6 +499,11 @@ watch(
 )
 
 function useSuggestedRoute() {
+  if (routeStops.value.some((stop) => stop.scheduleId)) {
+    feedback.value =
+      'A rota já possui paradas salvas. Adicione ou remova as paradas individualmente para preservar o histórico.'
+    return
+  }
   const suggested = groupRoute(filteredTrees.value, 20, MAX_SUGGESTED_ROUTE_RADIUS_KM)
   routeStops.value = suggested.map((item, index) => ({
     id: item.tree.id,
@@ -400,6 +523,7 @@ function organizeSelectedRoute() {
     .filter((item): item is PrioritizedTree<Tree> => Boolean(item))
   const ordered = groupRoute(selected, selected.length)
   routeStops.value = ordered.map((item, index) => ({
+    ...routeStops.value.find((stop) => stop.id === item.tree.id),
     id: item.tree.id,
     order: index + 1,
     tree: item.tree,
@@ -408,23 +532,25 @@ function organizeSelectedRoute() {
 
 watch(
   () => filters.date,
-  () => {
+  async () => {
     routeStops.value = []
     syncState.value = 'idle'
+    planning.value = true
     loadLocalRoute()
+    await loadServerRoute()
   },
 )
 
 // Qualquer edição das paradas após salvar invalida a confirmação anterior:
 // a rota passa a estar apenas "local" até um novo "Salvar rota" bem-sucedido.
 watch(
-  routeStops,
+  () => routeStops.value.map((stop) => stop.id).join(','),
   () => {
     if (syncState.value === 'server' || syncState.value === 'pending') {
       syncState.value = 'local'
     }
   },
-  { deep: true },
+  { flush: 'sync' },
 )
 
 onMounted(async () => {
@@ -447,11 +573,8 @@ onBeforeUnmount(() => {
   <v-container fluid class="page-shell py-8">
     <PageHeader
       title="Rotas diárias de poda"
-      subtitle="Selecione árvores próximas, agrupe por região e revise o trajeto pelas ruas no mapa."
-      :breadcrumbs="[
-        { text: 'Meu Painel', to: isManager ? '/manager' : '/user' },
-        { text: 'Rotas diárias' },
-      ]"
+      subtitle="Planeje o trajeto, identifique cada árvore e registre o serviço na própria parada."
+      :breadcrumbs="[{ text: 'Meu Painel', to: homeBase }, { text: 'Rotas diárias' }]"
     />
     <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-6 route-page-actions">
       <div class="d-flex flex-wrap align-center ga-2">
@@ -459,15 +582,19 @@ onBeforeUnmount(() => {
           variant="tonal"
           color="blue-darken-2"
           prepend-icon="mdi-map"
-          :disabled="!routeStops.length"
+          :disabled="!routeStops.length || saving"
           @click="openRouteOnMap"
           >Ver rota no mapa</v-btn
+        >
+        <v-btn variant="text" prepend-icon="mdi-refresh" :loading="loading" @click="loadTrees"
+          >Atualizar rota</v-btn
         >
         <v-btn
           color="green-darken-2"
           prepend-icon="mdi-content-save"
           :loading="saving"
           @click="saveRoute"
+          :disabled="loading || !routeStops.length"
           >Salvar rota</v-btn
         >
       </div>
@@ -492,8 +619,42 @@ onBeforeUnmount(() => {
       feedback
     }}</v-alert>
 
+    <div class="execution-toolbar mb-5">
+      <v-btn-toggle v-model="planning" mandatory color="green-darken-3" variant="outlined" divided>
+        <v-btn :value="true" prepend-icon="mdi-map-marker-path">Planejar rota</v-btn>
+        <v-btn :value="false" prepend-icon="mdi-content-cut">Executar e registrar</v-btn>
+      </v-btn-toggle>
+      <v-btn
+        :to="`${homeBase}/podas`"
+        variant="text"
+        color="green-darken-3"
+        prepend-icon="mdi-history"
+        >Histórico de podas</v-btn
+      >
+    </div>
+    <v-card v-if="!planning && routeStops.length" class="execution-summary mb-5" elevation="0">
+      <div>
+        <span class="text-overline">Andamento do trabalho</span>
+        <h2>{{ completedCount }} de {{ routeStops.length }} árvores atendidas</h2>
+        <p>
+          {{
+            completedCount === routeStops.length
+              ? 'Todas as podas desta rota foram registradas.'
+              : 'Navegue até a árvore, confira a identificação e registre o que foi feito.'
+          }}
+        </p>
+      </div>
+      <v-progress-linear
+        :model-value="(completedCount / routeStops.length) * 100"
+        color="green-darken-3"
+        height="9"
+        rounded
+        class="mt-4"
+        aria-label="Progresso das podas na rota"
+      />
+    </v-card>
     <v-row>
-      <v-col cols="12" lg="7">
+      <v-col v-if="planning" cols="12" lg="7">
         <v-card elevation="0" class="panel-card">
           <v-card-item>
             <template #prepend><v-icon color="green-darken-2">mdi-filter-variant</v-icon></template>
@@ -622,7 +783,7 @@ onBeforeUnmount(() => {
         </v-card>
       </v-col>
 
-      <v-col cols="12" lg="5">
+      <v-col cols="12" :lg="planning ? 5 : 12">
         <v-card elevation="0" class="panel-card route-card">
           <v-card-item>
             <template #prepend><v-icon color="blue-darken-2">mdi-route</v-icon></template>
@@ -646,7 +807,10 @@ onBeforeUnmount(() => {
           <v-divider />
           <v-card-text>
             <!-- Mini-mapa com a rota -->
-            <div class="route-minimap-wrap mb-4">
+            <div
+              class="route-minimap-wrap mb-4"
+              :class="{ 'route-minimap-wrap--execution': !planning }"
+            >
               <div ref="routeMapEl" class="route-minimap" />
               <div v-if="routeStops.length === 0" class="route-minimap-hint">
                 <v-icon size="18" class="mr-1">mdi-information-outline</v-icon>
@@ -657,7 +821,7 @@ onBeforeUnmount(() => {
             <div v-if="routeStops.length === 0" class="empty-state">
               <v-icon size="48" color="blue-lighten-2">mdi-map-marker-path</v-icon>
               <p class="text-body-2 mt-2 mb-0">
-                Selecione árvores à esquerda para criar a sequência.
+                Abra Planejar rota para selecionar as árvores do trabalho.
               </p>
             </div>
             <v-list v-else lines="two" class="pa-0">
@@ -665,6 +829,7 @@ onBeforeUnmount(() => {
                 v-for="(stop, index) in routeStops"
                 :key="stop.id"
                 class="route-stop mb-2"
+                :class="{ 'route-stop--completed': stop.status === 'COMPLETED' }"
               >
                 <template #prepend
                   ><v-avatar color="blue-lighten-5" size="32"
@@ -677,21 +842,64 @@ onBeforeUnmount(() => {
                   stop.tree.speciesName ||
                   `Árvore #${stop.id.slice(-6)}`
                 }}</v-list-item-title>
-                <v-list-item-subtitle>{{ coordinates(stop.tree) }}</v-list-item-subtitle>
+                <v-list-item-subtitle class="stop-identity"
+                  >Identificação: #{{ stop.id }}<br />{{
+                    coordinates(stop.tree)
+                  }}</v-list-item-subtitle
+                >
+                <div class="stop-work mt-3">
+                  <template v-if="stop.status === 'COMPLETED'">
+                    <v-chip
+                      color="green-darken-3"
+                      variant="tonal"
+                      prepend-icon="mdi-check-circle-outline"
+                      size="small"
+                      >Poda registrada</v-chip
+                    >
+                    <p v-if="stop.pruning" class="text-body-2 mt-2">
+                      {{ pruningTypeLabel(stop.pruning.type) }} ·
+                      {{ new Date(stop.pruning.date).toLocaleDateString('pt-BR')
+                      }}<span v-if="stop.pruning.user"> · {{ stop.pruning.user.name }}</span>
+                    </p>
+                    <p v-if="stop.pruning?.observations" class="text-body-2 mt-1 stop-observation">
+                      {{ stop.pruning.observations }}
+                    </p>
+                  </template>
+                  <div v-else class="stop-work-actions">
+                    <v-btn
+                      color="green-darken-3"
+                      variant="flat"
+                      prepend-icon="mdi-content-cut"
+                      :disabled="saving || !!errorMessage || !stop.scheduleId"
+                      @click="startPruning(stop)"
+                      >Registrar poda desta árvore</v-btn
+                    >
+                    <v-btn
+                      variant="tonal"
+                      color="blue-darken-2"
+                      prepend-icon="mdi-navigation-variant"
+                      @click="openExternalNavigation(stop)"
+                      >Ir até a árvore</v-btn
+                    >
+                    <p v-if="!stop.scheduleId" class="text-caption">
+                      Salve a rota para vincular esta parada ao serviço.
+                    </p>
+                  </div>
+                </div>
                 <template #append>
-                  <div class="d-flex align-center">
+                  <div v-if="planning" class="d-flex align-center">
                     <v-btn
                       icon="mdi-chevron-up"
                       size="x-small"
                       variant="text"
-                      :disabled="index === 0"
+                      :disabled="index === 0 || saving"
                       @click="moveStop(index, -1)"
                     />
                     <v-btn
                       icon="mdi-chevron-down"
                       size="x-small"
                       variant="text"
-                      :disabled="index === routeStops.length - 1"
+                      :disabled="index === routeStops.length - 1 || saving"
                       @click="moveStop(index, 1)"
                     />
                     <v-btn
@@ -708,6 +916,7 @@ onBeforeUnmount(() => {
                       variant="text"
                       color="error"
                       aria-label="Remover parada"
+                      :disabled="saving || stop.status === 'COMPLETED'"
                       @click="removeStop(index)"
                     />
                   </div>
@@ -722,9 +931,12 @@ onBeforeUnmount(() => {
                 class="route-ready-alert mb-0"
               >
                 <template #prepend><v-icon>mdi-check-circle-outline</v-icon></template>
-                <strong>{{ selectedCount }} paradas prontas.</strong>
+                <strong
+                  >{{ completedCount }} concluídas ·
+                  {{ selectedCount - completedCount }} pendentes.</strong
+                >
                 <span class="route-ready-copy"
-                  >Revise a sequência no mapa antes de iniciar o trabalho.</span
+                  >Em cada parada, use Registrar poda para salvar o serviço na árvore correta.</span
                 >
               </v-alert>
               <div class="route-ready-actions">
@@ -750,10 +962,77 @@ onBeforeUnmount(() => {
         </v-card>
       </v-col>
     </v-row>
+    <PruningExecutionDialog
+      v-model="pruningDialog"
+      :tree="activeStop?.tree || null"
+      :schedule-id="activeStop?.scheduleId"
+      :order="activeStop?.order"
+      :has-next="hasNextStop"
+      @saved="pruningSaved"
+    />
   </v-container>
 </template>
 
 <style scoped>
+.execution-toolbar,
+.stop-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.execution-toolbar {
+  justify-content: space-between;
+}
+.execution-summary {
+  padding: 22px;
+  border: 1px solid #c9ddca;
+  border-radius: 16px;
+  background: #edf5ed;
+}
+.execution-summary h2 {
+  font-size: 1.3rem;
+  color: #274c31;
+}
+.execution-summary p {
+  color: #586e5d;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+.stop-identity {
+  white-space: normal;
+  opacity: 1;
+  font-family: monospace;
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+.stop-observation {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.route-stop--completed {
+  background: #edf5ed;
+  border-color: #a5c4a9 !important;
+}
+.stop-work {
+  padding-bottom: 8px;
+}
+.route-minimap-wrap--execution {
+  max-height: 260px;
+}
+@media (max-width: 600px) {
+  .stop-work-actions .v-btn {
+    width: 100%;
+    font-size: 0.75rem;
+  }
+  .execution-toolbar .v-btn {
+    font-size: 0.73rem;
+  }
+  .route-stop :deep(.v-list-item__prepend) {
+    display: none;
+  }
+}
+
 .panel-card {
   border: 1px solid #e5e7eb;
   border-radius: 18px;

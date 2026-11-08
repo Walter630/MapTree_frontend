@@ -13,8 +13,20 @@ export interface DailyRouteSnapshot {
   updatedAt: string
 }
 
+function routeOwner(): string | null {
+  try {
+    const token = window.localStorage.getItem('accessToken')
+    const part = token?.split('.')[1]
+    if (!part) return null
+    const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { id?: unknown }
+    return typeof payload.id === 'string' && payload.id ? payload.id : null
+  } catch {
+    return null
+  }
+}
 export function dailyRouteStorageKey(date: string): string {
-  return `maptree:daily-route:${date}`
+  // Identidade apenas para isolar o cache. A autorização continua no servidor.
+  return `maptree:daily-route:${encodeURIComponent(routeOwner() || 'no-session')}:${date}`
 }
 
 function isFiniteCoordinate(value: unknown): value is number {
@@ -22,12 +34,12 @@ function isFiniteCoordinate(value: unknown): value is number {
 }
 
 export function saveDailyRouteSnapshot(snapshot: DailyRouteSnapshot): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || !routeOwner()) return
   window.localStorage.setItem(dailyRouteStorageKey(snapshot.date), JSON.stringify(snapshot))
 }
 
 export function readDailyRouteSnapshot(date: string): DailyRouteSnapshot | null {
-  if (typeof window === 'undefined') return null
+  if (typeof window === 'undefined' || !routeOwner()) return null
 
   const raw = window.localStorage.getItem(dailyRouteStorageKey(date))
   if (!raw) return null

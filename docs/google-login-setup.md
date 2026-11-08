@@ -1,48 +1,84 @@
-# Login Google — implementação e configuração
+# Login Google — frontend Vue e backend NestJS
 
-## Como o fluxo funciona
+## Fluxo implementado
 
-1. A tela de login renderiza o botão oficial do Google Identity Services (GIS). O site não simula esse botão com um botão próprio, conforme as regras de integração do Google.
-2. Depois do consentimento, o navegador recebe um ID token assinado (JWT).
-3. O frontend envia o token para `POST /auth/google`.
-4. O backend valida assinatura, expiração, emissor e audiência com `GoogleIdTokenVerifier`, exige e-mail verificado e encontra uma conta MapTree existente por e-mail sem diferenciar maiúsculas/minúsculas.
-5. O backend emite o mesmo JWT/sessão MapTree usado pelo login normal.
+1. O frontend renderiza o botão oficial Google Identity Services.
+2. O Google retorna um ID token ao callback; o frontend envia `{ credential }`
+   para `POST /api/auth/google`.
+3. O backend NestJS em `/home/josewalter/IdeaProjects/backend-maptree` verifica
+   assinatura, audiência, emissor e expiração com `google-auth-library`.
+4. Exige `sub`, e-mail verificado e uma identidade Gmail ou Workspace com `hd`.
+   Contas de outros provedores precisam de confirmação adicional e são recusadas.
+5. Busca uma única conta MapTree pelo e-mail sem diferenciar maiúsculas e minúsculas.
+   Não cria contas automaticamente; contas ausentes, ambíguas ou inativas são recusadas.
+6. Usa o perfil e a organização salvos no banco para emitir o JWT MapTree e o mesmo
+   cookie HttpOnly de renovação usado pelo login por senha. A senha não é retornada.
 
-O endpoint **não cria usuários automaticamente** nem escolhe perfil/role a partir do Google. O usuário precisa ter uma conta MapTree com o e-mail Google verificado. Para proteger contas ligadas a domínios externos, a implementação aceita endereço `@gmail.com` ou conta Google Workspace com claim de domínio `hd`.
+A implementação Java de outro repositório não atende o frontend configurado na porta
+4000. A rota foi implementada no backend NestJS que já atende essa porta.
 
-## Configuração ainda necessária
+## Configuração local
 
-O Client ID não está configurado no `.env` local neste momento. Sem isso, a tela mostra “Login com Google indisponível” e não renderiza o botão.
+No frontend (`.env`):
 
-1. No Google Cloud Console, configure a tela de consentimento OAuth e crie um OAuth Client ID do tipo **Web application**.
-2. Cadastre os JavaScript origins usados pela aplicação, por exemplo `http://localhost:3500` e o domínio real de produção.
-3. Configure o mesmo Web Client ID no frontend (`VITE_GOOGLE_CLIENT_ID`) e no backend (`GOOGLE_CLIENT_ID`). O client ID não é segredo; não coloque client secret no frontend.
-4. Configure `CORS_ALLOWED_ORIGINS` no backend com as origens reais separadas por vírgula. Os padrões no código são apenas localhost/127.0.0.1 para desenvolvimento.
-5. Inicie API e frontend e valide um login com uma conta previamente cadastrada. Também valide origem não permitida, token com audiência errada, e-mail sem verificação e conta MapTree inexistente.
+```dotenv
+VITE_API_BASE_URL=http://localhost:4000/api
+VITE_GOOGLE_CLIENT_ID=SEU_CLIENT_ID.apps.googleusercontent.com
+```
 
-## Arquivos envolvidos
+No backend NestJS (`.env`):
 
-- Frontend: `src/plugins/googleAuth.ts`, `src/components/MainView/LoginComponent.vue`, `src/plugins/apiConnect.ts`.
-- Backend Java separado: `GoogleIdentityConfig`, `GoogleLoginRequest`, `UserAuthController`, `UserService`, `UserRepository` e `SecurityConfig`.
-- Variáveis: `VITE_GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_ID`, `CORS_ALLOWED_ORIGINS`.
+```dotenv
+GOOGLE_CLIENT_ID=SEU_CLIENT_ID.apps.googleusercontent.com
+CORS_ORIGIN=http://localhost:3500,http://localhost:4000
+```
 
-## Decisões e segurança
+Use o mesmo OAuth Web Client ID nos dois projetos. O Client ID é público e não é
+um client secret. O valor válido já presente no frontend foi configurado também
+no backend local em 06/11/2026. Credenciais de banco/JWT existentes foram preservadas.
 
-- Usar o SDK oficial GIS para renderizar o botão; One Tap/`prompt()` não é usado para fingir um clique em botão personalizado.
-- Nunca confiar em nome/e-mail/role enviados como JSON pelo navegador; o backend deriva os dados do ID token verificado e do usuário persistido.
-- O backend verifica o token com chave pública rotacionada pelo Google e audiência igual ao Client ID do aplicativo. O frontend não valida nem decodifica o token como autenticação.
-- Não usar `tokeninfo` como verificação de produção; a documentação do Google o reserva para depuração.
-- O logout/refresh continua usando o fluxo existente do MapTree.
+No Google Cloud Console, autorize `http://localhost:3500` como JavaScript origin.
+Abra o frontend com esse hostname; `127.0.0.1` é uma origem diferente.
+Reinicie o frontend após alterar variáveis `VITE_*` e o backend após alterar seu `.env`.
+O login requer uma conta MapTree ativa com o mesmo e-mail da conta Google.
+
+## Verificação
+
+```sh
+curl -i -X POST http://localhost:4000/api/auth/google \
+  -H 'Content-Type: application/json' --data '{}'
+```
+
+O corpo vazio deve retornar 400; uma credencial inválida deve retornar 401, nunca
+`Cannot POST /api/auth/google`. O teste real depende do usuário concluir o popup
+Google no navegador. Verifique também acesso às rotas protegidas, refresh e logout.
+
+Em 06/11/2026 foram confirmados na API local: corpo vazio → 400, token inválido →
+401 e preflight da origem `http://localhost:3500` → 204 com credenciais permitidas.
+Os testes automatizados cobrem validação de identidade, audiência passada à biblioteca,
+conta inexistente/ambígua/inativa, DTO inválido e sessão com refresh. A verificação
+Google é simulada nos testes; o JWT e o cookie da aplicação são exercitados pelo HTTP.
+
+## Produção
+
+O `vercel.json` encaminha `/api/*` para `http://76.13.227.139:4000/api/*`.
+Esse endereço respondeu `Cannot POST /api/auth/google` antes da implementação local.
+Para corrigir produção, publique o backend NestJS atualizado, incluindo `package.json`,
+lockfile e fontes, instale as dependências (`npm ci`), compile (`npm run build`) e
+reinicie o processo da API pelo gerenciador já usado no servidor.
+
+Configure `GOOGLE_CLIENT_ID` no ambiente do processo da API e o mesmo
+`VITE_GOOGLE_CLIENT_ID` no build do frontend. Inclua os domínios reais
+(`https://www.maptree.com.br` e, se usado, `https://maptree.com.br`) no `CORS_ORIGIN`
+e nas origens JavaScript autorizadas do Google. Não é necessário trocar o destino
+atual do proxy se o mesmo servidor receber a versão atualizada da API.
+
+Publique também as alterações do frontend para aplicar o cabeçalho COOP do Vercel.
+`same-origin-allow-popups` foi configurado no Vercel, no Vite e no preview; ele não
+substitui a implementação da rota. Nenhuma publicação em produção foi realizada.
 
 ## Referências oficiais
 
-- [Integrar o Google Identity Services](https://developers.google.com/identity/gsi/web/guides/integrate)
-- [Renderizar o botão oficial](https://developers.google.com/identity/gsi/web/guides/display-button)
 - [Verificar ID tokens no servidor](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)
-- [Criar/configurar Client ID](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)
-
-## Validação já executada
-
-- Frontend: testes GIS verificam renderização do botão oficial, callback da credencial e falha sem Client ID.
-- Backend: testes verificam token inválido, e-mail não verificado, usuário não cadastrado e login de usuário existente.
-- Ainda falta o teste real com Client ID/origens do projeto Google e API/ambiente implantado, pois o Client ID local está vazio.
+- [Configurar Client ID e política COOP](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)
+- [Renderizar o botão oficial](https://developers.google.com/identity/gsi/web/guides/display-button)

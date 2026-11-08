@@ -30,6 +30,8 @@ import {
   countTreesBySpecies,
   estimateTotalCrownAreaM2,
   getTreeDensityCategories,
+  getTreeDensityCategory,
+  getTreeDensityHeatPoints,
   isValidGeoPoint,
   type TreeDensityDimension,
 } from '@/utils/treeDensity'
@@ -268,19 +270,19 @@ export default defineComponent({
 
     /* ---------- Estado Reativo ---------- */
     const trees = ref<TreeOnMap[]>([])
-    const showTreeDensityLayer = ref(currentRoute.query.camada === 'calor')
+    const showTreeDensityLayer = ref(false)
     const treeDensityDimension = ref<TreeDensityDimension>('species')
-    const treeDensityCategory = ref(
-      typeof currentRoute.query.especie === 'string' ? currentRoute.query.especie : 'all',
-    )
+    const treeDensityCategory = ref('all')
     watch(
       () => currentRoute.query,
       (query) => {
         if (query.camada !== 'calor') return
         treeDensityDimension.value = 'species'
-        treeDensityCategory.value = typeof query.especie === 'string' ? query.especie : 'all'
+        treeDensityCategory.value =
+          (typeof query.especie === 'string' && query.especie.trim()) || 'all'
         showTreeDensityLayer.value = true
       },
+      { immediate: true },
     )
     const densityTrees = computed(() => trees.value.filter((tree) => !tree.isDemoData))
     const markedLocations = ref<MarkedLocation[]>([])
@@ -408,27 +410,48 @@ export default defineComponent({
     const loadingAiData = ref(false)
 
     /* ---------- Computed ---------- */
+    const activeHeatSpecies = computed(() =>
+      showTreeDensityLayer.value &&
+      treeDensityDimension.value === 'species' &&
+      treeDensityCategory.value !== 'all'
+        ? treeDensityCategory.value
+        : null,
+    )
+
     const filteredTrees = computed(() => {
+      const species = activeHeatSpecies.value
+      const candidates =
+        species === null
+          ? trees.value
+          : densityTrees.value.filter((tree) => getTreeDensityCategory(tree, 'species') === species)
+
       if (dailyRouteVisible.value) {
         const routeIds = new Set(dailyRouteStops.value.map((stop) => stop.id))
-        return trees.value.filter((tree) => routeIds.has(tree.id))
+        return candidates.filter((tree) => routeIds.has(tree.id))
       }
       if (activeFilter.value === 'PRIORITY') {
-        return prioritizeTrees(trees.value)
+        return prioritizeTrees(candidates)
           .filter((item) => isTreeForPruning(item.tree))
           .map((item) => item.tree)
       }
-      if (activeFilter.value === 'ALL') return trees.value
+      if (activeFilter.value === 'ALL') return candidates
       if (activeFilter.value === 'CRITICAL') {
-        return prioritizeTrees(trees.value)
+        return prioritizeTrees(candidates)
           .filter((item) => item.urgency === 'CRITICAL')
           .map((item) => item.tree)
       }
-      return trees.value.filter((t) => t.status === activeFilter.value)
+      return candidates.filter((tree) => tree.status === activeFilter.value)
     })
 
     const treeDensityCategories = computed(() =>
       getTreeDensityCategories(densityTrees.value, treeDensityDimension.value),
+    )
+    const treeDensityHeatPoints = computed(() =>
+      getTreeDensityHeatPoints(
+        densityTrees.value,
+        treeDensityDimension.value,
+        treeDensityCategory.value,
+      ),
     )
     const treeDensityCells = computed(() =>
       buildTreeDensityCells(
@@ -453,7 +476,7 @@ export default defineComponent({
     // ESCOPOS DOS CONTADORES (regra adotada — ver FEAT-003):
     // - treeCount: árvores CARREGADAS em memória (depende do modo nearby/bounds/city/tile).
     //   NÃO é o total do banco; é o que foi trazido para o cliente.
-    // - visibleTreeCount: subconjunto de treeCount que está DENTRO do bounds atual do mapa.
+    // - visibleTreeCount: árvores nos bounds atuais, respeitando a rota e o recorte por espécie.
     // - cityStats.total: TOTAL global na cidade (vem do servidor via getCityStats), escopo distinto.
     // Esses três contadores medem coisas diferentes e NÃO devem ser forçados a bater.
     const treeCount = computed(() => trees.value.length)
@@ -488,11 +511,13 @@ export default defineComponent({
     const mapZoom = ref<number>(DEFAULT_ZOOM)
 
     // Contador de árvores visíveis na tela (bounds atual do mapa).
-    // Só recalcula quando trees ou mapBounds mudam (mapBounds agora só muda
-    // no 'moveend', não a cada frame). Conta com loop simples, sem alocar
+    // Os bounds só mudam no 'moveend', não a cada frame. Conta com loop simples, sem alocar
     // array intermediário, para suportar volumes grandes sem travar.
     const visibleTreeCount = computed(() => {
-      const list = dailyRouteVisible.value ? filteredTrees.value : trees.value
+      const list =
+        dailyRouteVisible.value || activeHeatSpecies.value !== null
+          ? filteredTrees.value
+          : trees.value
       const bounds = mapBounds.value
       if (!map || !bounds) return list.length
       let count = 0
@@ -1486,50 +1511,7 @@ export default defineComponent({
     }
 
     const renderTreeDensity = () => {
-      if (!treeDensityLayer) return
-      if (!showTreeDensityLayer.value) {
-        treeDensityLayer.setLatLngs([])
-        return
-      }
-
-      const heatPoints: L.LatLngTuple[] = []
-      for (const tree of densityTrees.value) {
-        if (!isValidGeoPoint(tree.latitude, tree.longitude)) continue
-        const category =
-          treeDensityDimension.value === 'species'
-            ? tree.speciesName
-            : treeDensityDimension.value === 'status'
-              ? tree.status
-              : treeDensityDimension.value === 'vigor'
-                ? tree.vigor
-                : treeDensityDimension.value === 'proximity'
-                  ? tree.nearPowerLine
-                    ? 'Indicador de risco ativo'
-                    : 'Sem alerta atual'
-                  : treeDensityDimension.value === 'nests'
-                    ? Number(tree.nestCount) > 0
-                      ? 'Com ninhos'
-                      : 'Sem ninhos registrados'
-                    : Number(tree.canopyWidthMeters) > 0
-                      ? 'Copa medida'
-                      : 'Sem medição de copa'
-        if (treeDensityCategory.value !== 'all' && treeDensityCategory.value !== category) continue
-
-        const intensity =
-          treeDensityDimension.value === 'nests'
-            ? Number(tree.nestCount)
-            : treeDensityDimension.value === 'canopy'
-              ? Math.PI * (Number(tree.canopyWidthMeters) / 2) ** 2
-              : 1
-        if (!Number.isFinite(intensity) || intensity <= 0) continue
-        heatPoints.push([tree.latitude, tree.longitude, intensity])
-      }
-
-      // Leaflet.heat interprets point intensity against `max`. Using the
-      // 250 m cell total here diluted individual points, making the layer
-      // nearly invisible when trees were spread across several cells.
-      treeDensityLayer.setOptions({ max: 1 })
-      treeDensityLayer.setLatLngs(heatPoints)
+      treeDensityLayer?.setLatLngs(showTreeDensityLayer.value ? treeDensityHeatPoints.value : [])
     }
 
     const drawPowerLines = () => {
@@ -1957,10 +1939,7 @@ export default defineComponent({
         renderTimeout = null
       }, 100)
     })
-    watch(
-      [trees, showTreeDensityLayer, treeDensityDimension, treeDensityCategory],
-      renderTreeDensity,
-    )
+    watch([showTreeDensityLayer, treeDensityHeatPoints], renderTreeDensity)
     watch(
       treeDensityDimension,
       () => {
@@ -2232,6 +2211,7 @@ export default defineComponent({
       treeDensityDimension,
       treeDensityCategory,
       treeDensityCategories,
+      treeDensityHeatPoints,
       topDensityCell,
       speciesDistribution,
       crownAreaEstimate,
@@ -2903,6 +2883,7 @@ export default defineComponent({
                 item-title="title"
                 item-value="value"
                 label="Categoria"
+                @update:model-value="showTreeDensityLayer = true"
                 density="compact"
                 variant="outlined"
                 hide-details
@@ -2914,8 +2895,7 @@ export default defineComponent({
                 >
               </div>
               <p class="text-caption text-grey-darken-1 mt-2 mb-0">
-                Kernel calculado sobre {{ densityTrees.length }} árvores reais carregadas nesta
-                sessão.
+                Árvores da categoria no mapa de calor: {{ treeDensityHeatPoints.length }}.
                 <template v-if="topDensityCell">
                   Maior célula de referência (250 m):
                   <template v-if="treeDensityDimension === 'nests'"
@@ -2945,7 +2925,7 @@ export default defineComponent({
                       ? 'Não há vistorias de ninho registradas.'
                       : treeDensityDimension === 'canopy'
                         ? 'Não há medidas de copa válidas.'
-                        : 'Não há dados válidos para agrupar.'
+                        : 'Não há árvores da categoria selecionada na área carregada.'
                   }}
                 </template>
               </p>

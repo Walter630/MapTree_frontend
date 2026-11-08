@@ -62,17 +62,38 @@ const router = createRouter({
     {
       path: '/',
       component: MainPage,
+      meta: { requiresAuth: true },
       children: [
         /* --- Rotas Públicas --- */
         { path: '', name: 'Main', component: MainComponent, meta: { requiresAuth: true } },
-        { path: 'login', name: 'Login', component: LoginPage },
-        { path: 'register', name: 'Register', component: RegisterComponent },
-        { path: 'recovery', name: 'Recovery', component: RecoveryPage },
-        { path: 'recovery-code', name: 'RecoveryCode', component: EmailMessageComponent },
-        { path: 'reset-password', name: 'ResetPassword', component: ResetPasswordComponent },
+        { path: 'login', name: 'Login', meta: { public: true }, component: LoginPage },
+        {
+          path: 'register',
+          name: 'Register',
+          meta: { public: true },
+          component: RegisterComponent,
+        },
+        { path: 'recovery', name: 'Recovery', meta: { public: true }, component: RecoveryPage },
+        {
+          path: 'recovery-code',
+          name: 'RecoveryCode',
+          meta: { public: true },
+          component: EmailMessageComponent,
+        },
+        {
+          path: 'reset-password',
+          name: 'ResetPassword',
+          meta: { public: true },
+          component: ResetPasswordComponent,
+        },
         { path: 'logout', name: 'Logout', component: LogoutPage },
-        { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina },
-        { path: 'dashboard-previews', name: 'DashboardPreviews', component: DashboardPreviewsPage },
+        { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina, meta: { role: 'ADMIN' } },
+        {
+          path: 'dashboard-previews',
+          name: 'DashboardPreviews',
+          component: DashboardPreviewsPage,
+          meta: { role: 'ADMIN' },
+        },
         {
           path: 'edit-account',
           name: 'EditAccount',
@@ -100,6 +121,13 @@ const router = createRouter({
             },
             { path: 'trees/new', name: 'AdminTreeRegistration', component: TreeRegistrationPage },
             { path: 'map', name: 'AdminMap', component: MapPage },
+            { path: 'routes/daily', name: 'AdminDailyRoutes', component: DailyRoutesPage },
+            { path: 'podas', name: 'AdminPruningList', component: PruningList },
+            {
+              path: 'podas/nova',
+              name: 'AdminPruningRegistration',
+              component: PruningRegistration,
+            },
           ],
         },
 
@@ -114,6 +142,12 @@ const router = createRouter({
             { path: 'register-employee', name: 'RegisterEmployee', component: RegisterEmployee },
             { path: 'trees/new', name: 'ManagerTreeRegistration', component: TreeRegistrationPage },
             { path: 'routes/daily', name: 'ManagerDailyRoutes', component: DailyRoutesPage },
+            { path: 'podas', name: 'ManagerPruningList', component: PruningList },
+            {
+              path: 'podas/nova',
+              name: 'ManagerPruningRegistration',
+              component: PruningRegistration,
+            },
             { path: 'reports', name: 'ManagerReports', component: ManagerReportsView },
             {
               path: 'notifications',
@@ -149,6 +183,7 @@ const router = createRouter({
         },
       ],
     },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
@@ -157,7 +192,7 @@ const router = createRouter({
 =================================== */
 
 router.beforeEach(async (to, _from, next) => {
-  const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
+  const requiresAuth = to.meta.public !== true
   const store = useAppStore()
 
   // 1. Rotas públicas: libera direto
@@ -186,18 +221,21 @@ router.beforeEach(async (to, _from, next) => {
       return next({ name: 'Login' })
     }
 
-    // Erro de rede / servidor instável: NÃO desloga o usuário.
-    // Deixa seguir; se realmente não houver sessão, a própria tela tratará o 401.
-    console.error('Falha ao validar sessão (seguindo sem deslogar):', error)
-    return next()
+    // Preserva o token em falha temporária, mas não libera a página sem validar o perfil.
+    console.error('Não foi possível validar o acesso:', error)
+    return next({ name: 'Login', query: { reason: 'session-unavailable' } })
   }
 
   const user = store.user
   if (!user) return next({ name: 'Login' })
+  if (to.name === 'Main') {
+    const home = { ADMIN: '/admin', MANAGER: '/manager', USER: '/user' }[user.role]
+    return home ? next(home) : next({ name: 'Login' })
+  }
 
   // 4. Verificação de role: se a role não bate, NÃO desloga.
   //    Apenas redireciona o usuário para a home da própria role.
-  const requiredRole = to.matched.find((record) => record.meta.role)?.meta.role
+  const requiredRole = to.meta.role
 
   if (requiredRole && user.role !== requiredRole) {
     console.warn(`Acesso negado: usuário ${user.role} tentou acessar rota de ${requiredRole}`)

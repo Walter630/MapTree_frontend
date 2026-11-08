@@ -83,7 +83,7 @@ it('limpa a sessão e rejeita as chamadas em fila se o refresh falhar', async ()
   try {
     const results = Promise.allSettled([apiConnect.get('/trees'), apiConnect.get('/species')])
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
-    rejectRefresh(new Error('Refresh expirado'))
+    rejectRefresh(Object.assign(new Error('Refresh expirado'), { response: { status: 401 } }))
     expect((await results).every((result) => result.status === 'rejected')).toBe(true)
     expect(apiConnect.isAuthenticated()).toBe(false)
     expect(unauthorized).toHaveBeenCalledOnce()
@@ -134,3 +134,25 @@ it('limita a uma renovação mesmo quando duas chamadas simultâneas continuam c
   expect((await results).every((result) => result.status === 'rejected')).toBe(true)
   expect(refresh).toHaveBeenCalledOnce()
 })
+
+it.each([undefined, 500, 503])(
+  'preserva a sessão se a renovação falha temporariamente: %s',
+  async (status) => {
+    const temporaryError = Object.assign(
+      new Error('Falha temporária'),
+      status ? { response: { status } } : {},
+    )
+    const refresh = vi.spyOn(axios, 'post').mockRejectedValue(temporaryError)
+    const unauthorized = vi.fn()
+    window.addEventListener('auth:unauthorized', unauthorized)
+    apiConnect.api.defaults.adapter = async (config) => fail(config, 401)
+    try {
+      await expect(apiConnect.get('/trees')).rejects.toBe(temporaryError)
+      expect(refresh).toHaveBeenCalledOnce()
+      expect(apiConnect.getToken().accessToken).toBe('old-token')
+      expect(unauthorized).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('auth:unauthorized', unauthorized)
+    }
+  },
+)

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { routerKey } from 'vue-router'
+import { routerKey, routeLocationKey } from 'vue-router'
 
 const get = vi.fn()
 
@@ -83,7 +83,10 @@ function mountPage() {
   const wrapper = mount(PruningList, {
     global: {
       plugins: [vuetify],
-      provide: { [routerKey as symbol]: router },
+      provide: {
+        [routerKey as symbol]: router,
+        [routeLocationKey as symbol]: { path: '/user/podas' },
+      },
       stubs: {
         PageHeader: true,
         VDataTable: TestDataTable,
@@ -112,7 +115,7 @@ describe('PruningList', () => {
     expect(wrapper.get('[data-test="dialog"]').text()).toContain('Detalhes da poda')
     expect(wrapper.get('[data-test="dialog"]').text()).toContain('Ipê-amarelo')
     expect(wrapper.get('[data-test="dialog"]').text()).toContain('Handroanthus albus')
-    expect(wrapper.get('[data-test="dialog"]').text()).not.toContain('tree-1234')
+    expect(wrapper.get('[data-test="dialog"]').text()).toContain('tree-1234')
     expect(wrapper.get('[data-test="dialog"]').text()).toContain('Moderada')
     expect(wrapper.get('[data-test="dialog"]').text()).toContain(
       'Remoção de galhos próximos à rede.',
@@ -131,7 +134,7 @@ describe('PruningList', () => {
     await flushPromises()
 
     const dialog = wrapper.get('[data-test="dialog"]')
-    expect(dialog.text()).toContain('Árvore sem identificação')
+    expect(dialog.text()).toContain('Árvore · identificação não informada')
     expect(dialog.text()).toContain('Data inválida')
     expect(dialog.text()).toContain('Localização não informada')
     expect(dialog.text()).toContain('Nenhuma observação foi registrada para esta poda.')

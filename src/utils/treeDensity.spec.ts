@@ -5,6 +5,7 @@ import {
   estimateCrownAreaM2,
   estimateTotalCrownAreaM2,
   getTreeDensityCategories,
+  getTreeDensityHeatPoints,
   isValidGeoPoint,
   type TreeDensityInput,
 } from './treeDensity'
@@ -44,6 +45,25 @@ describe('treeDensity', () => {
 
     expect(cells).toHaveLength(1)
     expect(cells[0]?.label).toBe('Ipê')
+  })
+
+  it('uses the displayed species categories for heat points, including legacy names', () => {
+    const trees = [
+      point({ speciesName: '  Ipê-Amarelo  ' }),
+      point({ latitude: -3.732, speciesName: 'Oiticica' }),
+      point({ latitude: -3.733, speciesName: ' ' }),
+      point({ latitude: 91, speciesName: 'Ipê-Amarelo' }),
+    ]
+
+    expect(getTreeDensityCategories(trees, 'species')).toContain('Ipê-Amarelo')
+    expect(getTreeDensityHeatPoints(trees, 'species', 'Ipê-Amarelo')).toEqual([
+      [-3.7319, -38.5267, 1],
+    ])
+    expect(getTreeDensityHeatPoints(trees, 'species', 'Espécie não identificada')).toEqual([
+      [-3.733, -38.5267, 1],
+    ])
+    expect(getTreeDensityHeatPoints(trees, 'species', 'Mangueira')).toEqual([])
+    expect(getTreeDensityHeatPoints(trees, 'species')).toHaveLength(3)
   })
 
   it('accepts zero latitude and longitude and rejects invalid coordinates', () => {

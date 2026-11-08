@@ -14,6 +14,18 @@
           <div class="form-area">
             <h2 class="title mb-8">Bem-vindo(a)!</h2>
 
+            <v-alert
+              v-if="$route.query.reason === 'session-unavailable'"
+              type="info"
+              variant="tonal"
+              class="mb-5"
+            >
+              Não foi possível validar sua sessão agora. Ela foi preservada; tente novamente quando
+              a conexão voltar.
+              <v-btn variant="text" class="mt-2" @click="$router.push('/')"
+                >Tentar acessar meu painel</v-btn
+              >
+            </v-alert>
             <!-- Alerta inline integrado ao formulário -->
             <v-expand-transition>
               <div
@@ -142,6 +154,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import { getLoginErrorMessage } from '@/utils/loginError'
 import facebookLogo from '@/assets/facebook-logo.png'
 import { type LoginRequest, type LoginResponse } from '@/plugins/apiConnect.ts'
 import { isGoogleAuthEnabled, renderGoogleButton } from '@/plugins/googleAuth'
@@ -176,6 +189,7 @@ export default defineComponent({
     this.googleButtonCleanup?.()
   },
   methods: {
+    getLoginErrorMessage,
     checkIsMobile() {
       this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
     },
@@ -231,46 +245,6 @@ export default defineComponent({
         this.loading = false
       }
     },
-    getLoginErrorMessage(error: unknown): string {
-      const err = error as {
-        response?: { status?: number; data?: { message?: string | string[] } }
-        code?: string
-        isAxiosError?: boolean
-      }
-
-      // Erros do fluxo do Google (sem resposta HTTP): indisponível/cancelado.
-      if (!err.response && !err.isAxiosError && error instanceof Error) {
-        return error.message
-      }
-
-      // Sem resposta do servidor (offline / API fora do ar)
-      if (!err.response) {
-        return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
-      }
-
-      const status = err.response.status
-      const backendMsg = err.response.data?.message
-      const msgText = Array.isArray(backendMsg) ? backendMsg.join(', ') : backendMsg
-
-      // Mensagens mais amigáveis para os casos comuns
-      if (status === 401 || status === 400) {
-        return (
-          msgText ||
-          'Credenciais rejeitadas. E-mail ou senha incorretos — verifique seus dados e tente novamente.'
-        )
-      }
-      if (status === 404) {
-        return 'E-mail não cadastrado.'
-      }
-      if (status === 403) {
-        return msgText || 'Sua conta está inativa ou sem permissão de acesso.'
-      }
-      if (status && status >= 500) {
-        return 'Erro no servidor. Tente novamente em instantes.'
-      }
-
-      return msgText || 'Não foi possível fazer login. Tente novamente.'
-    },
     async loginWithGoogle(credential: string) {
       this.feedback.show = false
 
@@ -290,7 +264,7 @@ export default defineComponent({
         }
       } catch (error) {
         console.error('Google login failed:', error)
-        this.notify(this.getLoginErrorMessage(error))
+        this.notify(this.getLoginErrorMessage(error, 'google'))
       } finally {
         this.loading = false
       }

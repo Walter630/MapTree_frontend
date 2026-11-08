@@ -212,6 +212,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
     { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
     { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/admin/trees/new' },
+    { title: 'Rota do dia', icon: 'mdi-map-marker-path', to: '/admin/routes/daily' },
     { title: 'Mapa', icon: 'mdi-map', to: '/admin/map' },
   ],
   MANAGER: [

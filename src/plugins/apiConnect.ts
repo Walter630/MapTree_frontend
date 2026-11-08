@@ -269,8 +269,11 @@ class ApiConnect {
             return this.axiosInstance(originalRequest)
           } catch (refreshError) {
             this.processQueue(refreshError as AxiosError, null)
-            this.clearTokens()
-            this.handleAuthenticationError()
+            const status = (refreshError as AxiosError).response?.status
+            if (status === 401 || status === 403) {
+              this.clearTokens()
+              this.handleAuthenticationError()
+            }
             return Promise.reject(refreshError)
           } finally {
             this.isRefreshing = false
@@ -333,6 +336,9 @@ class ApiConnect {
 
   private clearTokens(): void {
     localStorage.removeItem('accessToken')
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('maptree:daily-route:')) localStorage.removeItem(key)
+    }
   }
 
   /* ---------- API Pública ---------- */

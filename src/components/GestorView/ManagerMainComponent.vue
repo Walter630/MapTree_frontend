@@ -520,6 +520,9 @@ export default defineComponent({
 
   components: { SpeciesCatalogCard, MiniMap, PruningChart },
 
+  setup() {
+    return { auth: useAuth() }
+  },
   data() {
     return {
       user: null as User | null,
@@ -764,8 +767,7 @@ export default defineComponent({
     },
 
     getUser() {
-      const auth = useAuth()
-      auth
+      this.auth
         .getCurrentUser()
         .then((u) => {
           if (u) this.user = u as User
