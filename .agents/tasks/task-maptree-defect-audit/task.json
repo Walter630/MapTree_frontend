@@ -1,7 +1,0 @@
-{
-  "task_id": "task-maptree-defect-audit",
-  "task_description": "Auditoria e correcao de defeitos em dois repositorios MapTree (Frontend Vue 3 e Backend NestJS). Corrigir contrato de arvore/poda e seguranca no backend; alinhar payloads, mensagens PT-BR e UX dos formularios no frontend; esclarecer contadores do mapa e sincronizacao de rotas diarias. Trabalhar direto nos workspaces, SEM worktree e SEM commit automatico alem do commit local por feature; NAO fazer push. Preservar funcionalidades existentes.",
-  "status": "pending",
-  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
-  "blocked_reason": null
-}
