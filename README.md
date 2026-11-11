@@ -71,3 +71,23 @@ npm run test:e2e -- --debug
 ```sh
 npm run lint
 ```
+
+### Homologar com o backend e MongoDB
+
+Use dados descartáveis. Configure `VITE_API_BASE_URL` com a URL da API, incluindo `/api`, e inclua a origem exata do frontend em `CORS_ORIGIN` no backend.
+
+```sh
+npm ci
+npm run test:unit -- --run
+npm run build
+npx playwright install chromium
+npm run preview -- --host 127.0.0.1 --port 3500
+```
+
+Com o frontend e o backend em execução, defina `E2E_BASE_URL`, `E2E_API_URL`, `E2E_EMAIL` e `E2E_PASSWORD` com os endereços e uma conta de teste. Rode `npm run test:session`. Se necessário, `E2E_BROWSER_PATH` aponta para um Chromium instalado.
+
+Para testar gravações, habilite `E2E_RUN_MUTATING_TESTS=1` somente em um banco descartável. Use uma conta `USER`, um inventário sem árvores críticas e duas espécies cadastradas no catálogo. Defina `E2E_FIRST_SPECIES` com o nome de uma espécie sem árvores e `E2E_SECOND_SPECIES` com o nome de outra espécie com exatamente duas árvores normais próximas de `-3.73191, -38.52671` (Fortaleza). O teste cadastra um usuário e uma árvore e grava a medição pela API. Recrie os dados antes de repetir o teste de gravação.
+
+Antes de publicar, repita o login Google com o Client ID e uma conta da homologação. Valide o primeiro vínculo com a senha MapTree, um segundo login Google e o carregamento dos mapas com o provedor de mapas habilitado.
+
+No Vercel, deixe `VITE_API_BASE_URL` vazio para o build usar `/api` no mesmo domínio. O rewrite encaminha a chamada para `https://api.maptree.com.br`. Confirme esse caminho em um preview HTTPS antes de promover o deploy.

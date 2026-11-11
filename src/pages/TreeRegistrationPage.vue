@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { apiConnect } from '@/plugins/apiConnect'
+import { apiConnect, type Measurement } from '@/plugins/apiConnect'
 import { getApiErrorMessage } from '@/utils/apiError'
+import {
+  parseMeasurementPair,
+  readMeters,
+  type FieldMeasurementInput,
+} from '@/utils/measurementInput'
 import PageHeader from '@/components/shared/PageHeader.vue'
+import TreeSavingOverlay from '@/components/shared/TreeSavingOverlay.vue'
 
 interface SpeciesOption {
   id: string
   commonName: string
   scientificName?: string
+}
+
+interface PendingMeasurement extends FieldMeasurementInput {
+  treeId: string
+  location: string
 }
 
 const router = useRouter()
@@ -18,6 +29,15 @@ const loading = ref(false)
 const loadingSpecies = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const warningMessage = ref('')
+const pendingMeasurement = ref<PendingMeasurement | null>(null)
+const savingMeasurement = ref(false)
+const meters = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
+// Tela de carregamento: cobre as duas gravações (árvore e, se houver, medição).
+const isSaving = computed(() => loading.value || savingMeasurement.value)
+const savingStep = computed<'tree' | 'measurement'>(() =>
+  savingMeasurement.value ? 'measurement' : 'tree',
+)
 const species = ref<SpeciesOption[]>([])
 const speciesDialog = ref(false)
 const speciesMenu = ref(false)
@@ -94,6 +114,8 @@ const form = reactive({
   age: '',
   status: 'NORMAL',
   vigor: 'GOOD',
+  height: '',
+  canopyWidth: '',
 })
 
 const backRoute = computed(() => {
@@ -142,6 +164,31 @@ const rules = {
   },
 }
 
+function isFilled(value: unknown): boolean {
+  return String(value ?? '').trim().length > 0
+}
+
+// Altura e largura da copa são gravadas juntas (POST /measurements exige as duas).
+const measurementRules = {
+  height: (value: unknown) => {
+    if (!isFilled(value)) return isFilled(form.canopyWidth) ? 'Informe também a altura.' : true
+    const number = readMeters(String(value))
+    return (Number.isFinite(number) && number > 0) || 'Informe a altura em metros, maior que zero.'
+  },
+  canopyWidth: (value: unknown) => {
+    if (!isFilled(value)) {
+      return isFilled(form.height) ? 'Informe também a largura da copa.' : true
+    }
+    return Number.isFinite(readMeters(String(value))) || 'Informe a largura da copa em metros.'
+  },
+}
+
+const pendingMeasurementLabel = computed(() => {
+  const pending = pendingMeasurement.value
+  if (!pending) return ''
+  return `altura ${meters.format(pending.height)} m, copa ${meters.format(pending.canopyWidth)} m`
+})
+
 async function loadSpecies() {
   loadingSpecies.value = true
   try {
@@ -163,14 +210,96 @@ async function loadSpecies() {
   }
 }
 
+function resetForm() {
+  form.speciesId = ''
+  form.latitude = ''
+  form.longitude = ''
+  form.age = ''
+  form.status = 'NORMAL'
+  form.vigor = 'GOOD'
+  form.height = ''
+  form.canopyWidth = ''
+}
+
+const TREE_SAVED_MESSAGE =
+  'Árvore cadastrada com sucesso. Ela já pode aparecer no mapa após a atualização.'
+const TREE_AND_MEASUREMENT_SAVED_MESSAGE =
+  'Árvore e medição cadastradas com sucesso. Elas já podem aparecer no mapa após a atualização.'
+
+/** Grava a medição pendente. Só considera salva quando a API confirma com id e treeId. */
+async function postPendingMeasurement() {
+  const pending = pendingMeasurement.value
+  if (!pending || savingMeasurement.value) return
+
+  savingMeasurement.value = true
+  warningMessage.value = ''
+  try {
+    const { data } = await apiConnect.post<Measurement>('/measurements', {
+      treeId: pending.treeId,
+      height: pending.height,
+      canopyWidth: pending.canopyWidth,
+    })
+    if (data?.treeId !== pending.treeId || !data.id) {
+      warningMessage.value =
+        'A árvore foi cadastrada, mas a API não confirmou a medição. Tente salvar de novo ou confira o histórico no mapa.'
+      return
+    }
+    pendingMeasurement.value = null
+    successMessage.value = TREE_AND_MEASUREMENT_SAVED_MESSAGE
+  } catch (cause: unknown) {
+    warningMessage.value =
+      'A árvore foi cadastrada, mas a medição não foi salva. ' +
+      getApiErrorMessage(cause, 'Não foi possível registrar a medição.')
+  } finally {
+    savingMeasurement.value = false
+  }
+}
+
+function dismissPendingMeasurement() {
+  pendingMeasurement.value = null
+  warningMessage.value = ''
+}
+
+/** Segunda gravação do cadastro: nunca lança, pois a árvore já foi salva. */
+async function saveInitialMeasurement(
+  treeId: string | undefined,
+  measurement: FieldMeasurementInput | null,
+  location: string,
+) {
+  if (!measurement) {
+    successMessage.value = TREE_SAVED_MESSAGE
+    return
+  }
+  if (!treeId) {
+    warningMessage.value = `A árvore foi cadastrada em ${location}, mas a API não devolveu o identificador para vincular a medição. Abra a árvore no mapa e use Registrar medição.`
+    return
+  }
+  pendingMeasurement.value = { treeId, location, ...measurement }
+  await postPendingMeasurement()
+}
+
 async function submit() {
+  // Reserve the submit synchronously, before Vuetify's async validation yields.
+  // Two fast clicks can otherwise validate in parallel and both POST /trees.
+  if (loading.value || savingMeasurement.value) return
+  loading.value = true
   errorMessage.value = ''
   successMessage.value = ''
-  const result = await formRef.value?.validate()
-  if (result && !result.valid) return
-
-  loading.value = true
+  warningMessage.value = ''
   try {
+    const result = await formRef.value?.validate()
+    if (result && !result.valid) return
+
+    let measurement: FieldMeasurementInput | null = null
+    if (isFilled(form.height) || isFilled(form.canopyWidth)) {
+      const parsed = parseMeasurementPair(form.height, form.canopyWidth)
+      if (!parsed.ok) {
+        errorMessage.value = parsed.error
+        return
+      }
+      measurement = parsed.value
+    }
+
     const payload: {
       idSpecies: string
       latitude: number
@@ -190,15 +319,12 @@ async function submit() {
       payload.age = new Date(`${form.age}-01-01`).toISOString()
     }
 
-    await apiConnect.post('/trees', payload)
-    successMessage.value =
-      'Árvore cadastrada com sucesso. Ela já pode aparecer no mapa após a atualização.'
-    form.speciesId = ''
-    form.latitude = ''
-    form.longitude = ''
-    form.age = ''
-    form.status = 'NORMAL'
-    form.vigor = 'GOOD'
+    const location = `${payload.latitude}, ${payload.longitude}`
+    const response = await apiConnect.post<{ id?: string }>('/trees', payload)
+    // A árvore está gravada: limpa o formulário antes da segunda gravação para
+    // que um reenvio não duplique o cadastro.
+    resetForm()
+    await saveInitialMeasurement(response?.data?.id, measurement, location)
   } catch (error: unknown) {
     errorMessage.value = getApiErrorMessage(
       error,
@@ -262,6 +388,34 @@ onMounted(loadSpecies)
         {{ successMessage }}
       </v-alert>
       <v-alert
+        v-if="warningMessage"
+        type="warning"
+        variant="tonal"
+        class="ma-4 mb-0"
+        closable
+        data-testid="measurement-warning"
+        @click:close="dismissPendingMeasurement"
+      >
+        <p class="mb-2">{{ warningMessage }}</p>
+        <template v-if="pendingMeasurement">
+          <p class="text-caption mb-3">
+            Medição pendente ({{ pendingMeasurementLabel }}) da árvore em
+            {{ pendingMeasurement.location }}. Tente de novo ou feche este aviso para descartá-la e
+            registrar depois pelo mapa.
+          </p>
+          <v-btn
+            size="small"
+            variant="flat"
+            color="warning"
+            prepend-icon="mdi-refresh"
+            :disabled="savingMeasurement"
+            data-testid="retry-measurement"
+            @click="postPendingMeasurement"
+            >Tentar salvar a medição novamente</v-btn
+          >
+        </template>
+      </v-alert>
+      <v-alert
         v-if="errorMessage"
         type="error"
         variant="tonal"
@@ -272,7 +426,13 @@ onMounted(loadSpecies)
         {{ errorMessage }}
       </v-alert>
 
-      <v-form ref="formRef" validate-on="submit" class="pa-6" @submit.prevent="submit">
+      <v-form
+        ref="formRef"
+        validate-on="submit"
+        class="pa-6"
+        :inert="isSaving ? '' : undefined"
+        @submit.prevent="submit"
+      >
         <div class="d-flex flex-wrap justify-space-between align-center ga-2 mb-4">
           <div>
             <p class="text-subtitle-1 font-weight-bold mb-0">Identificação</p>
@@ -370,6 +530,47 @@ onMounted(loadSpecies)
           </v-col>
         </v-row>
 
+        <p class="text-subtitle-1 font-weight-bold mb-1 mt-4">
+          Medição de campo
+          <span class="text-caption text-grey font-weight-regular">(opcional)</span>
+        </p>
+        <p class="text-caption text-medium-emphasis mb-3">
+          Se você mediu a árvore, informe a altura e a largura da copa juntas. Os valores entram no
+          histórico de medições e aparecem no mapa.
+        </p>
+        <v-row>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.height"
+              label="Altura medida"
+              inputmode="decimal"
+              autocomplete="off"
+              suffix="m"
+              variant="outlined"
+              prepend-inner-icon="mdi-ruler"
+              :rules="[measurementRules.height]"
+              hint="Ex.: 5,2"
+              persistent-hint
+              data-testid="initial-height"
+            />
+          </v-col>
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="form.canopyWidth"
+              label="Largura da copa"
+              inputmode="decimal"
+              autocomplete="off"
+              suffix="m"
+              variant="outlined"
+              prepend-inner-icon="mdi-arrow-expand-horizontal"
+              :rules="[measurementRules.canopyWidth]"
+              hint="Ex.: 2,4"
+              persistent-hint
+              data-testid="initial-canopy-width"
+            />
+          </v-col>
+        </v-row>
+
         <p class="text-subtitle-1 font-weight-bold mb-4 mt-4">
           Dados operacionais
           <span class="text-caption text-grey font-weight-regular">(opcionais)</span>
@@ -406,8 +607,7 @@ onMounted(loadSpecies)
           <v-btn
             color="green-darken-2"
             type="submit"
-            :loading="loading"
-            :disabled="loading"
+            :disabled="isSaving || Boolean(pendingMeasurement)"
             prepend-icon="mdi-content-save"
             >Salvar árvore</v-btn
           >
@@ -461,6 +661,8 @@ onMounted(loadSpecies)
         </v-form>
       </v-card>
     </v-dialog>
+
+    <TreeSavingOverlay :visible="isSaving" :step="savingStep" />
   </v-container>
 </template>
 

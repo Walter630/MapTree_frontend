@@ -95,20 +95,11 @@
             size="small"
             variant="text"
             color="blue-grey-darken-2"
+            aria-label="Editar funcionário"
             @click="openDialogEdit(item)"
           >
             <v-icon>mdi-pencil-outline</v-icon>
             <v-tooltip activator="parent" location="top">Editar</v-tooltip>
-          </v-btn>
-          <v-btn
-            icon
-            size="small"
-            variant="text"
-            color="red-darken-2"
-            @click="openDialogDelete(item)"
-          >
-            <v-icon>mdi-trash-can-outline</v-icon>
-            <v-tooltip activator="parent" location="top">Excluir</v-tooltip>
           </v-btn>
         </template>
 
@@ -158,27 +149,6 @@
                 density="comfortable"
               />
             </v-col>
-            <v-col cols="12">
-              <v-select
-                v-model="dialogEdit.item.role"
-                :items="roleOptions"
-                label="Perfil"
-                variant="outlined"
-                density="comfortable"
-              />
-            </v-col>
-            <v-col cols="12">
-              <v-select
-                v-model="dialogEdit.item.isActive"
-                :items="[
-                  { title: 'Ativo', value: true },
-                  { title: 'Inativo', value: false },
-                ]"
-                label="Status da Conta"
-                variant="outlined"
-                density="comfortable"
-              />
-            </v-col>
           </v-row>
         </v-card-text>
         <v-card-actions>
@@ -191,25 +161,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- ===== Diálogo de Exclusão ===== -->
-    <v-dialog v-model="dialogDelete.active" max-width="450px">
-      <v-card v-if="dialogDelete.item" class="rounded-xl pa-4">
-        <v-card-title class="text-h6 font-weight-bold text-error"
-          >Excluir Funcionário?</v-card-title
-        >
-        <v-card-text>
-          Tem certeza que deseja remover <strong>{{ dialogDelete.item.name }}</strong
-          >? Esta ação removerá o acesso do usuário permanentemente.
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeDialogDelete">Pensa melhor</v-btn>
-          <v-btn color="error" variant="flat" :loading="dialogDelete.loading" @click="deleteItem"
-            >Sim, Excluir</v-btn
-          >
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-container>
 </template>
 
@@ -256,21 +207,11 @@ export default defineComponent({
         { title: 'Status', key: 'isActive', align: 'center' as const },
         { title: 'Ações', key: 'acoes', align: 'end' as const, sortable: false },
       ],
-      dialogDelete: {
-        active: false,
-        loading: false,
-        item: null as Funcionario | null,
-      },
       dialogEdit: {
         active: false,
         loading: false,
         item: null as Funcionario | null,
       },
-      roleOptions: [
-        { title: 'Usuário', value: 'USER' },
-        { title: 'Gestor', value: 'GESTOR' },
-      ],
-
       // backup para filtros
       allUsers: [] as Funcionario[],
       totalUsers: 0,
@@ -301,7 +242,7 @@ export default defineComponent({
 
     async getAllUsers(): Promise<void> {
       try {
-        const response = await this.$api.get<Funcionario[]>('/users')
+        const response = await this.$api.get<Funcionario[]>('/users', { params: { role: 'USER' } })
         this.allUsers = response.data.map((user) => ({
           ...user,
           isActive: user.isActive ?? true,
@@ -379,21 +320,6 @@ export default defineComponent({
       this.$router.push('/manager/register-employee')
     },
 
-    /** 🔹 Excluir item */
-    async deleteItem() {
-      if (!this.dialogDelete.item) return
-      try {
-        this.dialogDelete.loading = true
-        await this.$api.delete(`/users/${this.dialogDelete.item.id}`)
-        this.notify('Usuário removido.', 'success')
-      } catch (error) {
-        console.error('Erro ao excluir:', error)
-      } finally {
-        await this.getAllUsers()
-        this.closeDialogDelete()
-      }
-    },
-
     /** 🔹 Aplicar filtros */
     applyFilters() {
       this.users = this.users.filter((g) => {
@@ -404,16 +330,6 @@ export default defineComponent({
         return matchName
       })
       this.page = 1
-    },
-
-    openDialogDelete(item: Funcionario) {
-      this.dialogDelete.active = true
-      this.dialogDelete.item = item
-    },
-    closeDialogDelete() {
-      this.dialogDelete.active = false
-      this.dialogDelete.item = null
-      this.dialogDelete.loading = false
     },
 
     /** 🔹 Voltar */

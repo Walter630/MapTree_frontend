@@ -3,7 +3,8 @@ import { defineConfig, devices } from '@playwright/test'
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3500'
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'session.spec.ts',
+  testMatch: ['session.spec.ts', 'tree-map.spec.ts'],
+  grepInvert: process.env.E2E_RUN_MUTATING_TESTS === '1' ? undefined : /@mutates/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

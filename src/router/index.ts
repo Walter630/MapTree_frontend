@@ -11,8 +11,6 @@ import LoginPage from '@/pages/LoginPage.vue'
 import RecoveryPage from '@/pages/RecoveryPage.vue'
 import MainComponent from '@/components/MainView/MainComponent.vue'
 import RegisterComponent from '@/components/MainView/RegisterComponent.vue'
-import EmailMessageComponent from '@/components/MainView/EmailMessageComponent.vue'
-import ResetPasswordComponent from '@/components/MainView/ResetPasswordComponent.vue'
 
 /* ===================================
    IMPORTS — Admin
@@ -78,13 +76,13 @@ const router = createRouter({
           path: 'recovery-code',
           name: 'RecoveryCode',
           meta: { public: true },
-          component: EmailMessageComponent,
+          redirect: { name: 'Recovery' },
         },
         {
           path: 'reset-password',
           name: 'ResetPassword',
           meta: { public: true },
-          component: ResetPasswordComponent,
+          redirect: { name: 'Recovery' },
         },
         { path: 'logout', name: 'Logout', component: LogoutPage },
         { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina, meta: { role: 'ADMIN' } },

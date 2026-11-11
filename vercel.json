@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://76.13.227.139:4000/api/:path*"
+      "destination": "https://api.maptree.com.br/api/:path*"
     },
     {
       "source": "/(.*)",

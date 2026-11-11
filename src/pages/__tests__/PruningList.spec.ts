@@ -148,4 +148,13 @@ describe('PruningList', () => {
     expect(wrapper.text()).toContain('Falha de rede')
     expect(wrapper.text()).not.toContain('Carregando podas...')
   })
+
+  it('explica que é necessário entrar novamente quando a sessão é rejeitada', async () => {
+    get.mockRejectedValue({ response: { status: 401, data: { message: 'Unauthorized' } } })
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sua sessão expirou. Entre novamente.')
+    wrapper.unmount()
+  })
 })

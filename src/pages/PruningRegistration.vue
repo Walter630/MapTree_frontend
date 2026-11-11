@@ -11,8 +11,8 @@
     />
 
     <v-alert type="info" variant="tonal" class="mb-5"
-      >Está atendendo uma rota? Registre o serviço na própria parada, com a árvore já
-      selecionada.<v-btn
+      >Se houver uma parada pendente da sua rota para a mesma árvore e data, este registro também
+      conclui a parada.<v-btn
         class="ml-2"
         variant="text"
         :to="`${route.path.startsWith('/admin') ? '/admin' : route.path.startsWith('/manager') ? '/manager' : '/user'}/routes/daily`"
@@ -166,7 +166,9 @@
       <v-card class="pa-4 text-center">
         <v-icon size="64" color="success" class="mb-4">mdi-check-circle</v-icon>
         <h3 class="text-h6 font-weight-bold mb-2">Poda Registrada!</h3>
-        <p class="text-body-2 text-grey mb-4">A poda foi registrada com sucesso no sistema.</p>
+        <p class="text-body-2 text-grey mb-4">
+          A data da poda aparece na árvore no mapa. A avaliação de risco é exibida separadamente.
+        </p>
         <v-btn color="success" block @click="goToList"> Ver Lista de Podas </v-btn>
       </v-card>
     </v-dialog>
@@ -189,6 +191,7 @@ import { localDate, treeIdentity, treeCoordinates } from '@/utils/pruningWorkflo
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { getDailyRouteSchedules } from '@/utils/dailyRouteSchedules'
 
 const router = useRouter()
 const route = useRoute()
@@ -201,6 +204,7 @@ const submitting = ref(false)
 const showSuccess = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
+let attemptedSchedule: { id: string; treeId: string; date: string } | undefined
 
 // Data
 const trees = ref<(TreeApiRecord & { displayName: string })[]>([])
@@ -266,19 +270,32 @@ const loadTrees = async () => {
 const submit = async () => {
   if (submitting.value) return
   showValidation.value = true
-
-  const validation = await formRef.value?.validate()
-  const valid = validation?.valid
-  if (!valid) return
-
   submitting.value = true
   try {
-    await apiConnect.post('/pruning', {
-      idTree: form.value.idTree,
-      type: form.value.type,
-      date: `${form.value.date}T12:00:00-03:00`,
-      observations: form.value.observations,
-    })
+    if (!(await formRef.value?.validate())?.valid) return
+    const { idTree, type, date, observations } = form.value
+    const payload = {
+      type,
+      date: date === localDate() ? new Date().toISOString() : `${date}T12:00:00-03:00`,
+      observations,
+    }
+    if (attemptedSchedule?.treeId !== idTree || attemptedSchedule.date !== date) {
+      const schedules = await getDailyRouteSchedules(date)
+      const matches = schedules.filter(
+        (stop) => stop.status === 'PENDING' && stop.treeId === idTree,
+      )
+      if (matches.length > 1) {
+        errorMessage.value =
+          'Há mais de uma parada para esta árvore e data. Escolha a parada na rota diária para registrar a poda.'
+        showError.value = true
+        return
+      }
+      const match = matches[0]
+      attemptedSchedule = match ? { id: match.id, treeId: idTree, date } : undefined
+    }
+    if (attemptedSchedule)
+      await apiConnect.post(`/scheduling/${attemptedSchedule.id}/complete`, payload)
+    else await apiConnect.post('/pruning', { ...payload, idTree })
 
     showSuccess.value = true
   } catch (error: unknown) {

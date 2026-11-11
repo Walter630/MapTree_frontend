@@ -261,6 +261,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const router = useRouter()
 const route = useRoute()
@@ -388,9 +389,11 @@ const loadPrunings = async () => {
     }
     prunings.value = records
   } catch (error: unknown) {
-    console.error('Erro ao carregar podas:', error)
     const apiError = error as { response?: { data?: { message?: string } } }
-    errorMessage.value = apiError.response?.data?.message || 'Erro ao carregar podas'
+    errorMessage.value = getApiErrorMessage(
+      error,
+      apiError.response?.data?.message || 'Não foi possível carregar o histórico de podas.',
+    )
     showError.value = true
   } finally {
     loading.value = false

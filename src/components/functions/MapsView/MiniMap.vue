@@ -8,6 +8,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { speciesIcon } from '@/utils/speciesDisplay'
 import { buildTreeDensityCells, isValidGeoPoint } from '@/utils/treeDensity'
+import { buildTreePopup, TREE_TONE_COLORS, type TreeTone } from '@/utils/treePopup'
 
 interface DashboardTree {
   id: string
@@ -16,7 +17,7 @@ interface DashboardTree {
   lat?: number
   lng?: number
   status: string
-  species?: { commonName?: string }
+  species?: { commonName?: string; scientificName?: string }
 }
 const props = withDefaults(
   defineProps<{
@@ -71,13 +72,13 @@ function render() {
   if (heat && map.hasLayer(heat as unknown as L.Layer)) map.removeLayer(heat as unknown as L.Layer)
   for (const tree of displayedTrees.value) {
     const name = tree.species?.commonName || 'Espécie não identificada'
-    const color =
-      tree.status === 'CRITICAL'
-        ? '#b93d43'
-        : prioritySet.value.has(tree.id)
-          ? '#b66b20'
-          : '#347451'
-    const marker = L.marker([tree.latitude ?? tree.lat!, tree.longitude ?? tree.lng!], {
+    const latitude = tree.latitude ?? tree.lat!
+    const longitude = tree.longitude ?? tree.lng!
+    // O mesmo tom define a cor do marcador e a do cartão do popup.
+    const tone: TreeTone =
+      tree.status === 'CRITICAL' ? 'critical' : prioritySet.value.has(tree.id) ? 'priority' : 'normal'
+    const color = TREE_TONE_COLORS[tone]
+    const marker = L.marker([latitude, longitude], {
       title: name,
       alt: name,
       icon: L.divIcon({
@@ -86,13 +87,26 @@ function render() {
         className: 'dashboard-tree-marker',
       }),
     })
-    const content = document.createElement('div')
-    const heading = document.createElement('strong')
-    heading.textContent = name
-    const status = document.createElement('p')
-    status.textContent = statusLabels[tree.status] || tree.status
-    content.append(heading, status)
-    marker.bindPopup(content)
+    marker.bindPopup(
+      buildTreePopup({
+        id: tree.id,
+        name,
+        scientificName: tree.species?.scientificName,
+        icon: speciesIcon(name),
+        statusLabel: statusLabels[tree.status] || tree.status,
+        tone,
+        latitude,
+        longitude,
+      }),
+      { className: 'tree-info-popup', minWidth: 230, maxWidth: 270 },
+    )
+    // O Leaflet rotula o botão de fechar em inglês; ajusta para o idioma da interface.
+    marker.on('popupopen', (event: L.PopupEvent) => {
+      event.popup
+        .getElement()
+        ?.querySelector('.leaflet-popup-close-button')
+        ?.setAttribute('aria-label', 'Fechar')
+    })
     marker.on('click', () => emit('select-trees', [tree.id]))
     markerIds.set(marker, tree.id)
     markers.set(tree.id, marker)
@@ -136,7 +150,23 @@ function focusOn(latitude: number, longitude: number) {
   }
 }
 defineExpose({ focusOn })
-watch([displayedTrees, mode], render)
+// Os painéis passam `priorityIds` como um array novo a cada render (ex.: após o clique
+// num marcador mudar a seleção). Comparar por referência redesenhava o mapa, fechava o
+// popup recém-aberto e reenquadrava a visão. A assinatura muda apenas quando o conteúdo
+// desenhado muda.
+const renderSignature = computed(
+  () =>
+    `${mode.value}|` +
+    displayedTrees.value
+      .map(
+        (tree) =>
+          `${tree.id}:${tree.latitude ?? tree.lat}:${tree.longitude ?? tree.lng}:${tree.status}:` +
+          `${prioritySet.value.has(tree.id) ? 1 : 0}:${tree.species?.commonName ?? ''}:` +
+          `${tree.species?.scientificName ?? ''}`,
+      )
+      .join('|'),
+)
+watch(renderSignature, render)
 watch(mode, () => emit('select-trees', []))
 onMounted(() => {
   if (!container.value) return
@@ -334,5 +364,180 @@ onUnmounted(() => {
 :deep(.dashboard-tree-marker) {
   border: 0;
   background: transparent;
+}
+
+/* ===== Popup da árvore: cartão em 3 faixas (identificação, situação, ação) ===== */
+:deep(.tree-info-popup .leaflet-popup-content-wrapper) {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
+}
+:deep(.tree-info-popup .leaflet-popup-content) {
+  margin: 0;
+  line-height: 1.35;
+}
+:deep(.tree-info-popup .leaflet-popup-tip) {
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.16);
+}
+:deep(.tree-info-popup a.leaflet-popup-close-button) {
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  font: 22px/26px system-ui, sans-serif;
+  color: #475569;
+}
+:deep(.tree-info-popup a.leaflet-popup-close-button:hover) {
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+:deep(.tree-info-popup a.leaflet-popup-close-button:focus-visible) {
+  outline: 2px solid #183f2b;
+  outline-offset: 1px;
+}
+
+:deep(.tip) {
+  --tip-accent: #347451;
+  --tip-tint: #f0f6f2;
+  --tip-line: #d5e6dc;
+  --tip-chip-bg: #e3f0e8;
+  --tip-chip-fg: #1f5237;
+  color: #0f172a;
+}
+:deep(.tip[data-tone='priority']) {
+  --tip-accent: #b66b20;
+  --tip-tint: #fcf5ec;
+  --tip-line: #f0dfc8;
+  --tip-chip-bg: #fbebd6;
+  --tip-chip-fg: #7a4310;
+}
+:deep(.tip[data-tone='critical']) {
+  --tip-accent: #b93d43;
+  --tip-tint: #fbf1f1;
+  --tip-line: #f0d5d6;
+  --tip-chip-bg: #fbe7e8;
+  --tip-chip-fg: #8a2a2f;
+}
+
+/* Faixa 1: identificação (o espaço à direita evita o botão de fechar) */
+:deep(.tip-head) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 44px 12px 14px;
+  background: var(--tip-tint);
+  border-bottom: 1px solid var(--tip-line);
+  border-left: 4px solid var(--tip-accent);
+}
+:deep(.tip-avatar) {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  font-size: 20px;
+  background: #fff;
+  border: 2px solid var(--tip-accent);
+  border-radius: 50%;
+}
+:deep(.tip-identity) {
+  min-width: 0;
+}
+:deep(.tip-name) {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+:deep(.tip-sci) {
+  margin: 1px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: #475569;
+}
+:deep(.tip-code) {
+  margin: 3px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Faixa 2: situação e localização, uma linha rotulada para cada */
+:deep(.tip-rows) {
+  margin: 0;
+  padding: 4px 14px 4px 18px;
+}
+:deep(.tip-row) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+}
+:deep(.tip-row + .tip-row) {
+  border-top: 1px solid #eef2f0;
+}
+:deep(.tip-row dt) {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #475569;
+}
+:deep(.tip-row dd) {
+  margin: 0;
+  text-align: right;
+  font-size: 13px;
+}
+:deep(.tip-chip) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tip-chip-fg);
+  background: var(--tip-chip-bg);
+  border-radius: 999px;
+}
+:deep(.tip-dot) {
+  width: 8px;
+  height: 8px;
+  background: var(--tip-accent);
+  border-radius: 50%;
+}
+:deep(.tip-coords) {
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Faixa 3: ação */
+:deep(.tip-action) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f5237;
+  text-decoration: none;
+  background: #f7faf8;
+  border-top: 1px solid #e5ece7;
+}
+:deep(.tip-action:hover) {
+  background: #eaf3ed;
+  text-decoration: underline;
+}
+:deep(.tip-action:focus-visible) {
+  outline: 2px solid #183f2b;
+  outline-offset: -3px;
 }
 </style>

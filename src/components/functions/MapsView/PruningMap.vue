@@ -3,17 +3,19 @@ import type { TreeApiRecord } from '@/types/treeApi'
 import { isAxiosError } from 'axios'
 import { speciesIcon } from '@/utils/speciesDisplay'
 import { defineComponent, onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import * as L from 'leaflet'
 import { HeatLayer } from 'leaflet.heat'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { apiConnect, type TreeWithAi } from '@/plugins/apiConnect'
+import { apiConnect, type Measurement, type TreeWithAi } from '@/plugins/apiConnect'
 import TreeAiStats from '@/components/functions/TreeAiStats.vue'
+import TreeFieldMeasurement from '@/components/functions/TreeFieldMeasurement.vue'
 import { SOIL_TYPES, getSoilInfo } from '@/utils/soilData'
 import { readDailyRouteSnapshot, type DailyRouteStopSnapshot } from '@/utils/dailyRouteStorage'
+import { getDailyRouteSchedules, getPendingMapStops } from '@/utils/dailyRouteSchedules'
 import { isTreeForPruning, prioritizeTrees } from '@/utils/treePriority'
 import 'leaflet-routing-machine'
 import {
@@ -105,6 +107,7 @@ interface TreeOnMap {
   latitude: number
   longitude: number
   status: string
+  pruningLabel?: string
   speciesName: string
   scientificName: string
   family: string
@@ -217,6 +220,11 @@ const DEFAULT_STATUS: StatusInfo = {
   border: '#2E7D32',
 }
 
+const pruningDateFormatter = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  dateStyle: 'short',
+})
+
 function getStatusCfg(status: string, danger: boolean): StatusInfo {
   const s = String(status).toUpperCase()
 
@@ -240,7 +248,7 @@ function getStatusCfg(status: string, danger: boolean): StatusInfo {
 
 export default defineComponent({
   name: 'PruningMap',
-  components: { TreeAiStats },
+  components: { TreeAiStats, TreeFieldMeasurement },
 
   setup() {
     const currentRoute = useRoute()
@@ -324,7 +332,10 @@ export default defineComponent({
       const value = currentRoute.query.routeDate
       return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
     })
+    const router = useRouter()
     const dailyRouteStops = ref<DailyRouteStopSnapshot[]>([])
+    const dailyRouteState = ref<'loading' | 'ready' | 'empty' | 'completed' | 'error'>('loading')
+    let dailyRouteRequest = 0
     const dailyRouteVisible = computed(() =>
       Boolean(dailyRouteDate.value && dailyRouteStops.value.length),
     )
@@ -407,6 +418,9 @@ export default defineComponent({
     /* ---------- IA Drawer ---------- */
     const aiDrawerOpen = ref(false)
     const aiTreeData = ref<TreeWithAi | null>(null)
+    const fieldMeasurement = ref<Measurement>()
+    const fieldWireHeight = ref<number>()
+    let treeDetailsRequest = 0
     const loadingAiData = ref(false)
 
     /* ---------- Computed ---------- */
@@ -435,6 +449,9 @@ export default defineComponent({
           .map((item) => item.tree)
       }
       if (activeFilter.value === 'ALL') return candidates
+      if (activeFilter.value === 'PRUNED') {
+        return candidates.filter((tree) => tree.pruningLabel || tree.status === 'PRUNED')
+      }
       if (activeFilter.value === 'CRITICAL') {
         return prioritizeTrees(candidates)
           .filter((item) => item.urgency === 'CRITICAL')
@@ -502,6 +519,7 @@ export default defineComponent({
       }
       trees.value.forEach((t) => {
         counts[t.status] = (counts[t.status] || 0) + 1
+        if (t.pruningLabel && t.status !== 'PRUNED') counts.PRUNED = (counts.PRUNED || 0) + 1
       })
       return counts
     })
@@ -551,6 +569,7 @@ export default defineComponent({
         dailyRoadRoutingControl = null
       }
       if (!dailyRouteStops.value.length) return
+      treeClusterGroup?.clearLayers()
 
       const points = dailyRouteStops.value.map((stop) => L.latLng(stop.latitude, stop.longitude))
 
@@ -567,7 +586,11 @@ export default defineComponent({
 
         // O Routing Machine transforma os waypoints em um trajeto viário real.
         dailyRoadRoutingControl = L.Routing.control({
-          waypoints: points,
+          plan: L.Routing.plan(points, {
+            addWaypoints: false,
+            draggableWaypoints: false,
+            createMarker: () => false,
+          }),
           lineOptions: {
             extendToWaypoints: false,
             missingRouteTolerance: 0,
@@ -615,11 +638,40 @@ export default defineComponent({
       else map.setView(points[0]!, 17)
     }
 
-    const loadDailyRoute = () => {
-      dailyRouteStops.value = dailyRouteDate.value
-        ? readDailyRouteSnapshot(dailyRouteDate.value)?.stops || []
-        : []
+    const loadDailyRoute = async () => {
+      const request = ++dailyRouteRequest
+      const date = dailyRouteDate.value
+      dailyRouteStops.value = []
+      dailyRouteState.value = 'loading'
       renderDailyRoute()
+      if (!date) return
+
+      try {
+        const schedules = await getDailyRouteSchedules(date)
+        if (isDestroyed || request !== dailyRouteRequest) return
+        const cached = readDailyRouteSnapshot(date)?.stops ?? []
+        dailyRouteStops.value = getPendingMapStops(schedules, cached)
+        if (dailyRouteStops.value.length) dailyRouteState.value = 'ready'
+        else if (schedules.some((stop) => stop.status === 'PENDING'))
+          dailyRouteState.value = 'empty'
+        else
+          dailyRouteState.value = schedules.some((stop) => stop.status === 'COMPLETED')
+            ? 'completed'
+            : 'empty'
+        renderDailyRoute()
+      } catch {
+        if (!isDestroyed && request === dailyRouteRequest) dailyRouteState.value = 'error'
+      }
+    }
+
+    const exitDailyRoute = () => {
+      const query = { ...currentRoute.query }
+      delete query.routeDate
+      void router.replace({ query })
+    }
+
+    const refreshVisibleDailyRoute = () => {
+      if (dailyRouteDate.value && document.visibilityState === 'visible') void loadDailyRoute()
     }
 
     const openExternalNavigation = (stop: DailyRouteStopSnapshot | null) => {
@@ -698,28 +750,38 @@ export default defineComponent({
       const lng = Number(lngValue)
       if (!isValidGeoPoint(lat, lng)) return null
 
-      const curH = Number(
-        t.currentHeight ||
-          t.estimatedHeight ||
-          t.estimated_height_m ||
-          t.aiPrediction?.estimated_height_m ||
-          0,
+      const latestMeasurement = t.measurements?.find(
+        ({ height }) => Number.isFinite(height) && height >= 0,
       )
-      const wireH = Number(t.wireHeight || t.wire_height_m || t.aiPrediction?.wire_height_m || 6.5)
-      const treeStatus = t.status || 'NORMAL'
-      const isDanger = checkNearPowerLine(lat, lng) || (wireH > 0 && curH / wireH >= 0.9)
+      const curH =
+        t.currentHeight ??
+        latestMeasurement?.height ??
+        t.estimatedHeight ??
+        t.estimated_height_m ??
+        t.aiPrediction?.estimated_height_m
+      const wireH = t.wireHeight ?? t.wire_height_m ?? t.aiPrediction?.wire_height_m
+      const treeStatus = t.measuredStatus || t.status || 'NORMAL'
+      const isDanger =
+        checkNearPowerLine(lat, lng) ||
+        (wireH !== undefined && wireH > 0 && curH !== undefined && curH / wireH >= 0.9)
+      const pruningDate = t.lastPruneDate ? Date.parse(t.lastPruneDate) : NaN
+      const pruningLabel = Number.isFinite(pruningDate)
+        ? `Última poda em ${pruningDateFormatter.format(pruningDate)}`
+        : t.status === 'PRUNED'
+          ? 'Poda registrada'
+          : undefined
 
       // Extrair dados de solo se disponíveis
       const soilQuality = t.soil?.quality || t.soilQuality || 'UNKNOWN'
       const vigor = t.vigor || t.soil?.vigor || 'GOOD'
       const nestObservation = Array.isArray(t.nestObservations) ? t.nestObservations[0] : null
-      const latestMeasurement = Array.isArray(t.measurements) ? t.measurements[0] : null
 
       return {
         id: t.id,
         latitude: lat,
         longitude: lng,
         status: treeStatus,
+        pruningLabel,
         speciesName: t.species?.commonName || 'Espécie não identificada',
         scientificName: t.species?.scientificName || '',
         family: t.species?.family || '',
@@ -1389,6 +1451,7 @@ export default defineComponent({
         return
       }
       treeClusterGroup.clearLayers()
+      if (dailyRouteVisible.value) return
 
       if (filteredTrees.value.length === 0) {
         console.warn('[PruningMap] Nenhuma árvore para renderizar')
@@ -1424,9 +1487,11 @@ export default defineComponent({
                 </div>
                 <div style="text-align:right;">
                   <p style="margin:0; font-size:10px; color:#999; font-weight:700;">RISCO</p>
-                  <p style="margin:0; font-size:12px; font-weight:700; color:${t.nearPowerLine ? '#E53935' : '#43A047'}">${t.nearPowerLine ? '⚠ RISCO' : '✓ SEGURO'}</p>
+                  <p style="margin:0; font-size:12px; font-weight:700; color:${cfg.color}">${cfg.label}</p>
                 </div>
               </div>
+
+              ${t.pruningLabel ? `<p style="margin:0 0 12px; color:#2E7D32;">${escapeHtml(t.pruningLabel)}</p>` : ''}
 
               <!-- Novo Bloco de Solo Unificado -->
               <div style="
@@ -1803,16 +1868,37 @@ export default defineComponent({
     }
 
     /* ---------- IA Drawer ---------- */
-    const openAiDrawer = async (t: TreeOnMap) => {
+    const openAiDrawer = async (t: TreeOnMap, savedMeasurement?: Measurement) => {
+      const request = ++treeDetailsRequest
+      const isCurrent = () => !isDestroyed && request === treeDetailsRequest
       selectedTree.value = t
       aiDrawerOpen.value = true
       loadingAiData.value = true
       aiTreeData.value = null
+      fieldMeasurement.value = savedMeasurement
+      if (!savedMeasurement) fieldWireHeight.value = undefined
 
       try {
         // LAZY LOAD: Busca detalhes completos apenas ao abrir a gaveta
         const res = await apiConnect.get<TreeApiRecord>(`/trees/${t.id}`)
+        if (!isCurrent()) return
         const data: Partial<TreeApiRecord> = res.data || {}
+        fieldMeasurement.value =
+          data.measurements?.find(({ height }) => Number.isFinite(height) && height >= 0) ??
+          savedMeasurement
+        fieldWireHeight.value = data.wireHeight
+        if (savedMeasurement) {
+          const updated = parseTreeData({
+            ...data,
+            id: t.id,
+            latitude: t.latitude,
+            longitude: t.longitude,
+          })
+          if (updated) {
+            trees.value = trees.value.map((tree) => (tree.id === t.id ? updated : tree))
+            selectedTree.value = updated
+          }
+        }
 
         // Valida se um objeto tem o formato mínimo de uma predição de IA.
         // Evita passar a resposta bruta de /trees/:id (que NÃO tem os campos de
@@ -1829,7 +1915,7 @@ export default defineComponent({
 
         // Se não tiver predição nos dados básicos, tenta buscar no novo endpoint
         let aiPrediction = isValidPrediction(data.aiPrediction) ? data.aiPrediction : null
-        if (!aiPrediction) {
+        if (!aiPrediction && data.aiPrediction === undefined) {
           try {
             const predRes = await apiConnect.getAiPrediction(t.id)
             aiPrediction = isValidPrediction(predRes.data) ? predRes.data : null
@@ -1838,13 +1924,14 @@ export default defineComponent({
           }
         }
 
+        if (!isCurrent()) return
         // Só montamos o objeto quando há predição válida. Sem predição, deixamos
         // aiTreeData nulo para que o drawer mostre o estado "sem análise disponível".
         if (aiPrediction) {
           aiTreeData.value = {
             id: t.id,
             commonName: data.species?.commonName || t.speciesName || 'Árvore Independente',
-            status: t.status as TreeWithAi['status'],
+            status: (data.measuredStatus || data.status || t.status) as TreeWithAi['status'],
             aiPrediction,
             soil: data.soil || data.solo?.[0] || undefined,
             vigor: (data.vigor || 'GOOD') as TreeWithAi['vigor'],
@@ -1855,11 +1942,23 @@ export default defineComponent({
           aiTreeData.value = null
         }
       } catch (err) {
+        if (!isCurrent()) return
         console.error('Erro ao buscar dados completos da árvore:', err)
-        notify('Erro ao carregar detalhes. Tente novamente.', 'error')
-        aiDrawerOpen.value = false // Fecha se falhar feio
+        notify(
+          savedMeasurement
+            ? 'Medição registrada. Abra a árvore novamente para atualizar a classificação no mapa.'
+            : 'Erro ao carregar detalhes. Tente novamente.',
+          'error',
+        )
       } finally {
-        loadingAiData.value = false
+        if (isCurrent()) loadingAiData.value = false
+      }
+    }
+
+    const fieldMeasurementSaved = (measurement: Measurement) => {
+      const tree = selectedTree.value
+      if (tree?.id === measurement.treeId && aiDrawerOpen.value) {
+        void openAiDrawer(tree, measurement)
       }
     }
 
@@ -2024,7 +2123,7 @@ export default defineComponent({
       })
       map.addLayer(treeClusterGroup)
       dailyRouteLayer = L.layerGroup().addTo(map)
-      loadDailyRoute()
+      void loadDailyRoute()
 
       markedMarkersLayer = L.layerGroup().addTo(map)
       powerLinesLayer = L.layerGroup().addTo(map)
@@ -2173,6 +2272,7 @@ export default defineComponent({
       initMap()
       window.addEventListener('keydown', handleKeydown)
       window.addEventListener('resize', handleResize)
+      document.addEventListener('visibilitychange', refreshVisibleDailyRoute)
     })
 
     onUnmounted(() => {
@@ -2186,6 +2286,7 @@ export default defineComponent({
       if (tileLoadTimeout) clearTimeout(tileLoadTimeout)
       window.removeEventListener('keydown', handleKeydown)
       window.removeEventListener('resize', handleResize)
+      document.removeEventListener('visibilitychange', refreshVisibleDailyRoute)
 
       // Remove todos os listeners do Leaflet antes de destruir o mapa,
       // para que eventos em voo (moveend etc.) não disparem após o unmount.
@@ -2258,11 +2359,16 @@ export default defineComponent({
       loadingRoute,
       dailyRouteDate,
       dailyRouteStops,
-      dailyRouteVisible,
+      dailyRouteState,
       nextDailyRouteStop,
+      loadDailyRoute,
+      exitDailyRoute,
       openExternalNavigation,
       aiDrawerOpen,
       aiTreeData,
+      fieldMeasurement,
+      fieldWireHeight,
+      fieldMeasurementSaved,
       loadingAiData,
       openAiDrawer,
       closeAiDrawer,
@@ -2373,7 +2479,7 @@ export default defineComponent({
     </Transition>
 
     <!-- ============ ROTA DIÁRIA ============ -->
-    <v-card v-if="dailyRouteVisible" class="daily-route-map-card" elevation="8">
+    <v-card v-if="dailyRouteDate" class="daily-route-map-card" elevation="8">
       <div class="d-flex align-center mb-2">
         <v-avatar color="green-darken-2" size="34" class="mr-2"
           ><v-icon color="white" size="19">mdi-map-marker-path</v-icon></v-avatar
@@ -2381,27 +2487,49 @@ export default defineComponent({
         <div class="flex-grow-1">
           <p class="text-subtitle-2 font-weight-bold mb-0">Rota do dia</p>
           <p class="text-caption text-grey-darken-1 mb-0">
-            {{ dailyRouteDate.split('-').reverse().join('/') }} ·
-            {{ dailyRouteStops.length }} paradas
+            {{ dailyRouteDate.split('-').reverse().join('/') }}
           </p>
         </div>
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          size="small"
+          aria-label="Sair da visualização da rota"
+          @click="exitDailyRoute"
+        />
       </div>
-      <div class="daily-route-next mb-3">
-        <span class="text-caption text-grey-darken-1">Próxima parada</span>
-        <strong
-          >Parada {{ nextDailyRouteStop?.order }} ·
-          {{ nextDailyRouteStop?.label || 'Árvore' }}</strong
+      <template v-if="dailyRouteState === 'ready'">
+        <div class="daily-route-next mb-3">
+          <span class="text-caption text-grey-darken-1">
+            {{ dailyRouteStops.length }} paradas no mapa · Próxima parada
+          </span>
+          <strong>
+            Parada {{ nextDailyRouteStop?.order }} · {{ nextDailyRouteStop?.label || 'Árvore' }}
+          </strong>
+        </div>
+        <v-btn
+          block
+          color="blue-darken-2"
+          variant="flat"
+          class="text-none"
+          prepend-icon="mdi-navigation-variant"
+          @click="openExternalNavigation(nextDailyRouteStop)"
+          >Navegar até a próxima</v-btn
         >
-      </div>
-      <v-btn
-        block
-        color="blue-darken-2"
-        variant="flat"
-        class="text-none"
-        prepend-icon="mdi-navigation-variant"
-        @click="openExternalNavigation(nextDailyRouteStop)"
-        >Navegar até a próxima</v-btn
-      >
+      </template>
+      <p v-else-if="dailyRouteState === 'completed'" role="status" class="text-body-2 mb-0">
+        Rota concluída. O mapa voltou a mostrar as árvores.
+      </p>
+      <p v-else-if="dailyRouteState === 'loading'" role="status" class="text-body-2 mb-0">
+        Conferindo as paradas da rota…
+      </p>
+      <p v-else-if="dailyRouteState === 'empty'" role="status" class="text-body-2 mb-0">
+        Nenhuma parada pendente com coordenadas disponíveis.
+      </p>
+      <template v-else>
+        <p role="alert" class="text-body-2 mb-1">Não foi possível conferir as paradas da rota.</p>
+        <v-btn variant="text" color="primary" @click="loadDailyRoute">Tentar novamente</v-btn>
+      </template>
     </v-card>
 
     <!-- ============ BARRA DE BUSCA DE ENDEREÇO (Nominatim) ============ -->
@@ -2436,19 +2564,23 @@ export default defineComponent({
         rounded="pill"
         class="filter-toggle"
       >
-        <v-btn value="PRIORITY" class="toggle-btn">
+        <v-btn value="PRIORITY" class="toggle-btn" :aria-pressed="activeFilter === 'PRIORITY'">
           <v-icon start color="orange-darken-2">mdi-content-cut</v-icon>
           Pendentes ({{ criticalCount }})
         </v-btn>
-        <v-btn value="ALL" class="toggle-btn">
+        <v-btn value="ALL" class="toggle-btn" :aria-pressed="activeFilter === 'ALL'">
           <v-icon start>mdi-tree</v-icon>
           Todas ({{ treeCount }})
         </v-btn>
-        <v-btn value="CRITICAL" class="toggle-btn">
+        <v-btn value="CRITICAL" class="toggle-btn" :aria-pressed="activeFilter === 'CRITICAL'">
           <v-icon start color="red">mdi-alert-decagram</v-icon>
           Críticos ({{ criticalUrgencyCount }})
         </v-btn>
-        <v-btn value="UNDER_OBSERVATION" class="toggle-btn">
+        <v-btn
+          value="UNDER_OBSERVATION"
+          class="toggle-btn"
+          :aria-pressed="activeFilter === 'UNDER_OBSERVATION'"
+        >
           <v-icon start color="amber">mdi-eye</v-icon>
           Obs. ({{ statusCounts['UNDER_OBSERVATION'] || 0 }})
         </v-btn>
@@ -3155,7 +3287,9 @@ export default defineComponent({
                   @click="activeFilter = String(key)"
                   class="mr-1 mb-1"
                 >
-                  {{ cfg.emoji }} {{ cfg.label }} ({{ statusCounts[key] || 0 }})
+                  {{ cfg.emoji }} {{ key === 'PRUNED' ? 'Com poda registrada' : cfg.label }} ({{
+                    statusCounts[key] || 0
+                  }})
                 </v-chip>
               </div>
             </div>
@@ -3219,6 +3353,9 @@ export default defineComponent({
                     {{ STATUS_CONFIG[tree.status]?.label || tree.status }}
                     <span v-if="tree.nearPowerLine" class="text-red"> · ⚠ Risco</span>
                   </v-list-item-subtitle>
+                  <span v-if="tree.pruningLabel" class="text-caption text-green-darken-3">
+                    {{ tree.pruningLabel }}
+                  </span>
 
                   <template #append>
                     <v-icon size="16" color="grey">mdi-chevron-right</v-icon>
@@ -3408,6 +3545,9 @@ export default defineComponent({
           <div class="ml-3">
             <p class="ai-drawer-title">Análise de IA</p>
             <p class="ai-drawer-subtitle">{{ selectedTree?.speciesName || 'Árvore' }}</p>
+            <p v-if="selectedTree?.pruningLabel" class="ai-drawer-subtitle">
+              {{ selectedTree.pruningLabel }}
+            </p>
           </div>
         </div>
         <v-btn icon variant="text" size="small" @click="closeAiDrawer">
@@ -3432,6 +3572,15 @@ export default defineComponent({
 
       <!-- Conteúdo do Drawer -->
       <div class="ai-drawer-body" v-if="aiDrawerOpen || aiTreeData">
+        <TreeFieldMeasurement
+          v-if="selectedTree && !selectedTree.isDemoData"
+          :key="selectedTree.id"
+          :tree-id="selectedTree.id"
+          :measurement="fieldMeasurement"
+          :wire-height="fieldWireHeight"
+          @saved="fieldMeasurementSaved"
+        />
+
         <!-- Loading -->
         <div v-if="loadingAiData" class="ai-drawer-loading">
           <v-progress-circular indeterminate color="deep-purple" size="48" width="4" />
@@ -3446,9 +3595,6 @@ export default defineComponent({
           <v-icon size="64" color="grey-lighten-1">mdi-brain</v-icon>
           <p class="mt-4 text-body-2 text-grey-darken-1 text-center">
             Nenhuma análise de IA disponível para esta árvore.
-          </p>
-          <p class="text-caption text-grey text-center">
-            Execute a importação de dados no painel do Administrador.
           </p>
         </div>
       </div>
@@ -4054,11 +4200,15 @@ export default defineComponent({
 /* ============ ALERTA / BADGE ============ */
 .location-error-alert {
   position: absolute;
-  bottom: 60px;
+  /* Acima da barra de filtros (bottom 30px + ~48px de altura), sem sobrepor. */
+  bottom: 92px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1001;
   max-width: 360px;
+  /* Fundo sólido: o tonal translúcido deixava o texto ilegível sobre o mapa. */
+  background: #fff7ed !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 
 .mark-mode-badge {
@@ -4228,7 +4378,8 @@ export default defineComponent({
   }
 
   .location-error-alert {
-    bottom: 16px;
+    /* Barra de filtros no mobile fica em bottom 20px; o aviso sobe acima dela. */
+    bottom: 78px;
     max-width: calc(100% - 24px);
   }
 

@@ -20,6 +20,11 @@ import {
   type TreePriorityInput,
 } from '@/utils/treePriority'
 import { readDailyRouteSnapshot, saveDailyRouteSnapshot } from '@/utils/dailyRouteStorage'
+import {
+  getDailyRouteSchedules,
+  routeStopSnapshot,
+  type DailyRouteSchedule,
+} from '@/utils/dailyRouteSchedules'
 import { groupRoute, MAX_SUGGESTED_ROUTE_RADIUS_KM } from '@/utils/dailyRoutePlanner'
 
 interface Tree extends TreePriorityInput {
@@ -58,23 +63,19 @@ const activeStop = ref<RouteStop | null>(null)
 const completedCount = computed(
   () => routeStops.value.filter((stop) => stop.status === 'COMPLETED').length,
 )
-const nextPendingStop = computed(() => routeStops.value.find((stop) => stop.status !== 'COMPLETED'))
-const hasNextStop = computed(() =>
-  routeStops.value.some((stop) => stop.id !== activeStop.value?.id && stop.status !== 'COMPLETED'),
+const pendingRouteStops = computed(() =>
+  routeStops.value.filter((stop) => stop.status !== 'COMPLETED'),
 )
-interface ServerStop {
-  id: string
-  treeId: string
-  routeOrder?: number
-  status: string
-  tree: Tree
-  prunings?: RoutePruning[]
-  userId?: string
-  type: string
-}
+const routeCompleted = computed(
+  () => routeStops.value.length > 0 && pendingRouteStops.value.length === 0,
+)
+const nextPendingStop = computed(() => pendingRouteStops.value.find((stop) => stop.scheduleId))
+const hasNextStop = computed(() =>
+  pendingRouteStops.value.some((stop) => stop.scheduleId && stop.id !== activeStop.value?.id),
+)
 
 function startPruning(stop: RouteStop) {
-  if (stop.status === 'COMPLETED') return
+  if (!stop.scheduleId || stop.status === 'COMPLETED' || errorMessage.value) return
   activeStop.value = stop
   pruningDialog.value = true
 }
@@ -83,6 +84,7 @@ function pruningSaved(pruning: RoutePruning, next: boolean) {
   if (!stop) return
   stop.status = 'COMPLETED'
   stop.pruning = pruning
+  savePendingSnapshot()
   feedback.value = `Poda salva para a árvore #${stop.id}. ${completedCount.value} de ${routeStops.value.length} paradas concluídas.`
   activeStop.value = null
   if (next && nextPendingStop.value) {
@@ -93,24 +95,32 @@ function pruningSaved(pruning: RoutePruning, next: boolean) {
 async function loadServerRoute() {
   const requestedDate = filters.date
   try {
-    const { data } = await apiConnect.get<ServerStop[]>('/scheduling', {
-      params: { date: requestedDate, mine: 'true' },
-    })
+    const schedules = await getDailyRouteSchedules<Tree>(requestedDate)
     if (requestedDate !== filters.date) return
-    const stops = data.filter((stop) => stop.type === 'PRUNING' && stop.status !== 'CANCELLED')
-    if (stops.length) {
-      routeStops.value = stops.map((stop, index) => ({
+    const stops = schedules.filter((stop) => stop.status !== 'CANCELLED')
+    const scheduledTrees = new Set(schedules.map((stop) => stop.treeId))
+    const drafts = routeStops.value.filter((stop) => !scheduledTrees.has(stop.id))
+    routeStops.value = [
+      ...stops.map((stop, index) => ({
         id: stop.treeId,
         order: stop.routeOrder || index + 1,
         tree: stop.tree,
         scheduleId: stop.id,
         status: stop.status,
         pruning: stop.prunings?.[0],
-      }))
-      syncState.value = 'server'
-      planning.value = false
-    }
+      })),
+      ...drafts,
+    ].sort((a, b) => a.order - b.order)
+    syncState.value = drafts.length
+      ? stops.length
+        ? 'pending'
+        : 'local'
+      : stops.length
+        ? 'server'
+        : 'idle'
+    planning.value = !stops.length || drafts.length > 0
   } catch {
+    if (requestedDate !== filters.date) return
     errorMessage.value =
       'Não foi possível conferir a rota e as podas no servidor. Atualize antes de registrar um serviço.'
   }
@@ -141,7 +151,15 @@ let routeMap: L.Map | null = null
 let routeLayer: L.LayerGroup | null = null
 
 const prioritized = computed(() => prioritizeTrees(trees.value))
-const pendingTrees = computed(() => prioritized.value.filter((item) => item.needsPruning))
+const completedTreeIds = computed(
+  () =>
+    new Set(routeStops.value.filter((stop) => stop.status === 'COMPLETED').map((stop) => stop.id)),
+)
+const pendingTrees = computed(() =>
+  prioritized.value.filter(
+    (item) => item.needsPruning && !completedTreeIds.value.has(item.tree.id),
+  ),
+)
 const filteredTrees = computed(() => {
   const search = filters.search.trim().toLowerCase()
   return pendingTrees.value.filter((item) => {
@@ -249,6 +267,7 @@ async function removeStop(index: number) {
   }
   routeStops.value.splice(index, 1)
   normalizeOrder()
+  savePendingSnapshot()
 }
 
 function moveStop(index: number, direction: -1 | 1) {
@@ -278,6 +297,7 @@ function loadLocalRoute() {
   const treesById = new Map(trees.value.map((tree) => [tree.id, tree]))
   routeStops.value = saved.stops
     .map((stop) => {
+      if (stop.scheduleId) return null
       const tree = treesById.get(stop.id)
       return tree ? { id: stop.id, order: stop.order, tree } : null
     })
@@ -301,8 +321,19 @@ async function loadTrees() {
   }
 }
 
+function savePendingSnapshot() {
+  saveDailyRouteSnapshot({
+    date: filters.date,
+    updatedAt: new Date().toISOString(),
+    stops: pendingRouteStops.value.flatMap((stop) => {
+      const point = routeStopSnapshot(stop.tree, stop.order, stop.scheduleId)
+      return point ? [point] : []
+    }),
+  })
+}
+
 async function saveRoute() {
-  if (routeStops.value.length === 0) {
+  if (pendingRouteStops.value.length === 0) {
     feedback.value = 'Selecione pelo menos uma árvore para montar a rota.'
     return
   }
@@ -312,21 +343,7 @@ async function saveRoute() {
   feedback.value = ''
   syncState.value = 'local'
 
-  // Snapshot local primeiro: a rota fica sempre disponível neste dispositivo
-  // (mini-mapa e "Ver rota no mapa"), independente do resultado da sincronização.
-  const snapshot = {
-    date: filters.date,
-    updatedAt: new Date().toISOString(),
-    stops: routeStops.value.map((stop) => ({
-      id: stop.id,
-      order: stop.order,
-      latitude: Number(stop.tree.latitude ?? stop.tree.lat ?? 0),
-      longitude: Number(stop.tree.longitude ?? stop.tree.lng ?? 0),
-      label: stop.tree.species?.commonName || stop.tree.speciesName,
-      urgency: prioritizeTrees([stop.tree])[0]?.urgency || null,
-    })),
-  }
-  saveDailyRouteSnapshot(snapshot)
+  savePendingSnapshot()
 
   // DECISÃO (ver FEAT-003): o backend expõe POST /scheduling com CreateScheduleDto,
   // que exige treeId SINGULAR e descarta campos não declarados (treeIds/stops/status)
@@ -334,9 +351,10 @@ async function saveRoute() {
   // em 400 sempre. Por isso enviamos UMA solicitação de agendamento POR PARADA.
   // Dia planejado no fuso da operação.
   const plannedDate = new Date(`${filters.date}T08:00:00-03:00`).toISOString()
+  const stopsToSave = pendingRouteStops.value
   const results = await Promise.allSettled(
-    routeStops.value.map((stop) =>
-      apiConnect.post<ServerStop>('/scheduling', {
+    stopsToSave.map((stop) =>
+      apiConnect.post<DailyRouteSchedule<Tree>>('/scheduling', {
         treeId: stop.id,
         type: 'PRUNING',
         plannedDate,
@@ -347,12 +365,13 @@ async function saveRoute() {
   )
 
   results.forEach((result, index) => {
-    const stop = routeStops.value[index]
+    const stop = stopsToSave[index]
     if (result.status === 'fulfilled' && stop) {
       stop.scheduleId = result.value.data.id
       stop.status = result.value.data.status
     }
   })
+  savePendingSnapshot()
   const failed = results.filter((r) => r.status === 'rejected').length
   saving.value = false
 
@@ -365,13 +384,14 @@ async function saveRoute() {
       'Rota salva. Use Registrar poda na parada atendida; a árvore já está selecionada.'
   } else {
     syncState.value = 'pending'
-    const total = routeStops.value.length
+    const total = stopsToSave.length
     const ok = total - failed
     feedback.value = `Rota salva neste dispositivo, mas pendente de sincronização: ${ok} de ${total} paradas confirmadas no servidor. Toque em "Salvar rota" para tentar novamente.`
   }
 }
 
 function openRouteOnMap() {
+  savePendingSnapshot()
   router.push({
     path: homeBase.value === '/user' ? '/user/mapUser' : `${homeBase.value}/map`,
     query: { routeDate: filters.date },
@@ -390,12 +410,12 @@ function openExternalNavigation(stop: RouteStop) {
 /** Abre a ROTA INTEIRA no Google Maps: origem = localização atual do usuário,
  *  paradas intermediárias = waypoints, destino = última parada. */
 function openFullRouteOnGoogleMaps() {
-  if (routeStops.value.length === 0) {
+  if (pendingRouteStops.value.length === 0) {
     feedback.value = 'Monte a rota (selecione árvores) antes de abrir no Google Maps.'
     return
   }
 
-  const coords = routeStops.value
+  const coords = pendingRouteStops.value
     .map((stop) => {
       const lat = Number(stop.tree.latitude ?? stop.tree.lat)
       const lng = Number(stop.tree.longitude ?? stop.tree.lng)
@@ -450,7 +470,7 @@ function renderRouteOnMiniMap() {
   if (!routeMap || !routeLayer) return
   routeLayer.clearLayers()
 
-  const points: [number, number][] = routeStops.value
+  const points: [number, number][] = pendingRouteStops.value
     .map((stop) => {
       const lat = Number(stop.tree.latitude ?? stop.tree.lat)
       const lng = Number(stop.tree.longitude ?? stop.tree.lng)
@@ -469,13 +489,13 @@ function renderRouteOnMiniMap() {
   }
 
   // O número corresponde à parada original, mesmo quando há coordenadas ausentes.
-  routeStops.value.forEach((stop) => {
+  pendingRouteStops.value.forEach((stop) => {
     const lat = Number(stop.tree.latitude ?? stop.tree.lat)
     const lng = Number(stop.tree.longitude ?? stop.tree.lng)
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
     const marker = L.divIcon({
       className: 'route-stop-pin',
-      html: `<span style="background:${stop.status === 'COMPLETED' ? '#2e7d32' : '#1565c0'}">${stop.order}</span>`,
+      html: `<span>${stop.order}</span>`,
       iconSize: [26, 26],
       iconAnchor: [13, 13],
     })
@@ -582,7 +602,7 @@ onBeforeUnmount(() => {
           variant="tonal"
           color="blue-darken-2"
           prepend-icon="mdi-map"
-          :disabled="!routeStops.length || saving"
+          :disabled="!pendingRouteStops.length || saving || loading || !!errorMessage"
           @click="openRouteOnMap"
           >Ver rota no mapa</v-btn
         >
@@ -594,7 +614,7 @@ onBeforeUnmount(() => {
           prepend-icon="mdi-content-save"
           :loading="saving"
           @click="saveRoute"
-          :disabled="loading || !routeStops.length"
+          :disabled="loading || !pendingRouteStops.length || !!errorMessage"
           >Salvar rota</v-btn
         >
       </div>
@@ -634,7 +654,9 @@ onBeforeUnmount(() => {
     </div>
     <v-card v-if="!planning && routeStops.length" class="execution-summary mb-5" elevation="0">
       <div>
-        <span class="text-overline">Andamento do trabalho</span>
+        <span class="text-overline">{{
+          routeCompleted ? 'Rota concluída' : 'Andamento do trabalho'
+        }}</span>
         <h2>{{ completedCount }} de {{ routeStops.length }} árvores atendidas</h2>
         <p>
           {{
@@ -669,6 +691,7 @@ onBeforeUnmount(() => {
               <v-col cols="12" sm="4"
                 ><v-text-field
                   v-model="filters.date"
+                  :disabled="saving || loading"
                   type="date"
                   label="Dia da rota"
                   variant="outlined"
@@ -808,6 +831,7 @@ onBeforeUnmount(() => {
           <v-card-text>
             <!-- Mini-mapa com a rota -->
             <div
+              v-show="!routeCompleted"
               class="route-minimap-wrap mb-4"
               :class="{ 'route-minimap-wrap--execution': !planning }"
             >
@@ -939,12 +963,13 @@ onBeforeUnmount(() => {
                   >Em cada parada, use Registrar poda para salvar o serviço na árvore correta.</span
                 >
               </v-alert>
-              <div class="route-ready-actions">
+              <div v-if="pendingRouteStops.length" class="route-ready-actions">
                 <v-btn
                   color="blue-darken-2"
                   variant="flat"
                   class="text-none"
                   prepend-icon="mdi-map-marker-path"
+                  :disabled="loading || saving || !!errorMessage"
                   @click="openRouteOnMap"
                   >Abrir no mapa</v-btn
                 >
@@ -953,6 +978,7 @@ onBeforeUnmount(() => {
                   variant="flat"
                   class="text-none"
                   prepend-icon="mdi-google-maps"
+                  :disabled="loading || saving || !!errorMessage"
                   @click="openFullRouteOnGoogleMaps"
                   >Abrir no Google Maps</v-btn
                 >

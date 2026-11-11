@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { apiConnect, type User } from '@/plugins/apiConnect'
 import { useAppStore } from '@/stores/app'
 import { getHomeRouteByRole } from '@/router/helpers/getHomeRoute'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const router = useRouter()
 const store = useAppStore()
@@ -101,7 +102,9 @@ async function loadProfile() {
 }
 
 async function saveProfile() {
-  if (!currentUser.value?.id) {
+  if (saving.value || loading.value) return
+  const user = currentUser.value
+  if (!user?.id) {
     notify('Não foi possível identificar o usuário logado.', 'error')
     return
   }
@@ -118,16 +121,33 @@ async function saveProfile() {
   if (form.password.trim()) payload.password = form.password.trim()
 
   try {
-    const { data } = await apiConnect.put<User>(`/users/${currentUser.value.id}`, payload)
-    const updatedUser = data || { ...currentUser.value, ...payload, password: undefined }
+    const { data } = await apiConnect.patch<User | { count: number }>(`/users/${user.id}`, payload)
+    if (!data || ('count' in data && data.count === 0)) {
+      notify('A API não confirmou a atualização do perfil.', 'error')
+      return
+    }
 
-    store.getUser(updatedUser as User)
-    fillForm(updatedUser as User)
-    fillSummary(updatedUser as User)
+    let updatedUser: User
+    if ('count' in data) {
+      // A atualização restrita à organização pode retornar apenas a contagem.
+      form.password = ''
+      try {
+        const profile = await apiConnect.get<User>('/users/me/profile')
+        if (!profile.data) throw new Error('Perfil indisponível')
+        updatedUser = profile.data
+      } catch {
+        notify('Alterações salvas. Recarregue a página para atualizar o resumo do perfil.', 'info')
+        return
+      }
+    } else {
+      updatedUser = { ...user, ...data }
+    }
+    store.getUser(updatedUser)
+    fillForm(updatedUser)
+    fillSummary(updatedUser)
     notify('Perfil atualizado com sucesso.', 'success')
   } catch (error) {
-    console.error('Erro ao salvar perfil:', error)
-    notify('Não foi possível salvar as alterações agora.', 'error')
+    notify(getApiErrorMessage(error, 'Não foi possível salvar as alterações agora.'), 'error')
   } finally {
     saving.value = false
   }
@@ -281,7 +301,13 @@ onMounted(loadProfile)
             <v-btn variant="text" color="grey-darken-2" :disabled="saving" @click="cancel">
               Cancelar
             </v-btn>
-            <v-btn color="#C1E328" variant="flat" :loading="saving" type="submit">
+            <v-btn
+              color="#C1E328"
+              variant="flat"
+              :loading="saving"
+              :disabled="loading"
+              type="submit"
+            >
               Salvar alterações
             </v-btn>
           </div>

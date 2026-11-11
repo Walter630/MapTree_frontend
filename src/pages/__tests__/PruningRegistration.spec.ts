@@ -74,7 +74,7 @@ describe('PruningRegistration', () => {
   beforeEach(() => {
     post.mockReset()
     get.mockReset()
-    get.mockResolvedValue({ data: trees })
+    get.mockImplementation(async (url) => ({ data: url === '/trees' ? trees : [] }))
   })
 
   async function fillAndSubmit(wrapper: ReturnType<typeof mountPage>['wrapper']) {
@@ -123,6 +123,33 @@ describe('PruningRegistration', () => {
     await fillAndSubmit(wrapper)
 
     expect(vm.showSuccess).toBe(true)
+  })
+
+  it('conclui a parada correspondente sem criar uma poda avulsa em paralelo', async () => {
+    get.mockImplementation(async (url) => ({
+      data:
+        url === '/trees'
+          ? trees
+          : [
+              { id: 'other', treeId: 'tree-0002', type: 'PRUNING', status: 'PENDING' },
+              { id: 'scheduled', treeId: 'tree-0001', type: 'PRUNING', status: 'PENDING' },
+            ],
+    }))
+    post.mockResolvedValue({ status: 201, data: {} })
+    const { wrapper } = mountPage()
+    await flushPromises()
+    await fillAndSubmit(wrapper)
+
+    expect(get).toHaveBeenCalledWith('/scheduling', {
+      params: { date: '2024-05-10', mine: 'true' },
+    })
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post).toHaveBeenCalledWith('/scheduling/scheduled/complete', {
+      type: 'LIGHT',
+      date: '2024-05-10T12:00:00-03:00',
+      observations: 'Limpeza básica',
+    })
+    wrapper.unmount()
   })
 
   it('em erro não declara sucesso e exibe mensagem PT-BR', async () => {

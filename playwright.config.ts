@@ -12,6 +12,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/session.spec.ts', '**/tree-map.spec.ts'],
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
   expect: {
@@ -34,7 +35,9 @@ export default defineConfig({
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
     actionTimeout: 0,
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+    baseURL:
+      process.env.E2E_BASE_URL ||
+      (process.env.CI ? 'http://localhost:4173' : 'http://localhost:3500'),
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -49,6 +52,9 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        ...(process.env.E2E_BROWSER_PATH
+          ? { headless: true, launchOptions: { executablePath: process.env.E2E_BROWSER_PATH } }
+          : {}),
       },
     },
     {
@@ -97,14 +103,16 @@ export default defineConfig({
   // outputDir: 'test-results/',
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    /**
-     * Use the dev server by default for faster feedback loop.
-     * Use the preview server on CI for more realistic testing.
-     * Playwright will re-use the local server if there is already a dev-server running.
-     */
-    command: process.env.CI ? 'npm run preview' : 'npm run dev',
-    port: process.env.CI ? 4173 : 5173,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        /**
+         * Use the dev server by default for faster feedback loop.
+         * Use the preview server on CI for more realistic testing.
+         * Playwright will re-use the local server if there is already a dev-server running.
+         */
+        command: process.env.CI ? 'npm run preview' : 'npm run dev',
+        port: process.env.CI ? 4173 : 3500,
+        reuseExistingServer: !process.env.CI,
+      },
 })

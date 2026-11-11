@@ -4,7 +4,7 @@ export interface DailyRouteStopSnapshot {
   latitude: number
   longitude: number
   label?: string
-  urgency?: string | null
+  scheduleId?: string
 }
 
 export interface DailyRouteSnapshot {

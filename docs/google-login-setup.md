@@ -61,17 +61,16 @@ Google é simulada nos testes; o JWT e o cookie da aplicação são exercitados 
 
 ## Produção
 
-O `vercel.json` encaminha `/api/*` para `http://76.13.227.139:4000/api/*`.
-Esse endereço respondeu `Cannot POST /api/auth/google` antes da implementação local.
-Para corrigir produção, publique o backend NestJS atualizado, incluindo `package.json`,
-lockfile e fontes, instale as dependências (`npm ci`), compile (`npm run build`) e
-reinicie o processo da API pelo gerenciador já usado no servidor.
+O `vercel.json` encaminha `/api/*` para `https://api.maptree.com.br/api/*`. Deixe
+`VITE_API_BASE_URL` vazio no Vercel para usar `/api` no mesmo domínio do frontend.
+O primeiro vínculo pede a senha MapTree. Depois disso, o identificador Google
+vinculado identifica a conta nos próximos logins.
 
 Configure `GOOGLE_CLIENT_ID` no ambiente do processo da API e o mesmo
 `VITE_GOOGLE_CLIENT_ID` no build do frontend. Inclua os domínios reais
 (`https://www.maptree.com.br` e, se usado, `https://maptree.com.br`) no `CORS_ORIGIN`
-e nas origens JavaScript autorizadas do Google. Não é necessário trocar o destino
-atual do proxy se o mesmo servidor receber a versão atualizada da API.
+e nas origens JavaScript autorizadas do Google. Aplique o schema Prisma antes
+de iniciar o backend atualizado para criar o índice único dos vínculos.
 
 Publique também as alterações do frontend para aplicar o cabeçalho COOP do Vercel.
 `same-origin-allow-popups` foi configurado no Vercel, no Vite e no preview; ele não

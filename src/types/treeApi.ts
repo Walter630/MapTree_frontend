@@ -8,6 +8,8 @@ export interface TreeApiRecord {
   lat?: number | string | null
   lng?: number | string | null
   status?: string
+  measuredStatus?: string
+  lastPruneDate?: string | null
   vigor?: string
   speciesId?: string
   idSpecies?: string

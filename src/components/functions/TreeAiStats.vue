@@ -9,8 +9,8 @@
             <p class="text-overline hero-label">Análise de IA</p>
             <p class="hero-height mt-2 mb-0">
               <v-icon size="15" class="mr-1">mdi-arrow-expand-vertical</v-icon>
-              {{ heightLabel }} <span>altura atual</span><span class="mx-1">·</span
-              >{{ wireHeightLabel }} <span>fiação</span>
+              {{ heightLabel }} <span>altura estimada</span><span class="mx-1">·</span
+              >{{ wireHeightLabel }} <span>fiação no modelo</span>
             </p>
           </div>
           <div class="d-flex flex-column align-end">
@@ -49,12 +49,16 @@
       </v-alert>
 
       <!-- ===== Resumo em linguagem simples (para qualquer usuário) ===== -->
-      <div class="plain-summary mb-4" :class="`plain-summary--${riskClass}`">
+      <div
+        v-if="hasValidPrediction"
+        class="plain-summary mb-4"
+        :class="`plain-summary--${riskClass}`"
+      >
         <div class="plain-summary-icon">
           <v-icon size="26" color="white">{{ riskIcon }}</v-icon>
         </div>
         <div class="plain-summary-text">
-          <p class="plain-summary-title mb-1">Decisão da operação: {{ plainSummary.title }}</p>
+          <p class="plain-summary-title mb-1">{{ plainSummary.title }}</p>
           <p class="plain-summary-desc mb-0">{{ plainSummary.description }}</p>
         </div>
       </div>
@@ -455,19 +459,20 @@ export default defineComponent({
 
   computed: {
     /* ---------- Validação da predição ---------- */
-    // A predição é considerada válida quando traz pelo menos a altura estimada
-    // ou a altura da fiação como número finito. Sem isso, os cálculos recaem em
-    // defaults (0 / 6.5m) que NÃO representam uma análise real.
     hasValidPrediction(): boolean {
       const p = this.data.aiPrediction
       if (!p || typeof p !== 'object') return false
       return (
-        Number.isFinite(Number(p.estimated_height_m)) || Number.isFinite(Number(p.wire_height_m))
+        Number.isFinite(p.estimated_height_m) &&
+        p.estimated_height_m > 0 &&
+        Number.isFinite(p.wire_height_m) &&
+        p.wire_height_m > 0
       )
     },
 
     /* ---------- Risco ---------- */
     riskClass(): string {
+      if (!this.hasValidPrediction) return 'observation'
       // OVERRIDE: Se estiver a 90% ou mais da fiação, é CRÍTICO independente do status da IA
       if (this.heightPercent >= 90) return 'critical'
 
@@ -483,8 +488,9 @@ export default defineComponent({
     },
 
     riskLabel(): string {
-      if (this.heightPercent >= 100) return 'CONTATO COM FIAÇÃO'
-      if (this.heightPercent >= 90) return 'RISCO IMINENTE'
+      if (!this.hasValidPrediction) return 'Estimativa incompleta'
+      if (this.heightPercent >= 100) return 'ALTURA ESTIMADA ATINGE A REFERÊNCIA'
+      if (this.heightPercent >= 90) return 'PROXIMIDADE ESTIMADA'
 
       const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
@@ -498,6 +504,7 @@ export default defineComponent({
     },
 
     riskIcon(): string {
+      if (!this.hasValidPrediction) return 'mdi-information-outline'
       const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'mdi-shield-check',
@@ -523,19 +530,20 @@ export default defineComponent({
 
       if (pct >= 90) {
         return {
-          title: 'Situação: Crítica — poda urgente',
-          description: `Esta árvore já está muito próxima da fiação elétrica (faltam cerca de ${faltam}m). Há risco de contato com os fios. Recomendamos agendar uma poda com prioridade.`,
+          title: 'Prioridade de vistoria',
+          description:
+            'A altura estimada está próxima ou acima da referência da fiação. Priorize a vistoria em campo.',
         }
       }
       if (pct >= 70) {
         return {
           title: 'Situação: Atenção',
-          description: `Esta árvore está se aproximando da fiação (faltam cerca de ${faltam}m).${tempoTxt} Vale manter sob observação e planejar uma poda.`,
+          description: `A diferença estimada até a referência é de ${faltam} m.${tempoTxt} Inclua a árvore no planejamento de vistorias.`,
         }
       }
       return {
-        title: 'Situação: Segura',
-        description: `Esta árvore está a uma distância segura da fiação (faltam cerca de ${faltam}m).${tempoTxt} Nenhuma ação urgente é necessária no momento.`,
+        title: 'Estimativa abaixo da referência',
+        description: `A diferença estimada de altura é de ${faltam} m. A avaliação depende da vistoria em campo.`,
       }
     },
 

@@ -41,7 +41,7 @@
             </v-expand-transition>
 
             <v-form ref="form" v-model="valid" lazy-validation class="login-form">
-              <div class="field-group mb-6">
+              <div v-if="!pendingGoogleCredential" class="field-group mb-6">
                 <label class="field-label">Email</label>
                 <v-text-field
                   v-model="username"
@@ -55,7 +55,9 @@
               </div>
 
               <div class="field-group mb-6">
-                <label class="field-label">Senha</label>
+                <label class="field-label">{{
+                  pendingGoogleCredential ? 'Senha do MapTree' : 'Senha'
+                }}</label>
                 <v-text-field
                   v-model="password"
                   color="green"
@@ -84,8 +86,16 @@
                 :loading="loading"
                 @click="login"
               >
-                entrar
+                {{ pendingGoogleCredential ? 'Vincular Google' : 'entrar' }}
               </v-btn>
+              <v-btn
+                v-if="pendingGoogleCredential"
+                variant="text"
+                class="mb-4"
+                :disabled="loading"
+                @click="cancelGoogleLink"
+                >Cancelar vínculo</v-btn
+              >
 
               <div class="text-center mb-6">
                 <a class="forgot-password" @click="$router.push('/recovery')"
@@ -93,12 +103,13 @@
                 >
               </div>
 
-              <div class="divider mb-6">
+              <div v-show="!pendingGoogleCredential" class="divider mb-6">
                 <span>ou</span>
               </div>
 
               <div
                 v-if="googleEnabled"
+                v-show="!pendingGoogleCredential"
                 ref="googleButton"
                 class="google-button-frame mb-3"
                 :class="{ 'google-button-frame--loading': loading }"
@@ -108,17 +119,6 @@
               <p v-if="!googleEnabled" class="social-hint mb-3">
                 Login com Google indisponível: configure o Client ID da aplicação.
               </p>
-
-              <v-btn block class="mb-4 facebook-btn" size="large" disabled @click="loginFacebook">
-                <img
-                  class="mr-2"
-                  height="20"
-                  :src="getFacebookLogo"
-                  width="20"
-                  alt="facebook-action-login"
-                />
-                Continuar com Facebook
-              </v-btn>
 
               <div class="text-center mt-6">
                 Não possui uma conta?
@@ -154,8 +154,8 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import { isAxiosError } from 'axios'
 import { getLoginErrorMessage } from '@/utils/loginError'
-import facebookLogo from '@/assets/facebook-logo.png'
 import { type LoginRequest, type LoginResponse } from '@/plugins/apiConnect.ts'
 import { isGoogleAuthEnabled, renderGoogleButton } from '@/plugins/googleAuth'
 
@@ -171,6 +171,7 @@ export default defineComponent({
       loading: false,
       isUnmounted: false,
       googleButtonCleanup: null as (() => void) | null,
+      pendingGoogleCredential: '',
       feedback: {
         show: false,
         message: '',
@@ -217,6 +218,15 @@ export default defineComponent({
       // Limpa feedback anterior
       this.feedback.show = false
 
+      if (this.pendingGoogleCredential) {
+        if (!this.password) {
+          this.notify('Digite a senha da sua conta MapTree para concluir o vínculo.')
+          return
+        }
+        await this.loginWithGoogle(this.pendingGoogleCredential, this.password)
+        return
+      }
+
       // Validação básica de campos vazios
       if (!this.username || !this.password) {
         this.notify('Preencha o e-mail e a senha para continuar.')
@@ -245,7 +255,12 @@ export default defineComponent({
         this.loading = false
       }
     },
-    async loginWithGoogle(credential: string) {
+    cancelGoogleLink() {
+      this.pendingGoogleCredential = ''
+      this.password = ''
+      this.feedback.show = false
+    },
+    async loginWithGoogle(credential: string, password?: string) {
       this.feedback.show = false
 
       if (!credential || this.loading) {
@@ -255,22 +270,33 @@ export default defineComponent({
       this.loading = true
       try {
         // O backend precisa validar a credencial e emitir a sessão MapTree.
-        const response = await this.$api.post<LoginResponse>('/auth/google', { credential })
+        const response = await this.$api.post<LoginResponse>('/auth/google', {
+          credential,
+          ...(password ? { password } : {}),
+        })
 
         if (response.data) {
+          this.cancelGoogleLink()
           this.$api.setToken(response.data.accessToken)
           this.$store.setUser(response.data.user)
           this.$router.push(`/${response.data.user.role.toLowerCase()}`)
         }
       } catch (error) {
-        console.error('Google login failed:', error)
+        if (
+          isAxiosError<{ code?: string }>(error) &&
+          error.response?.data?.code === 'GOOGLE_LINK_REQUIRED'
+        ) {
+          this.pendingGoogleCredential = credential
+          this.password = ''
+          this.notify(
+            'Confirme sua senha do MapTree para vincular o Google. Nos próximos acessos, basta entrar com o Google.',
+          )
+          return
+        }
         this.notify(this.getLoginErrorMessage(error, 'google'))
       } finally {
         this.loading = false
       }
-    },
-    loginFacebook() {
-      this.notify('Login com Facebook indisponível no momento.')
     },
     showTerms() {
       console.log('Mostrar Termos e Condições')
@@ -282,9 +308,6 @@ export default defineComponent({
     },
   },
   computed: {
-    getFacebookLogo() {
-      return facebookLogo
-    },
     googleEnabled(): boolean {
       return isGoogleAuthEnabled()
     },
@@ -458,15 +481,6 @@ export default defineComponent({
   margin-top: -4px;
 }
 
-/* Ajustes nos botões sociais */
-.google-btn {
-  background-color: #fff !important;
-  border: 1px solid #ddd !important;
-  color: #333 !important;
-  text-transform: none !important;
-  font-weight: 500 !important;
-}
-
 .google-button-frame {
   display: flex;
   min-height: 44px;
@@ -479,13 +493,6 @@ export default defineComponent({
 .google-button-frame--loading {
   opacity: 0.55;
   pointer-events: none;
-}
-
-.facebook-btn {
-  background-color: #1877f2 !important;
-  color: #fff !important;
-  text-transform: none !important;
-  font-weight: 500 !important;
 }
 
 /* Input fields */

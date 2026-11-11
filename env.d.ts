@@ -17,6 +17,7 @@ interface Window {
         initialize: (config: {
           client_id: string
           callback: (response: { credential: string }) => void
+          use_fedcm_for_button?: boolean
         }) => void
         renderButton: (parent: HTMLElement, options: {
           type?: 'standard' | 'icon'

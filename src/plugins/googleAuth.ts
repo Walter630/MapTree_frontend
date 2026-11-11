@@ -63,6 +63,7 @@ export async function renderGoogleButton(
     gis.initialize({
       client_id: clientId,
       callback: handleCredential,
+      use_fedcm_for_button: true,
     })
     initializedClientId = clientId
   }
