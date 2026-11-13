@@ -65,7 +65,9 @@
     <v-card v-else class="pruning-card" flat>
       <div class="d-flex align-center justify-space-between mb-4">
         <h3 class="text-subtitle-1 font-weight-bold mb-0">Histórico de Podas</h3>
-        <v-chip size="small" color="grey-lighten-3">{{ prunings.length }} registros</v-chip>
+        <v-chip size="small" class="records-chip">
+          {{ prunings.length }} {{ prunings.length === 1 ? 'registro' : 'registros' }}
+        </v-chip>
       </div>
 
       <v-data-table
@@ -123,7 +125,15 @@
 
         <!-- Ações -->
         <template #[`item.actions`]="{ item }">
-          <v-btn icon size="small" variant="text" color="primary" @click="viewDetails(item)">
+          <v-btn
+            icon
+            size="small"
+            variant="text"
+            color="primary"
+            :aria-label="`Ver detalhes de ${treeDisplayName(item)} — ${formatDate(item.date)}`"
+            :title="`Ver detalhes de ${treeDisplayName(item)}`"
+            @click="viewDetails(item)"
+          >
             <v-icon size="18">mdi-eye</v-icon>
           </v-btn>
         </template>
@@ -434,8 +444,8 @@ onMounted(() => {
 
 .kpi-label {
   font-size: 0.85rem;
-  font-weight: 500;
-  color: #666;
+  font-weight: 600;
+  color: #43534a;
 }
 
 .kpi-value {
@@ -446,9 +456,17 @@ onMounted(() => {
 }
 
 .kpi-subtitle {
-  font-size: 0.75rem;
-  color: #888;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #53635a;
   margin-top: 4px;
+}
+
+.records-chip {
+  color: #173d2a !important;
+  background: #e8f1e9 !important;
+  border: 1px solid #c8d9cb;
+  font-weight: 650;
 }
 
 .pruning-card {
@@ -469,6 +487,11 @@ onMounted(() => {
 .pruning-table :deep(td) {
   padding-top: 12px !important;
   padding-bottom: 12px !important;
+}
+
+.pruning-table :deep(td .text-caption) {
+  color: #53635a !important;
+  font-size: 0.8125rem;
 }
 
 .details-dialog {

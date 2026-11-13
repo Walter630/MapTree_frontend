@@ -82,7 +82,7 @@ function render() {
       title: name,
       alt: name,
       icon: L.divIcon({
-        html: `<span style="display:grid;place-items:center;width:28px;height:28px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 5px #0003">${speciesIcon(name)}</span>`,
+        html: `<span style="display:grid;place-items:center;width:28px;height:28px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 5px #0003;font-size:17px">${speciesIcon(name)}</span>`,
         iconSize: [28, 28],
         className: 'dashboard-tree-marker',
       }),

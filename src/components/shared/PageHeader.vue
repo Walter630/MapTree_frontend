@@ -3,14 +3,20 @@
     <!-- Breadcrumbs -->
     <div v-if="breadcrumbs.length" class="d-flex flex-wrap align-center mb-4">
       <template v-for="(crumb, i) in breadcrumbs" :key="i">
+        <RouterLink
+          v-if="crumb.to"
+          :to="crumb.to"
+          class="breadcrumb-item breadcrumb-link text-caption d-inline-flex align-center"
+        >
+          <v-icon v-if="getBreadcrumbIcon(crumb)" size="14" class="breadcrumb-icon mr-1">
+            {{ getBreadcrumbIcon(crumb) }}
+          </v-icon>
+          {{ crumb.text }}
+        </RouterLink>
         <span
-          class="breadcrumb-item text-caption d-inline-flex align-center"
-          :class="{
-            'breadcrumb-link text-grey-darken-1': i < breadcrumbs.length - 1,
-            'breadcrumb-current font-weight-bold text-indigo-darken-4':
-              i === breadcrumbs.length - 1,
-          }"
-          @click="crumb.to ? router.push(crumb.to) : null"
+          v-else
+          class="breadcrumb-item breadcrumb-current text-caption d-inline-flex align-center font-weight-bold"
+          aria-current="page"
         >
           <v-icon v-if="getBreadcrumbIcon(crumb)" size="14" class="breadcrumb-icon mr-1">
             {{ getBreadcrumbIcon(crumb) }}
@@ -31,6 +37,7 @@
         variant="outlined"
         density="comfortable"
         class="mr-4 back-btn"
+        aria-label="Voltar à página anterior"
         @click="router.back()"
       />
       <div>
@@ -42,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
 interface Breadcrumb {
   text: string
@@ -63,8 +70,6 @@ withDefaults(
     showBackButton: true,
   },
 )
-
-const router = useRouter()
 
 const routeIconMap: Record<string, string> = {
   '/admin': 'mdi-view-dashboard',
@@ -91,6 +96,8 @@ const routeIconMap: Record<string, string> = {
   '/user/notifications': 'mdi-bell',
 }
 
+const router = useRouter()
+
 const textIconMap: Record<string, string> = {
   'Meu Painel': 'mdi-view-dashboard',
   '#Notificações': 'mdi-bell',
@@ -115,7 +122,13 @@ function getBreadcrumbIcon(crumb: Breadcrumb) {
 
 <style scoped>
 .breadcrumb-item {
+  color: #53635a;
   transition: color 0.2s ease;
+  text-decoration: none;
+}
+
+.breadcrumb-current {
+  color: #173d2a;
 }
 
 .breadcrumb-icon {

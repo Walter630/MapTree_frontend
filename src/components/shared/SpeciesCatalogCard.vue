@@ -81,9 +81,9 @@ watch(pageCount, (count) => {
             class="catalog-species"
             :aria-label="`Ver ${species.commonName} no mapa de calor`"
           >
-            <span class="catalog-symbol" aria-hidden="true">{{
-              speciesIcon(species.commonName)
-            }}</span>
+            <span class="catalog-symbol" aria-hidden="true">
+              {{ speciesIcon(species.commonName) }}
+            </span>
             <div class="catalog-info">
               <strong>{{ species.commonName }}</strong
               ><em>{{ species.scientificName }}</em>

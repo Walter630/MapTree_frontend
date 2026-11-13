@@ -109,6 +109,9 @@ describe('PruningList', () => {
     const { wrapper } = mountPage()
     await flushPromises()
 
+    expect(wrapper.get('[data-test="pruning-table"] button').attributes('aria-label')).toBe(
+      'Ver detalhes de Ipê-amarelo · #tree-1234 — 13/03/2025',
+    )
     await wrapper.get('[data-test="pruning-table"] button').trigger('click')
     await flushPromises()
 

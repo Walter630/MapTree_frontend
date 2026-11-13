@@ -171,7 +171,7 @@ const announcement = computed(() =>
 
 .ts-ripple {
   fill: none;
-  stroke: #66bb6a;
+  stroke: var(--mt-green-bright);
   stroke-width: 2;
   opacity: 0;
   transform-box: fill-box;
@@ -179,7 +179,7 @@ const announcement = computed(() =>
 }
 
 .ts-pin {
-  fill: #1b5e20;
+  fill: var(--mt-forest);
   opacity: 0;
   transform-box: fill-box;
   transform-origin: 50% 100%;
@@ -197,13 +197,13 @@ const announcement = computed(() =>
 }
 
 .ts-leaf--a {
-  fill: #2e7d32;
+  fill: var(--mt-green);
 }
 .ts-leaf--b {
-  fill: #43a047;
+  fill: var(--mt-green-bright);
 }
 .ts-leaf--c {
-  fill: #66bb6a;
+  fill: var(--mt-lime);
 }
 
 /* ===== Barra de andamento ===== */
@@ -214,7 +214,7 @@ const announcement = computed(() =>
   margin-top: 18px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e2e8f0;
+  background: var(--mt-border);
 }
 
 .ts-bar span {
@@ -222,7 +222,7 @@ const announcement = computed(() =>
   inset: 0 auto 0 0;
   width: 40%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #2e7d32, #c6f513);
+  background: linear-gradient(90deg, var(--mt-green), var(--mt-lime));
 }
 
 /* ===== Transição de entrada/saída ===== */

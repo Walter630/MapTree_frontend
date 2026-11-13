@@ -58,7 +58,8 @@ export function buildTreePopup(input: TreePopupInput): HTMLElement {
 
   // Faixa 1: identificação
   const head = element('header', 'tip-head')
-  const avatar = element('span', 'tip-avatar', input.icon)
+  const avatar = element('span', 'tip-avatar')
+  avatar.textContent = input.icon
   avatar.setAttribute('aria-hidden', 'true')
   const identity = element('div', 'tip-identity')
   identity.append(element('h3', 'tip-name', input.name))

@@ -1,53 +1,34 @@
-/* color palette from <https://github.com/vuejs/theme> */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
+  /* Paleta oficial MapTree: tons de marca e papéis de interface. */
+  --mt-forest: #00281a;
+  --mt-teal: #005657;
+  --mt-green: #008b48;
+  --mt-green-bright: #11d080;
+  --mt-lime: #b5e440;
+  --mt-blue: #5c95e2;
+  --mt-ink: #343434;
+  --mt-canvas: #f6f6f6;
+  --mt-white: #ffffff;
 
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
+  /* Neutros para separar conteúdo sem competir com as cores da marca. */
+  --mt-surface-soft: #f0f5f1;
+  --mt-border: #dce7df;
+  --mt-text-muted: #5c6b63;
+  --mt-focus: #5c95e2;
 
-  --vt-c-indigo: #2c3e50;
-
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
-
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
-}
-
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
-
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
-
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-1);
-
+  --color-background: var(--mt-canvas);
+  --color-background-soft: var(--mt-surface-soft);
+  --color-background-mute: #e9f0eb;
+  --color-border: var(--mt-border);
+  --color-border-hover: var(--mt-green);
+  --color-heading: var(--mt-forest);
+  --color-text: var(--mt-ink);
   --section-gap: 160px;
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--vt-c-black);
-    --color-background-soft: var(--vt-c-black-soft);
-    --color-background-mute: var(--vt-c-black-mute);
-
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
-
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
-  }
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 *,
@@ -71,25 +52,31 @@ body {
   min-height: 100vh;
   color: var(--color-text);
   background: var(--color-background);
-  transition:
-    color 0.5s,
-    background-color 0.5s;
   line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
+  font-family: 'Poppins', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 15px;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.v-card-title,
+.v-toolbar-title {
+  color: var(--mt-forest);
+  font-family: 'K2D', 'Poppins', sans-serif;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+:focus-visible {
+  outline: 3px solid var(--mt-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--mt-forest);
+  background: var(--mt-lime);
 }

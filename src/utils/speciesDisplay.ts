@@ -5,14 +5,11 @@ export interface CatalogSpecies {
   _count?: { Tree?: number; trees?: number }
 }
 
+export const NEST_ICON = '🪺'
+
 // Símbolos de identificação visual usados no catálogo e nos marcadores.
 export function speciesIcon(name = ''): string {
-  const key = name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[-\s]+/g, ' ')
-    .trim()
+  const key = normalizeSpeciesName(name)
   switch (key) {
     case 'ipe amarelo':
     case 'handroanthus albus':
@@ -27,6 +24,15 @@ export function speciesIcon(name = ''): string {
     default:
       return '🌿'
   }
+}
+
+function normalizeSpeciesName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[-\s]+/g, ' ')
+    .trim()
 }
 
 export function catalogCount(species: {

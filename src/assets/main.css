@@ -14,15 +14,13 @@
   max-width: none;
 }
 
-/* Fundo cinza uniforme em toda a área da aplicação, para que as laterais
-   (fora do container centralizado) tenham a mesma cor da faixa de conteúdo,
-   sem aquela borda branca em volta do cinza. */
+/* Fundo neutro levemente quente para deixar os verdes da marca em evidência. */
 .v-application {
-  background: #f5f5f5 !important;
+  background: var(--mt-canvas) !important;
 }
 
 .v-main {
-  background: #f5f5f5;
+  background: var(--mt-canvas);
 }
 
 .v-container {
@@ -57,7 +55,7 @@
      ocupe no mínimo a mesma área útil da viewport. */
   min-height: calc(100dvh - 56px);
   padding: 24px 24px 48px;
-  background: #f5f5f5;
+  background: var(--mt-canvas);
 }
 
 /* Telas largas (desktop grande): aumenta o respiro lateral */
@@ -106,34 +104,34 @@
 
 /* Superfícies suaves para a visão operacional dos dashboards. */
 .v-application .v-container.dash {
-  background: #e6ece7;
+  background: #eaf1ec;
 }
 .v-application .v-container.dash .panel {
-  background: #f3f5ef;
-  border-color: #cdd8cf;
-  box-shadow: 0 2px 8px #294c3810;
+  background: var(--mt-white);
+  border-color: var(--mt-border);
+  box-shadow: 0 4px 18px rgba(0, 40, 26, 0.06);
 }
 .v-application .v-container.dash .panel-head {
-  background: #dfe9e1;
-  border-bottom-color: #cdd8cf;
+  background: #f0f5f1;
+  border-bottom-color: var(--mt-border);
 }
 .v-application .v-container.dash .kpi {
-  background: #edf3ed;
-  border-color: #c8d8cb;
-  border-top: 3px solid #6a9278;
+  background: var(--mt-white);
+  border-color: var(--mt-border);
+  border-top: 3px solid var(--mt-green);
 }
 .v-application .v-container.dash .kpi--danger {
-  background: #f5ebe6;
-  border-top-color: #bc7666;
+  background: #fff5f3;
+  border-top-color: #b42318;
 }
 .v-application .v-container.dash .catalog {
-  background: #eff3ed;
-  border-color: #cdd8cf;
+  background: var(--mt-white);
+  border-color: var(--mt-border);
 }
 .v-application .v-container.dash .catalog-header {
-  background: #dfe9e1;
+  background: #f0f5f1;
   border-radius: 16px 16px 0 0;
 }
 .v-application .v-container.dash .alert-row:hover {
-  background: #dfece1;
+  background: #edf6ef;
 }

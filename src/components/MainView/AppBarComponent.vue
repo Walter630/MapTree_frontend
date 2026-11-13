@@ -156,14 +156,24 @@
 
     <!-- AppBar Mobile -->
     <v-app-bar color="white" flat class="appbar-mobile" elevation="1">
-      <v-btn icon variant="text" @click="drawer = !drawer">
+      <v-btn
+        icon
+        variant="text"
+        aria-label="Abrir menu de navegação"
+        @click="drawer = !drawer"
+      >
         <v-icon>mdi-menu</v-icon>
       </v-btn>
 
       <!-- Logo centralizada -->
-      <div class="logo-mobile" @click="goToHome()">
-        <img src="@/assets/LogomaptreeHeaderpng.png" alt="MapTree" style="height: 32px" />
-      </div>
+      <button
+        type="button"
+        class="logo-mobile"
+        aria-label="Ir para o painel inicial"
+        @click="goToHome()"
+      >
+        <img src="@/assets/LogomaptreeHeaderpng.png" alt="" style="height: 32px" />
+      </button>
 
       <v-spacer />
 
@@ -243,7 +253,7 @@ export default {
   data() {
     return {
       drawer: false,
-      green: '#C1E328',
+      green: '#007F43',
       user: null as User | null,
       logoSrc: new URL('@/assets/LogomaptreeHeaderpng.png', import.meta.url).href,
     }
@@ -320,7 +330,7 @@ export default {
     },
 
     checkMobile(): void {
-      this.store.setIsMobile(window.innerWidth < 1040)
+      this.store.setIsMobile(window.innerWidth < 1120)
     },
 
     async logout(): Promise<void> {
@@ -347,8 +357,8 @@ export default {
 
 <style scoped>
 .appbar-desktop {
-  border-bottom: 1px solid #e8edda !important;
-  box-shadow: 0 2px 14px rgba(31, 55, 23, 0.06) !important;
+  border-bottom: 1px solid var(--mt-border) !important;
+  box-shadow: 0 2px 14px rgba(0, 40, 26, 0.06) !important;
   z-index: 1200;
 }
 
@@ -381,17 +391,13 @@ export default {
   white-space: nowrap;
 }
 .nav-item--active {
-  background: #f2f8dc;
+  background: #edf6c9;
   font-weight: 700;
 }
 .nav-icon-3d {
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.16));
-  transition:
-    filter 0.2s ease,
-    transform 0.2s ease;
+  transition: transform 0.2s ease;
 }
 .nav-icon-3d:hover {
-  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22));
   transform: translateY(-1px);
 }
 .appbar-actions {
@@ -429,10 +435,10 @@ export default {
   border-radius: 10px;
 }
 .user-menu-trigger:hover {
-  background: #f6f8f0;
+  background: #f0f5f1;
 }
 .user-avatar {
-  background-color: #c1e328;
+  background-color: var(--mt-lime);
 }
 .avatar-img {
   width: 100%;
@@ -445,7 +451,7 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.88rem;
-  color: #1f2933;
+  color: var(--mt-forest);
 }
 
 .mobile-drawer {
@@ -453,11 +459,14 @@ export default {
 }
 .appbar-mobile {
   z-index: 1200 !important;
-  border-bottom: 1px solid #e8edda !important;
+  border-bottom: 1px solid var(--mt-border) !important;
 }
 .logo-mobile {
   display: flex;
   align-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
   cursor: pointer;
 }
 
@@ -470,7 +479,8 @@ export default {
     justify-content: flex-start;
   }
   .nav-label {
-    display: none;
+    display: inline;
+    font-size: 0.76rem;
   }
   .nav-item {
     padding: 0 9px;

@@ -1,7 +1,7 @@
 <script lang="ts">
 import type { TreeApiRecord } from '@/types/treeApi'
 import { isAxiosError } from 'axios'
-import { speciesIcon } from '@/utils/speciesDisplay'
+import { NEST_ICON, speciesIcon } from '@/utils/speciesDisplay'
 import { defineComponent, onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as L from 'leaflet'
@@ -37,6 +37,7 @@ import {
   isValidGeoPoint,
   type TreeDensityDimension,
 } from '@/utils/treeDensity'
+import { getDensestTreeMapCluster, uniqueTreeMapPoints } from '@/utils/treeMapViewport'
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
 /* =====================================================
@@ -185,36 +186,60 @@ function escapeHtml(value: unknown): string {
 
 interface StatusInfo {
   label: string
-  emoji: string
+  icon: string
   color: string
   bg: string
   border: string
 }
 
 const STATUS_CONFIG: { [key: string]: StatusInfo } = {
-  NORMAL: { label: 'Normal', emoji: '🌳', color: '#2E7D32', bg: '#2E7D32', border: '#1B5E20' },
+  NORMAL: {
+    label: 'Normal',
+    icon: 'mdi-tree',
+    color: '#2E7D32',
+    bg: '#2E7D32',
+    border: '#1B5E20',
+  },
   TO_PRUNE: {
     label: 'Para Podar',
-    emoji: '✂️',
+    icon: 'mdi-content-cut',
     color: '#EF6C00',
     bg: '#EF6C00',
     border: '#E65100',
   },
   UNDER_OBSERVATION: {
     label: 'Observação',
-    emoji: '👁️',
+    icon: 'mdi-eye-outline',
     color: '#F9A825',
     bg: '#F9A825',
     border: '#F57F17',
   },
-  PRUNED: { label: 'Podada', emoji: '🌿', color: '#4CAF50', bg: '#4CAF50', border: '#388E3C' },
-  DANGER: { label: 'Risco', emoji: '⚠️', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
-  CRITICAL: { label: 'CRÍTICO', emoji: '🚨', color: '#D32F2F', bg: '#D32F2F', border: '#B71C1C' },
+  PRUNED: {
+    label: 'Podada',
+    icon: 'mdi-leaf',
+    color: '#4CAF50',
+    bg: '#4CAF50',
+    border: '#388E3C',
+  },
+  DANGER: {
+    label: 'Risco',
+    icon: 'mdi-alert-outline',
+    color: '#D32F2F',
+    bg: '#D32F2F',
+    border: '#B71C1C',
+  },
+  CRITICAL: {
+    label: 'CRÍTICO',
+    icon: 'mdi-alert-octagon-outline',
+    color: '#D32F2F',
+    bg: '#D32F2F',
+    border: '#B71C1C',
+  },
 }
 
 const DEFAULT_STATUS: StatusInfo = {
   label: 'Normal',
-  emoji: '🌳',
+  icon: 'mdi-tree',
   color: '#4CAF50',
   bg: '#4CAF50',
   border: '#2E7D32',
@@ -486,7 +511,7 @@ export default defineComponent({
       { title: 'Status', value: 'status' },
       { title: 'Vigor', value: 'vigor' },
       { title: 'Indicador de risco', value: 'proximity' },
-      { title: 'Ninhos registrados', value: 'nests' },
+      { title: `${NEST_ICON} Ninhos registrados`, value: 'nests' },
       { title: 'Área de copa estimada', value: 'canopy' },
     ]
 
@@ -697,7 +722,7 @@ export default defineComponent({
           cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           ${danger ? 'animation:pulsePin 1.2s infinite;' : ''}
         " onmouseover="this.style.transform='rotate(-45deg) scale(1.15)'" onmouseout="this.style.transform='rotate(-45deg) scale(1)'">
-          <span style="transform: rotate(45deg); font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">${speciesIcon(species)}</span>
+          <span aria-hidden="true" style="transform: rotate(45deg); font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">${speciesIcon(species)}</span>
         </div>`,
         iconSize: [38, 38],
         iconAnchor: [19, 38],
@@ -937,6 +962,25 @@ export default defineComponent({
       }
     }
 
+    const focusInitialTreeCluster = () => {
+      if (!map || trees.value.length === 0 || !isInitialLoad.value) return
+
+      const cluster = getDensestTreeMapCluster(trees.value)
+      if (cluster.length === 0) return
+
+      if (cluster.length === 1) {
+        const tree = cluster[0]!
+        map.setView([tree.latitude, tree.longitude], 14)
+      } else {
+        map.fitBounds(
+          L.latLngBounds(cluster.map((tree) => [tree.latitude, tree.longitude])),
+          { padding: [50, 50], maxZoom: 15 },
+        )
+      }
+
+      isInitialLoad.value = false
+    }
+
     /**
      * Fallback: endpoint tradicional quando não há geolocalização
      */
@@ -952,18 +996,18 @@ export default defineComponent({
             (t.latitude != null || t.lat != null) && (t.longitude != null || t.lng != null),
         )
         console.log('[PruningMap] Árvores com coordenadas:', withCoords.length)
-        trees.value = withCoords
-          .map((t: TreeApiRecord) => parseTreeData(t))
-          .filter((t): t is TreeOnMap => t !== null)
+        trees.value = uniqueTreeMapPoints(
+          withCoords
+            .map((t: TreeApiRecord) => parseTreeData(t))
+            .filter((t): t is TreeOnMap => t !== null),
+        )
+        clearTreeLoadCache()
+        trees.value.forEach((tree) => loadedTreeIds.add(tree.id))
         console.log('[PruningMap] Árvores parseadas válidas:', trees.value.length)
 
         if (!silent) notify(`${trees.value.length} árvore(s) carregada(s)`, 'success')
 
-        if (map && trees.value.length > 0 && isInitialLoad.value) {
-          const bounds = L.latLngBounds(trees.value.map((t) => [t.latitude, t.longitude]))
-          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
-          isInitialLoad.value = false
-        }
+        focusInitialTreeCluster()
       } catch (err: unknown) {
         console.error('[PruningMap] Erro ao buscar árvores no fallback:', err)
         // Último recurso: dados mockados para demonstração
@@ -1473,7 +1517,7 @@ export default defineComponent({
         const popupHtml = `
           <div style="width:240px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
             <div style="background:${cfg.bg}; color:#fff; padding:14px; text-align:center;">
-              <div style="font-size:17px; font-weight:800;">${cfg.emoji} ${escapeHtml(t.speciesName)}</div>
+              <div style="font-size:17px; font-weight:800;">${speciesIcon(t.speciesName)} ${escapeHtml(t.speciesName)}</div>
               <div style="font-size:11px; opacity:0.8; margin-top:2px;">${escapeHtml(t.scientificName)}</div>
             </div>
             <div style="padding:16px;">
@@ -1590,7 +1634,7 @@ export default defineComponent({
      * Se followUserPosition=true, move o mapa para a posição.
      * Se false, apenas atualiza o marcador sem mover o mapa.
      */
-    const goToUserLocation = (): Promise<boolean> => {
+    const goToUserLocation = (moveMapOnSuccess = false): Promise<boolean> => {
       return new Promise((resolve) => {
         if (!navigator.geolocation) {
           locationError.value = 'Geolocalização não suportada neste navegador'
@@ -1608,7 +1652,7 @@ export default defineComponent({
 
             if (map) {
               // SEMPRE move o mapa para o usuário na inicialização
-              const shouldMoveMap = followUserPosition.value || trees.value.length === 0
+              const shouldMoveMap = moveMapOnSuccess || followUserPosition.value
 
               if (shouldMoveMap) {
                 map.flyTo([latitude, longitude], 17, { duration: 1.5 })
@@ -1654,10 +1698,10 @@ export default defineComponent({
             }
             locationError.value = msgs[err.code] || 'Erro desconhecido'
 
-            // Fallback: Se falhar a localização, centraliza na primeira árvore
-            if (map?.getPane?.('mapPane') && trees.value.length > 0 && trees.value[0]) {
-              const first = trees.value[0]
-              map.flyTo([first.latitude, first.longitude], 15)
+            // As árvores carregam em paralelo com a geolocalização. Se já
+            // chegaram, enquadra o grupo local mais denso e ignora outliers.
+            if (trees.value.length > 0) {
+              focusInitialTreeCluster()
               notify('Não foi possível obter sua posição. Centralizando nas árvores.', 'warning')
             } else {
               notify(locationError.value, 'warning')
@@ -2109,13 +2153,14 @@ export default defineComponent({
           const size = count < 10 ? 40 : count < 50 ? 50 : 60
           return L.divIcon({
             html: `<div style="
-              background:linear-gradient(135deg,#2E7D32,#66BB6A);
+              background:linear-gradient(135deg,#173d2a,#245a39);
               color:#fff;font-weight:700;font-size:14px;
               border-radius:50%;width:100%;height:100%;
               display:flex;align-items:center;justify-content:center;
+              gap:4px;
               box-shadow:0 2px 10px rgba(0,0,0,0.3);
               border:3px solid rgba(255,255,255,0.7);
-            ">🌳 ${count}</div>`,
+            "><i class="mdi mdi-tree" aria-hidden="true"></i><span>${count}</span></div>`,
             className: 'tree-cluster-icon',
             iconSize: [size, size],
           })
@@ -2176,26 +2221,26 @@ export default defineComponent({
         noteDialog.value = true
       })
 
-      // Iniciar: Primeiro obtém localização, depois carrega árvores
+      // Carrega o inventário sem esperar os até 10s da geolocalização.
       console.log('[PruningMap] Iniciando mapa...')
-      goToUserLocation().then((success) => {
+      void goToUserLocation(true).then((success) => {
         console.log('[PruningMap] Localização:', success ? 'obtida' : 'falhou/indisponível')
         startWatchingPosition()
-        // Carrega árvores mesmo se localização falhou (usa fallback)
-        console.log('[PruningMap] Carregando árvores...')
-        fetchTrees()
-          .then(() => {
-            console.log(`[PruningMap] Árvores carregadas: ${trees.value.length}`)
-            renderTrees()
-            console.log(`[PruningMap] Marcadores renderizados no cluster`)
-          })
-          .catch((err) => {
-            console.error('[PruningMap] Erro ao carregar árvores:', err)
-          })
-          .finally(() => {
-            isInitialMapLoading.value = false
-          })
       })
+      console.log('[PruningMap] Carregando árvores...')
+      void fetchTrees()
+        .then(() => {
+          console.log(`[PruningMap] Árvores carregadas: ${trees.value.length}`)
+          renderTrees()
+          console.log('[PruningMap] Marcadores renderizados no cluster')
+          if (!userLat.value || !userLng.value) focusInitialTreeCluster()
+        })
+        .catch((err) => {
+          console.error('[PruningMap] Erro ao carregar árvores:', err)
+        })
+        .finally(() => {
+          isInitialMapLoading.value = false
+        })
       // Refresh automático a cada 5 minutos (sem resetar - só atualiza dados existentes)
       refreshInterval = setInterval(() => refreshData(false, true), 300000)
 
@@ -2302,6 +2347,7 @@ export default defineComponent({
 
     return {
       speciesIcon,
+      NEST_ICON,
       trees,
       filteredTrees,
       densityTrees,
@@ -3267,7 +3313,8 @@ export default defineComponent({
                   @click="activeFilter = 'PRIORITY'"
                   class="mr-1 mb-1"
                 >
-                  ✂️ Precisa de poda ({{ criticalCount }})
+                  <v-icon start size="14">mdi-content-cut</v-icon>
+                  Precisa de poda ({{ criticalCount }})
                 </v-chip>
                 <v-chip
                   size="small"
@@ -3287,9 +3334,9 @@ export default defineComponent({
                   @click="activeFilter = String(key)"
                   class="mr-1 mb-1"
                 >
-                  {{ cfg.emoji }} {{ key === 'PRUNED' ? 'Com poda registrada' : cfg.label }} ({{
-                    statusCounts[key] || 0
-                  }})
+                  <v-icon start size="14">{{ cfg.icon }}</v-icon>
+                  {{ key === 'PRUNED' ? 'Com poda registrada' : cfg.label }}
+                  ({{ statusCounts[key] || 0 }})
                 </v-chip>
               </div>
             </div>
@@ -3298,9 +3345,10 @@ export default defineComponent({
 
             <!-- Lista de Árvores -->
             <div class="tree-list-header d-flex justify-space-between align-center mb-2">
-              <span class="text-caption font-weight-bold"
-                >🌳 Árvores ({{ filteredTrees.length }})</span
-              >
+              <span class="text-caption font-weight-bold">
+                <v-icon size="14" class="mr-1">mdi-tree</v-icon>
+                Árvores ({{ filteredTrees.length }})
+              </span>
               <v-btn
                 v-if="filteredTrees.length > 0"
                 size="x-small"
@@ -3336,12 +3384,10 @@ export default defineComponent({
                     <v-avatar
                       size="32"
                       :color="
-                        tree.nearPowerLine ? 'red' : STATUS_CONFIG[tree.status]?.bg || '#4CAF50'
+                        tree.nearPowerLine ? 'red-darken-2' : STATUS_CONFIG[tree.status]?.bg || '#4CAF50'
                       "
                     >
-                      <span class="text-caption">{{
-                        tree.nearPowerLine ? '⚠️' : STATUS_CONFIG[tree.status]?.emoji || '🌳'
-                      }}</span>
+                      <span class="tree-species-icon" aria-hidden="true">{{ speciesIcon(tree.speciesName) }}</span>
                     </v-avatar>
                   </template>
 
@@ -3412,7 +3458,8 @@ export default defineComponent({
               <div class="legend-grid">
                 <div v-for="(cfg, key) in STATUS_CONFIG" :key="key" class="legend-item">
                   <span class="legend-dot-new" :style="{ background: cfg.bg }" />
-                  <span class="text-caption">{{ cfg.emoji }} {{ cfg.label }}</span>
+                  <v-icon size="14" :color="cfg.color">{{ cfg.icon }}</v-icon>
+                  <span class="text-caption">{{ cfg.label }}</span>
                 </div>
                 <div class="legend-item">
                   <span class="legend-line-new" />
@@ -3564,9 +3611,9 @@ export default defineComponent({
         style="width: calc(100% - 32px)"
         color="green-darken-2"
         variant="tonal"
-        prepend-icon="mdi-bird"
         @click="openNestObservationDialog"
       >
+        <span class="nest-icon mr-2" aria-hidden="true">{{ NEST_ICON }}</span>
         Registrar vistoria de ninhos
       </v-btn>
 
@@ -3603,7 +3650,7 @@ export default defineComponent({
     <v-dialog v-model="nestObservationDialog" max-width="480">
       <v-card class="rounded-xl">
         <v-card-title class="d-flex align-center ga-2">
-          <v-icon color="green-darken-2">mdi-bird</v-icon>
+          <span class="nest-icon" aria-hidden="true">{{ NEST_ICON }}</span>
           Vistoria de ninhos
         </v-card-title>
         <v-card-subtitle>
@@ -4608,6 +4655,18 @@ export default defineComponent({
   border-bottom: 1px solid rgba(0, 0, 0, 0.03);
   cursor: pointer;
   transition: background 0.2s ease;
+}
+
+.tree-species-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.nest-icon {
+  display: inline-block;
+  font-size: 1.1rem;
+  line-height: 1;
+  vertical-align: -0.1em;
 }
 
 .tree-list-item-new:hover {
