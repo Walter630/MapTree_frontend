@@ -14,7 +14,7 @@
       elevation="0"
       @click="createPruning"
     >
-      Registrar poda pela rota
+      Registrar poda
     </v-btn>
 
     <!-- Cards de Resumo -->
