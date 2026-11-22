@@ -25,13 +25,12 @@ describe('ManagerReportsView', () => {
   beforeEach(() => {
     get.mockReset()
     const date = new Date().toISOString()
+    const pruningTypes = ['LIGHT', 'MODERATE', 'HEAVY'] as const
     const prunings: PruningApiRecord[] = Array.from({ length: 9 }, (_, index) => ({
       id: `pruning-${index}`,
       idTree: `tree-${index}`,
       date,
-      type: (['LIGHT', 'MODERATE', 'HEAVY'] as const)[index % 3],
-      tree: null,
-      user: null,
+      type: pruningTypes[index % pruningTypes.length] ?? 'LIGHT',
     }))
     get.mockImplementation((path: string) =>
       Promise.resolve({ data: path === '/pruning' ? prunings : [] }),

@@ -65,7 +65,10 @@ export function buildMonthlyPruningSeries(
 
   const currentMonth = monthKeyForDate(now)
   if (!currentMonth) return []
-  const [year, month] = currentMonth.split('-').map(Number)
+  const [yearPart = '', monthPart = ''] = currentMonth.split('-')
+  const year = Number(yearPart)
+  const month = Number(monthPart)
+  if (!yearPart || !monthPart || !Number.isInteger(year) || !Number.isInteger(month)) return []
   const months = Array.from({ length: monthCount }, (_, index) => {
     const date = new Date(Date.UTC(year, month - 1 - (monthCount - 1 - index), 1))
     const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
