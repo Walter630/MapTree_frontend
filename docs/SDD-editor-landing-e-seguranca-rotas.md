@@ -34,7 +34,7 @@ Permitir que ADMIN edite a landing pública completa pelo painel, com rascunho, 
 | Gestão | `/manager/**` | MANAGER vinculado à organização ativa. Rotas filhas herdam o papel, mas cada API também valida escopo. |
 | Campo | `/user/**` | USER vinculado à organização ativa. Rotas filhas herdam o papel, mas cada API valida autoria e escopo quando aplicável. |
 
-Em produção, `vercel.json` envia o domínio público para a aplicação em caminhos diferentes de `/`, envia `app.maptree.com.br/` para `/login` e encaminha `/api/*` ao backend. A landing pública fica em `maptree.com.br/`. Essas regras precisam ser verificadas em homologação junto com CORS, cookies, cache e a origem de cada sessão.
+Em produção, `maptree.com.br/` redireciona para `www.maptree.com.br/`, que serve a landing pública. `vercel.json` envia caminhos diferentes de `/` nos hosts públicos para o mesmo caminho em `app.maptree.com.br`, envia `app.maptree.com.br/` para `/login` e encaminha `/api/*` ao backend. Essas regras precisam ser verificadas junto com CORS, cookies, cache e a origem de cada sessão.
 
 ## Contrato editorial
 

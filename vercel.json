@@ -23,17 +23,6 @@
       ],
       "destination": "https://app.maptree.com.br/:path*",
       "permanent": false
-    },
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.maptree.com.br"
-        }
-      ],
-      "destination": "https://maptree.com.br/",
-      "permanent": true
     }
   ],
   "rewrites": [

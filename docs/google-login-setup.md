@@ -67,10 +67,16 @@ O primeiro vínculo pede a senha MapTree. Depois disso, o identificador Google
 vinculado identifica a conta nos próximos logins.
 
 Configure `GOOGLE_CLIENT_ID` no ambiente do processo da API e o mesmo
-`VITE_GOOGLE_CLIENT_ID` no build do frontend. Inclua os domínios reais
-(`https://www.maptree.com.br` e, se usado, `https://maptree.com.br`) no `CORS_ORIGIN`
-e nas origens JavaScript autorizadas do Google. Aplique o schema Prisma antes
-de iniciar o backend atualizado para criar o índice único dos vínculos.
+`VITE_GOOGLE_CLIENT_ID` no build do frontend. Como a tela de login fica em
+`https://app.maptree.com.br`, inclua essa origem em `CORS_ORIGIN` na API e em
+**Origens JavaScript autorizadas** no cliente OAuth Web do Google. A origem deve
+corresponder exatamente a esquema, host e porta; não inclua caminho, como `/login`.
+Adicione `https://www.maptree.com.br` ou `https://maptree.com.br` somente se a tela
+que renderiza o botão Google também for servida nesses hosts. Origens de preview
+devem ser cadastradas individualmente se o login Google for testado nelas.
+
+Aplique o schema Prisma antes de iniciar o backend atualizado para criar o índice
+único dos vínculos.
 
 Publique também as alterações do frontend para aplicar o cabeçalho COOP do Vercel.
 `same-origin-allow-popups` foi configurado no Vercel, no Vite e no preview; ele não
