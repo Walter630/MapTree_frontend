@@ -6,6 +6,7 @@ import type { RoutePruning } from './pruningWorkflow'
 export interface DailyRouteSchedule<T = TreeApiRecord> {
   id: string
   treeId: string
+  userId?: string | null
   routeOrder?: number
   status: string
   tree: T
@@ -13,11 +14,53 @@ export interface DailyRouteSchedule<T = TreeApiRecord> {
   type: string
 }
 
+export interface DailyRouteSummary {
+  date: string
+  pendingCount: number
+  completedCount: number
+}
+
+export async function getDailyRouteSummary(month: string) {
+  const { data } = await apiConnect.get<DailyRouteSummary[]>('/scheduling/daily-route', {
+    params: { month },
+  })
+  return data
+}
+
 export async function getDailyRouteSchedules<T = TreeApiRecord>(date: string) {
   const { data } = await apiConnect.get<DailyRouteSchedule<T>[]>('/scheduling', {
     params: { date, mine: 'true' },
   })
   return data.filter((stop) => stop.type === 'PRUNING')
+}
+
+export async function setDailyRouteTreeSelected<T = TreeApiRecord>(
+  date: string,
+  treeId: string,
+  selected: boolean,
+) {
+  const encodedDate = encodeURIComponent(date)
+  const encodedTreeId = encodeURIComponent(treeId)
+  const { data } = await apiConnect.put<DailyRouteSchedule<T>[]>(
+    `/scheduling/daily-route/${encodedDate}/stops/${encodedTreeId}`,
+    { selected },
+  )
+  return data.filter((stop) => stop.type === 'PRUNING')
+}
+
+export function getDailyRouteSchedulesByStatus<T>(
+  schedules: DailyRouteSchedule<T>[],
+  status: 'PENDING' | 'COMPLETED',
+): DailyRouteSchedule<T>[] {
+  return schedules
+    .map((schedule, index) => ({ schedule, originalIndex: index }))
+    .filter(({ schedule }) => schedule.status === status)
+    .sort(
+      (a, b) =>
+        (a.schedule.routeOrder ?? a.originalIndex + 1) -
+        (b.schedule.routeOrder ?? b.originalIndex + 1),
+    )
+    .map(({ schedule }) => schedule)
 }
 
 export function routeStopSnapshot(
@@ -35,18 +78,12 @@ export function routeStopSnapshot(
   return { id: tree.id, order, latitude, longitude, label: tree.species?.commonName, scheduleId }
 }
 
-export function getPendingMapStops(
-  schedules: DailyRouteSchedule[],
-  cached: DailyRouteStopSnapshot[],
-): DailyRouteStopSnapshot[] {
-  const scheduledTrees = new Set(schedules.map((stop) => stop.treeId))
-  const pending = schedules.flatMap((stop, index) => {
-    if (stop.status !== 'PENDING') return []
-    const point = routeStopSnapshot(stop.tree, stop.routeOrder || index + 1, stop.id)
-    return point ? [point] : []
-  })
-  return [
-    ...pending,
-    ...cached.filter((stop) => !stop.scheduleId && !scheduledTrees.has(stop.id)),
-  ].sort((a, b) => a.order - b.order)
+export function getPendingMapStops(schedules: DailyRouteSchedule[]): DailyRouteStopSnapshot[] {
+  return schedules
+    .flatMap((stop, index) => {
+      if (stop.status !== 'PENDING') return []
+      const point = routeStopSnapshot(stop.tree, stop.routeOrder || index + 1, stop.id)
+      return point ? [point] : []
+    })
+    .sort((a, b) => a.order - b.order)
 }

@@ -42,7 +42,7 @@ const route = {
   params: {},
   query: {},
   hash: '',
-  name: undefined,
+  name: undefined as string | undefined,
   meta: {},
   matched: [],
 }
@@ -52,15 +52,15 @@ const trees = [
   { id: 'tree-0002', species: { commonName: 'Oiti' }, latitude: -3.8, longitude: -38.6 },
 ]
 
-function mountPage() {
+function mountPage(currentRoute = route) {
   const push = vi.fn()
   const back = vi.fn()
   const wrapper = mount(PruningRegistration, {
     global: {
       plugins: [vuetify],
       provide: {
-        [routerKey as symbol]: { push, back, currentRoute: { value: route } },
-        [routeLocationKey as symbol]: route,
+        [routerKey as symbol]: { push, back, currentRoute: { value: currentRoute } },
+        [routeLocationKey as symbol]: currentRoute,
       },
       stubs: {
         PageHeader: true,
@@ -125,6 +125,29 @@ describe('PruningRegistration', () => {
     expect(vm.showSuccess).toBe(true)
   })
 
+  it('envia cada perfil para a lista de podas pela rota nomeada correta', async () => {
+    post.mockResolvedValue({ status: 201, data: {} })
+    const destinations = [
+      ['/manager/podas/nova', 'ManagerPruningRegistration', 'ManagerPruningList'],
+      ['/user/podas/nova', 'PruningRegistration', 'PruningList'],
+      ['/admin/podas/nova', 'AdminPruningRegistration', 'AdminPruningList'],
+    ] as const
+
+    for (const [path, name, destination] of destinations) {
+      const currentRoute = { ...route, path, fullPath: path, name, query: {} }
+      const { wrapper, push } = mountPage(currentRoute)
+      await flushPromises()
+      await fillAndSubmit(wrapper)
+
+      const vm = wrapper.vm as unknown as { showSuccess: boolean; goToList: () => void }
+      expect(vm.showSuccess).toBe(true)
+      vm.goToList()
+      expect(push).toHaveBeenCalledWith({ name: destination })
+      wrapper.unmount()
+      post.mockClear()
+    }
+  })
+
   it('conclui a parada correspondente sem criar uma poda avulsa em paralelo', async () => {
     get.mockImplementation(async (url) => ({
       data:
@@ -149,6 +172,36 @@ describe('PruningRegistration', () => {
       date: '2024-05-10T12:00:00-03:00',
       observations: 'Limpeza básica',
     })
+    wrapper.unmount()
+  })
+
+  it('prioriza paradas pendentes da data escolhida na busca da árvore', async () => {
+    get.mockImplementation(async (url) => ({
+      data:
+        url === '/trees'
+          ? trees
+          : [
+              {
+                id: 'stop-two',
+                treeId: 'tree-0002',
+                type: 'PRUNING',
+                status: 'PENDING',
+                routeOrder: 2,
+              },
+              {
+                id: 'stop-one',
+                treeId: 'tree-0001',
+                type: 'PRUNING',
+                status: 'PENDING',
+                routeOrder: 1,
+              },
+            ],
+    }))
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as { trees: { id: string }[] }
+    expect(vm.trees.map(({ id }) => id)).toEqual(['tree-0001', 'tree-0002'])
     wrapper.unmount()
   })
 

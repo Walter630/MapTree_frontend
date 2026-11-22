@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getPendingMapStops, type DailyRouteSchedule } from './dailyRouteSchedules'
+import {
+  getDailyRouteSchedulesByStatus,
+  getPendingMapStops,
+  type DailyRouteSchedule,
+} from './dailyRouteSchedules'
 
 function schedule(treeId: string, routeOrder: number, status: string): DailyRouteSchedule {
   return {
@@ -13,37 +17,53 @@ function schedule(treeId: string, routeOrder: number, status: string): DailyRout
 }
 
 describe('paradas exibidas no mapa', () => {
-  const cached = ['first', 'second', 'cancelled', 'draft'].map((id, index) => ({
-    id,
-    order: index + 1,
-    latitude: -3.7,
-    longitude: -38.5,
-  }))
-
-  it('substitui o cache pelo estado da API sem perder o rascunho local', () => {
-    const stops = getPendingMapStops(
-      [
-        schedule('first', 1, 'COMPLETED'),
-        schedule('second', 2, 'PENDING'),
-        schedule('cancelled', 3, 'CANCELLED'),
-      ],
-      cached,
-    )
+  it('usa somente paradas pendentes da API e preserva a ordem salva', () => {
+    const stops = getPendingMapStops([
+      schedule('first', 1, 'COMPLETED'),
+      schedule('third', 3, 'PENDING'),
+      schedule('cancelled', 4, 'CANCELLED'),
+      schedule('second', 2, 'PENDING'),
+    ])
     expect(stops.map(({ id, order }) => [id, order])).toEqual([
       ['second', 2],
-      ['draft', 4],
+      ['third', 3],
     ])
   })
 
-  it('não volta a exibir paradas confirmadas anteriormente e removidas da API', () => {
-    expect(getPendingMapStops([], [{ ...cached[0]!, scheduleId: 'deleted' }])).toEqual([])
+  it('não exibe rascunhos ou snapshots locais que não estão na agenda da API', () => {
+    expect(getPendingMapStops([])).toEqual([])
   })
 
   it('não desenha uma rota concluída nem inventa um ponto para coordenadas ausentes', () => {
     const missing = schedule('missing', 2, 'PENDING')
     missing.tree.latitude = null
-    expect(getPendingMapStops([schedule('first', 1, 'COMPLETED'), missing], [cached[0]!])).toEqual(
-      [],
-    )
+    expect(getPendingMapStops([schedule('first', 1, 'COMPLETED'), missing])).toEqual([])
+  })
+})
+
+describe('abas da rota diária', () => {
+  const schedules = [
+    schedule('third', 3, 'PENDING'),
+    schedule('first', 1, 'COMPLETED'),
+    schedule('cancelled', 2, 'CANCELLED'),
+    schedule('second', 2, 'PENDING'),
+  ]
+
+  it('separa somente pendentes e concluídas sem renumerar a ordem salva', () => {
+    expect(
+      getDailyRouteSchedulesByStatus(schedules, 'PENDING').map(({ treeId, routeOrder }) => [
+        treeId,
+        routeOrder,
+      ]),
+    ).toEqual([
+      ['second', 2],
+      ['third', 3],
+    ])
+    expect(
+      getDailyRouteSchedulesByStatus(schedules, 'COMPLETED').map(({ treeId, routeOrder }) => [
+        treeId,
+        routeOrder,
+      ]),
+    ).toEqual([['first', 1]])
   })
 })
