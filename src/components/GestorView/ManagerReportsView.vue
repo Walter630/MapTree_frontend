@@ -106,7 +106,7 @@
             <v-chip size="small" color="primary" variant="flat">Últimos 12 meses</v-chip>
           </div>
 
-          <div class="chart-container" style="height: 280px">
+          <div v-if="hasRecentPrunings" class="chart-container" style="height: 280px">
             <div class="y-axis">
               <span>Máx</span>
               <span>Méd</span>
@@ -123,6 +123,9 @@
                 <span class="bar-label">{{ item.month }}</span>
               </div>
             </div>
+          </div>
+          <div v-else class="text-center py-12 text-medium-emphasis">
+            Sem podas registradas nos últimos 12 meses.
           </div>
         </v-card>
       </v-col>
@@ -221,6 +224,7 @@
 <script lang="ts">
 import type { TreeApiRecord, PruningApiRecord } from '@/types/treeApi'
 import { getTreeHeightRatio } from '@/utils/treePriority'
+import { buildMonthlyPruningSeries } from '@/utils/pruningReportSeries'
 import PageHeader from '@/components/shared/PageHeader.vue'
 
 export default {
@@ -282,27 +286,16 @@ export default {
     },
 
     chartData() {
-      // Simulação baseada em dados reais (agrupamento por mês)
-      const months = [
-        'Jan',
-        'Fev',
-        'Mar',
-        'Abr',
-        'Mai',
-        'Jun',
-        'Jul',
-        'Ago',
-        'Set',
-        'Out',
-        'Nov',
-        'Dez',
-      ]
-      return months.map((m) => ({
-        month: m,
-        count: Math.floor(Math.random() * 50) + 10,
-        percent: Math.floor(Math.random() * 80) + 20,
-        color: m === 'Nov' ? '#22c55e' : '#cbd5e1',
+      return buildMonthlyPruningSeries(this.prunings, 12).map((item, index) => ({
+        month: item.label,
+        count: item.count,
+        percent: item.percent,
+        color: index === 11 ? '#22c55e' : '#cbd5e1',
       }))
+    },
+
+    hasRecentPrunings() {
+      return this.chartData.some((item) => item.count > 0)
     },
   },
 
@@ -371,7 +364,7 @@ export default {
 .chart-container {
   display: flex;
   position: relative;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .y-axis {
@@ -379,7 +372,7 @@ export default {
   flex-direction: column;
   justify-content: space-between;
   padding-right: 12px;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
   font-size: 10px;
 }
 
@@ -409,17 +402,17 @@ export default {
 .bar-label {
   margin-top: 8px;
   font-size: 10px;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 .modern-table {
-  background: white !important;
+  background: var(--mt-surface) !important;
 }
 
 .modern-table :deep(th) {
   text-transform: uppercase;
   font-size: 11px !important;
   letter-spacing: 0.5px;
-  color: #64748b !important;
+  color: var(--mt-text-muted) !important;
 }
 </style>

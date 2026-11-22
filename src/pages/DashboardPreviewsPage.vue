@@ -70,7 +70,7 @@ const previews = [
   max-width: 760px;
 }
 .preview-card {
-  border: 1px solid #e5ebdd;
+  border: 1px solid var(--mt-border);
   border-radius: 18px;
   overflow: hidden;
   transition:
@@ -83,7 +83,7 @@ const previews = [
 }
 .preview-image-wrap {
   padding: 10px;
-  background: #f5f8eb;
+  background: var(--mt-surface-soft);
 }
 .preview-image {
   display: block;

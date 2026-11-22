@@ -1,96 +1,121 @@
 <template>
   <v-card class="tree-ai-card" elevation="0">
-    <!-- ===== Header ===== -->
-    <div class="card-hero" :class="`hero-${riskClass}`">
-      <div class="hero-glow" />
-      <div class="hero-content">
-        <div class="d-flex align-center justify-space-between">
-          <div>
-            <p class="text-overline hero-label">Análise de IA</p>
-            <p class="hero-height mt-2 mb-0">
-              <v-icon size="15" class="mr-1">mdi-arrow-expand-vertical</v-icon>
-              {{ heightLabel }} <span>altura estimada</span><span class="mx-1">·</span
-              >{{ wireHeightLabel }} <span>fiação no modelo</span>
-            </p>
-          </div>
-          <div class="d-flex flex-column align-end">
-            <div class="risk-badge mb-2" :class="`risk-${riskClass}`">
-              <v-icon size="18" class="mr-1">{{ riskIcon }}</v-icon>
-              {{ riskLabel }}
-            </div>
-            <v-chip
-              v-if="data.vigor"
-              size="x-small"
-              class="font-weight-bold"
-              variant="flat"
-              :color="vigorColor"
-            >
-              <v-icon start size="14">{{ vigorIcon }}</v-icon>
-              {{ vigorLabel }}
-            </v-chip>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <v-card-text class="card-body">
-      <!-- ===== Alerta de IA ===== -->
-      <v-alert
-        v-if="data.aiPrediction?.alert"
-        type="warning"
-        variant="tonal"
-        density="compact"
-        icon="mdi-alert-circle-outline"
-        class="mb-5 ai-alert"
-        rounded="lg"
-        prominent
-      >
-        <span class="font-weight-medium">{{ data.aiPrediction?.alert }}</span>
-      </v-alert>
-
-      <!-- ===== Resumo em linguagem simples (para qualquer usuário) ===== -->
-      <div
-        v-if="hasValidPrediction"
-        class="plain-summary mb-4"
-        :class="`plain-summary--${riskClass}`"
-      >
-        <div class="plain-summary-icon">
-          <v-icon size="26" color="white">{{ riskIcon }}</v-icon>
+      <section class="tree-summary" aria-label="Resumo da árvore">
+        <div class="tree-summary__risk">
+          <p class="tree-summary__label">Risco operacional</p>
+          <v-chip
+            class="tree-summary__risk-badge font-weight-bold"
+            :color="operationalStatusColor"
+            variant="tonal"
+            :aria-label="`Risco operacional: ${operationalStatusLabel}`"
+          >
+            {{ operationalStatusLabel }}
+          </v-chip>
+          <p v-if="registeredClassificationLabel" class="tree-summary__classification">
+            Classificação registrada: {{ registeredClassificationLabel }}
+          </p>
         </div>
-        <div class="plain-summary-text">
-          <p class="plain-summary-title mb-1">{{ plainSummary.title }}</p>
-          <p class="plain-summary-desc mb-0">{{ plainSummary.description }}</p>
+
+        <div class="tree-summary__row" aria-label="Última poda">
+          <v-icon class="tree-summary__row-icon" size="20" aria-hidden="true">
+            mdi-calendar-clock
+          </v-icon>
+          <span class="tree-summary__row-label">Última poda</span>
+          <time class="tree-summary__row-value">{{ lastPruneDateLabel }}</time>
         </div>
-      </div>
 
-      <v-btn
-        block
-        variant="tonal"
-        color="grey-darken-2"
-        class="mb-5 text-none"
-        :prepend-icon="showDetails ? 'mdi-chevron-up' : 'mdi-information-outline'"
-        @click="showDetails = !showDetails"
-      >
-        {{ showDetails ? 'Ocultar detalhes técnicos' : 'Ver detalhes técnicos da análise' }}
-      </v-btn>
+        <div class="tree-summary__row" :aria-label="`Vigor da árvore: ${vigorLabel}`">
+          <v-icon class="tree-summary__row-icon" size="20" :color="vigorColor" aria-hidden="true">
+            {{ vigorIcon }}
+          </v-icon>
+          <span class="tree-summary__row-label">Vigor da árvore</span>
+          <strong class="tree-summary__row-value">{{ vigorLabel }}</strong>
+        </div>
+      </section>
 
-      <div v-if="showDetails" class="technical-details">
-        <!-- Aviso quando a predição está ausente/incompleta: evita exibir zeros
-           e defaults como se fossem resultado da análise. -->
+      <v-divider class="tree-summary__divider" />
+
+      <section class="ai-prediction" aria-labelledby="ai-prediction-title">
+        <div class="ai-prediction__heading">
+          <v-icon color="primary" size="20" aria-hidden="true">mdi-brain</v-icon>
+          <h3 id="ai-prediction-title" class="ai-prediction__title">Previsão da IA</h3>
+        </div>
+
+        <div
+          v-if="predictionState === 'loading'"
+          class="prediction-state"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="prediction-spinner" aria-hidden="true" />
+          <span>Consultando previsão...</span>
+        </div>
+
         <v-alert
-          v-if="!hasValidPrediction"
+          v-else-if="predictionState === 'error'"
+          class="prediction-state-alert"
+          type="error"
+          variant="tonal"
+          density="compact"
+          role="alert"
+        >
+          <span>{{ errorMessage || 'Não foi possível consultar a previsão.' }}</span>
+          <template #append>
+            <v-btn variant="text" size="small" @click="$emit('retry')">Tentar novamente</v-btn>
+          </template>
+        </v-alert>
+
+        <v-alert
+          v-else-if="!hasValidPrediction"
+          class="prediction-state-alert"
           type="info"
           variant="tonal"
           density="compact"
-          icon="mdi-information-outline"
-          class="mb-5"
-          rounded="lg"
+          role="status"
         >
-          <span class="font-weight-medium"
-            >Dados de análise incompletos para esta árvore. Os valores abaixo podem não refletir uma
-            previsão real.</span
-          >
+          Previsão indisponível.
         </v-alert>
+
+        <template v-else>
+          <div class="plain-summary" :class="`plain-summary--${riskClass}`">
+            <div class="plain-summary-icon" aria-hidden="true">
+              <v-icon size="22" color="white">{{ riskIcon }}</v-icon>
+            </div>
+            <div class="plain-summary-text">
+              <p class="plain-summary-title mb-1">{{ plainSummary.title }}</p>
+              <p class="plain-summary-desc mb-0">{{ plainSummary.description }}</p>
+            </div>
+          </div>
+
+          <v-alert
+            v-if="data.aiPrediction?.alert"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            icon="mdi-alert-circle-outline"
+            class="mt-3 mb-0 ai-alert"
+            rounded="lg"
+          >
+            <span class="font-weight-medium">{{ data.aiPrediction.alert }}</span>
+          </v-alert>
+        </template>
+
+        <v-btn
+          v-if="hasTechnicalDetails"
+          block
+          variant="tonal"
+          color="primary"
+          class="technical-details-toggle mt-3 text-none"
+          :prepend-icon="showDetails ? 'mdi-chevron-up' : 'mdi-information-outline'"
+          :aria-expanded="showDetails"
+          @click="showDetails = !showDetails"
+        >
+          {{ showDetails ? 'Ocultar detalhes técnicos' : 'Ver detalhes técnicos' }}
+        </v-btn>
+      </section>
+
+      <div v-if="showDetails && hasValidPrediction" class="technical-details">
         <!-- ===== Progresso Altura vs Fio ===== -->
         <div class="section-block mb-6">
           <div class="section-header">
@@ -135,7 +160,7 @@
                 <v-icon
                   size="24"
                   :color="
-                    data.aiPrediction?.will_reach_wire || heightPercent >= 90 ? 'red' : 'green'
+                    data.aiPrediction?.will_reach_wire || heightPercent >= 90 ? 'error' : 'success'
                   "
                 >
                   {{
@@ -148,8 +173,8 @@
                   class="metric-value"
                   :class="
                     data.aiPrediction?.will_reach_wire || heightPercent >= 90
-                      ? 'text-red'
-                      : 'text-green'
+                      ? 'text-error'
+                      : 'text-success'
                   "
                 >
                   {{ data.aiPrediction?.will_reach_wire || heightPercent >= 90 ? 'SIM' : 'NÃO' }}
@@ -331,7 +356,7 @@
               }"
             >
               <div class="d-flex justify-space-between align-center mb-1">
-                <span class="text-overline font-weight-bold" style="color: #444"
+                <span class="text-overline font-weight-bold" style="color: var(--mt-ink)"
                   >Expectativa de Crescimento</span
                 >
                 <v-chip
@@ -343,7 +368,7 @@
                   {{ soilGrowthLabel }}
                 </v-chip>
               </div>
-              <p class="text-body-2 mb-0" style="color: #333; font-weight: 500">
+              <p class="text-body-2 mb-0" style="color: var(--mt-ink); font-weight: 500">
                 {{ soilDefinition }}
               </p>
             </div>
@@ -432,6 +457,17 @@
           </div>
         </template>
       </div>
+      <v-alert
+        v-else-if="showDetails"
+        type="info"
+        variant="tonal"
+        density="compact"
+        icon="mdi-information-outline"
+        class="mb-5"
+        rounded="lg"
+      >
+        Detalhes técnicos indisponíveis sem uma previsão válida.
+      </v-alert>
     </v-card-text>
   </v-card>
 </template>
@@ -441,6 +477,51 @@ import { defineComponent, type PropType } from 'vue'
 import type { TreeWithAi } from '@/plugins/apiConnect'
 import { getSoilInfo } from '@/utils/soilData'
 
+type PredictionState = 'loading' | 'available' | 'unavailable' | 'error'
+
+const TREE_STATUS_LABELS: Record<string, string> = {
+  NORMAL: 'Normal',
+  MODERATE: 'Moderado',
+  TO_PRUNE: 'Poda necessária',
+  CRITICAL: 'Crítico',
+  DANGER: 'Crítico',
+  UNDER_OBSERVATION: 'Em observação',
+  PRUNED: 'Poda registrada',
+}
+
+const SAO_PAULO_DATE_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+})
+
+function formatLastPruneDate(value?: string | null): string {
+  if (!value?.trim()) return 'Data não informada'
+
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  let date: Date
+
+  if (dateOnly) {
+    const [, yearText, monthText, dayText] = dateOnly
+    const year = Number(yearText)
+    const month = Number(monthText)
+    const day = Number(dayText)
+    date = new Date(Date.UTC(year, month - 1, day, 12))
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return 'Data não informada'
+    }
+  } else {
+    date = new Date(value)
+  }
+
+  return Number.isNaN(date.getTime()) ? 'Data não informada' : SAO_PAULO_DATE_FORMATTER.format(date)
+}
+
 export default defineComponent({
   name: 'TreeAiStats',
 
@@ -449,7 +530,17 @@ export default defineComponent({
       type: Object as PropType<TreeWithAi>,
       required: true,
     },
+    predictionState: {
+      type: String as PropType<PredictionState>,
+      default: 'unavailable',
+    },
+    errorMessage: {
+      type: String,
+      default: '',
+    },
   },
+
+  emits: ['retry'],
 
   data() {
     return {
@@ -470,13 +561,17 @@ export default defineComponent({
       )
     },
 
+    hasTechnicalDetails(): boolean {
+      return this.predictionState === 'available' && this.hasValidPrediction
+    },
+
     /* ---------- Risco ---------- */
     riskClass(): string {
       if (!this.hasValidPrediction) return 'observation'
       // OVERRIDE: Se estiver a 90% ou mais da fiação, é CRÍTICO independente do status da IA
       if (this.heightPercent >= 90) return 'critical'
 
-      const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
+      const s = String(this.data.aiPrediction?.risk_status || '').toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'normal',
         MODERATE: 'moderate',
@@ -487,25 +582,9 @@ export default defineComponent({
       return map[s] || 'normal'
     },
 
-    riskLabel(): string {
-      if (!this.hasValidPrediction) return 'Estimativa incompleta'
-      if (this.heightPercent >= 100) return 'ALTURA ESTIMADA ATINGE A REFERÊNCIA'
-      if (this.heightPercent >= 90) return 'PROXIMIDADE ESTIMADA'
-
-      const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
-      const map: Record<string, string> = {
-        NORMAL: 'Risco Normal',
-        MODERATE: 'Risco Moderado',
-        CRITICAL: 'RISCO CRÍTICO',
-        TO_PRUNE: 'Poda Necessária',
-        UNDER_OBSERVATION: 'Em Observação',
-      }
-      return map[s] || 'Análise de IA'
-    },
-
     riskIcon(): string {
       if (!this.hasValidPrediction) return 'mdi-information-outline'
-      const s = String(this.data.aiPrediction?.risk_status || this.data.status).toUpperCase()
+      const s = String(this.data.aiPrediction?.risk_status || '').toUpperCase()
       const map: Record<string, string> = {
         NORMAL: 'mdi-shield-check',
         MODERATE: 'mdi-shield-alert',
@@ -513,7 +592,30 @@ export default defineComponent({
         TO_PRUNE: 'mdi-content-cut',
         UNDER_OBSERVATION: 'mdi-eye-outline',
       }
-      return map[s] || 'mdi-shield-check'
+      return map[s] || 'mdi-information-outline'
+    },
+
+    operationalStatusLabel(): string {
+      const status = String(this.data.effectiveStatus || this.data.status || '').toUpperCase()
+      return TREE_STATUS_LABELS[status] || 'Sem classificação'
+    },
+
+    registeredClassificationLabel(): string {
+      const status = String(this.data.status || '').trim().toUpperCase()
+      if (!status) return ''
+      const label = TREE_STATUS_LABELS[status] || status
+      return label.toLocaleLowerCase('pt-BR') === this.operationalStatusLabel.toLocaleLowerCase('pt-BR')
+        ? ''
+        : label
+    },
+
+    operationalStatusColor(): string {
+      const status = String(this.data.effectiveStatus || this.data.status || '').toUpperCase()
+      if (status === 'CRITICAL' || status === 'DANGER') return 'error'
+      if (status === 'TO_PRUNE') return 'warning'
+      if (status === 'UNDER_OBSERVATION') return 'info'
+      if (status === 'NORMAL' || status === 'PRUNED') return 'success'
+      return 'info'
     },
 
     /* ---------- Resumo em linguagem simples (para leigos) ---------- */
@@ -547,14 +649,8 @@ export default defineComponent({
       }
     },
 
-    heightLabel(): string {
-      const value = Number(this.data.aiPrediction?.estimated_height_m)
-      return Number.isFinite(value) && value > 0 ? `${value.toFixed(1)} m` : 'Não informada'
-    },
-
-    wireHeightLabel(): string {
-      const value = Number(this.data.aiPrediction?.wire_height_m)
-      return Number.isFinite(value) && value > 0 ? `${value.toFixed(1)} m` : 'Não informada'
+    lastPruneDateLabel(): string {
+      return formatLastPruneDate(this.data.lastPruneDate)
     },
 
     /* ---------- Altura ---------- */
@@ -596,13 +692,14 @@ export default defineComponent({
     },
 
     canopyColor(): string {
+      const shape = this.data.aiPrediction?.canopy?.shape || ''
       const map: Record<string, string> = {
         WIDE: 'teal',
         NARROW: 'indigo',
         ROUND: 'green',
         COLUMNAR: 'deep-purple',
       }
-      return map[this.data.aiPrediction?.canopy?.shape] || 'grey'
+      return map[shape] || 'grey'
     },
 
     /* ---------- Fibonacci ---------- */
@@ -656,12 +753,12 @@ export default defineComponent({
     /* ---------- Vigor (Saúde) ---------- */
     vigorLabel(): string {
       const map: Record<string, string> = {
-        EXCELLENT: 'Vigor Excelente',
-        GOOD: 'Saúde Estável',
-        POOR: 'Saúde Debilitada',
-        DEAD: 'Espécime Morto',
+        EXCELLENT: 'Excelente',
+        GOOD: 'Bom',
+        POOR: 'Debilitado',
+        DEAD: 'Morto',
       }
-      return map[this.data.vigor] || 'Vigor Desconhecido'
+      return map[this.data.vigor || ''] || 'Indisponível'
     },
 
     vigorColor(): string {
@@ -671,7 +768,7 @@ export default defineComponent({
         POOR: 'amber-darken-3',
         DEAD: 'grey-darken-3',
       }
-      return map[this.data.vigor] || 'grey'
+      return map[this.data.vigor || ''] || 'grey'
     },
 
     vigorIcon(): string {
@@ -681,7 +778,7 @@ export default defineComponent({
         POOR: 'mdi-heart-broken',
         DEAD: 'mdi-skull-crossbones',
       }
-      return map[this.data.vigor] || 'mdi-help-circle'
+      return map[this.data.vigor || ''] || 'mdi-help-circle'
     },
   },
 
@@ -708,130 +805,128 @@ export default defineComponent({
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08) !important;
 }
 
-.hero-height {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-.hero-height span {
-  color: rgba(255, 255, 255, 0.68);
-  font-weight: 500;
-}
-
-/* ============ HERO HEADER ============ */
-.card-hero {
-  position: relative;
-  padding: 24px 24px 20px;
-  overflow: hidden;
-}
-
-.hero-glow {
-  position: absolute;
-  top: -40px;
-  right: -40px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  filter: blur(50px);
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-.hero-normal {
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-}
-.hero-normal .hero-glow {
-  background: #4caf50;
-}
-
-.hero-moderate {
-  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-}
-.hero-moderate .hero-glow {
-  background: #ff9800;
-}
-
-.hero-critical {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-}
-.hero-critical .hero-glow {
-  background: #f44336;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-label {
-  font-size: 10px !important;
-  letter-spacing: 2px !important;
-  color: rgba(0, 0, 0, 0.45);
-  margin-bottom: 4px;
-}
-
-.hero-title {
-  font-size: 24px;
-  font-weight: 800;
-  color: #1a1a1a;
-  line-height: 1.2;
-}
-
-/* ============ RISK BADGE ============ */
-.risk-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 14px;
-  border-radius: 24px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  animation: badgePulse 2.5s ease-in-out infinite;
-}
-
-.risk-normal {
-  background: rgba(76, 175, 80, 0.15);
-  color: #2e7d32;
-}
-
-.risk-moderate {
-  background: rgba(255, 152, 0, 0.15);
-  color: #e65100;
-}
-
-.risk-critical {
-  background: rgba(244, 67, 54, 0.15);
-  color: #c62828;
-  animation: badgePulseCritical 1.5s ease-in-out infinite;
-}
-
-@keyframes badgePulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.03);
-  }
-}
-
-@keyframes badgePulseCritical {
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.3);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 12px 4px rgba(244, 67, 54, 0.15);
-  }
-}
-
 /* ============ BODY ============ */
 .card-body {
-  padding: 24px !important;
+  padding: 18px !important;
+}
+
+.tree-summary {
+  display: grid;
+  gap: 14px;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.tree-summary__risk {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.tree-summary__label,
+.tree-summary__row-label {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tree-summary__risk-badge {
+  min-height: 32px;
+  font-size: 0.9rem;
+}
+
+.tree-summary__classification {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.tree-summary__row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.tree-summary__row-icon {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+}
+
+.tree-summary__row-value {
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.tree-summary__divider {
+  margin: 16px 0;
+  opacity: 0.75;
+}
+
+.ai-prediction__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ai-prediction__title {
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.prediction-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: rgba(var(--v-theme-on-surface), 0.78);
+  font-size: 0.85rem;
+}
+
+.prediction-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(var(--v-theme-primary), 0.22);
+  border-top-color: rgb(var(--v-theme-primary));
+  border-radius: 50%;
+  animation: prediction-spin 0.8s linear infinite;
+}
+
+@keyframes prediction-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.prediction-state-alert {
+  margin: 0;
+}
+
+.technical-details-toggle {
+  min-height: 42px;
+}
+
+@media (max-width: 400px) {
+  .card-body {
+    padding: 15px !important;
+  }
+
+  .tree-summary__row {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .tree-summary__row-label,
+  .tree-summary__row-value {
+    font-size: 0.82rem;
+  }
 }
 
 /* ============ RESUMO EM LINGUAGEM SIMPLES ============ */
@@ -1173,4 +1268,63 @@ export default defineComponent({
   font-size: 13px;
   color: #333;
 }
+
+/* Text and surfaces follow the active Vuetify theme. Semantic status accents stay distinct. */
+.tree-ai-card {
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
+  border-color: rgba(var(--v-theme-on-surface), 0.14);
+}
+.plain-summary {
+  background: rgb(var(--v-theme-surface-variant));
+  border-color: rgba(var(--v-theme-on-surface), 0.22);
+}
+.plain-summary-title,
+.plain-summary-desc,
+.section-title,
+.metric-value,
+.insight-label,
+.insight-value,
+.log-values {
+  color: rgb(var(--v-theme-on-surface));
+}
+.metric-card,
+.insight-card-v2,
+.soil-analysis-banner,
+.measurement-log-item {
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
+  border-color: rgba(var(--v-theme-on-surface), 0.16);
+}
+.metric-card:hover,
+.insight-card-v2:hover {
+  background: rgb(var(--v-theme-surface-variant));
+}
+.progress-track,
+.modern-progress {
+  background: rgb(var(--v-theme-surface-variant));
+}
+.progress-wire-marker {
+  background: color-mix(in srgb, var(--mt-status-warning) 16%, var(--mt-surface));
+  border-color: var(--mt-status-warning);
+  color: var(--mt-status-warning);
+}
+.metric-label,
+.r-desc,
+.log-date,
+.tree-ai-card .text-grey-darken-1,
+.tree-ai-card .text-grey {
+  color: rgba(var(--v-theme-on-surface), 0.78) !important;
+}
+.tree-ai-card .text-error {
+  color: rgb(var(--v-theme-error)) !important;
+}
+.tree-ai-card .text-success {
+  color: rgb(var(--v-theme-success)) !important;
+}
+.progress-wire-marker {
+  background: rgb(var(--v-theme-surface));
+  border-color: rgb(var(--v-theme-warning));
+}
+
 </style>
