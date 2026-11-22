@@ -107,6 +107,22 @@ it('não entra em loop se a chamada repetida continuar retornando 401', async ()
   expect(refresh).toHaveBeenCalledOnce()
 })
 
+it('envia a chave de idempotência no cadastro de árvore', async () => {
+  let captured: InternalAxiosRequestConfig | undefined
+  apiConnect.api.defaults.adapter = async (config) => {
+    captured = config
+    return ok(config)
+  }
+
+  await apiConnect.createTree(
+    { idSpecies: 'species-1', latitude: -3.7, longitude: -38.5, status: 'NORMAL' },
+    'attempt-123',
+  )
+
+  expect(captured?.url).toBe('/trees')
+  expect(captured?.headers.get('Idempotency-Key')).toBe('attempt-123')
+})
+
 it('erro de senha no login não tenta renovar a sessão', async () => {
   const refresh = vi.spyOn(axios, 'post')
   apiConnect.api.defaults.adapter = async (config) => fail(config, 401)
@@ -133,6 +149,18 @@ it('limita a uma renovação mesmo quando duas chamadas simultâneas continuam c
   finish({ data: { accessToken: 'still-rejected' } })
   expect((await results).every((result) => result.status === 'rejected')).toBe(true)
   expect(refresh).toHaveBeenCalledOnce()
+})
+
+it('envia a referência local da fiação na consulta de previsão', async () => {
+  const request = vi.spyOn(apiConnect.api, 'get').mockResolvedValue({ data: {} })
+  try {
+    await apiConnect.getAiPrediction('tree-1', 7.25)
+    expect(request).toHaveBeenCalledWith('/trees/tree-1/ai-prediction', {
+      params: { referenceWireHeightM: 7.25 },
+    })
+  } finally {
+    request.mockRestore()
+  }
 })
 
 it.each([undefined, 500, 503])(

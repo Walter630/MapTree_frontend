@@ -27,6 +27,66 @@
   max-width: none !important;
 }
 
+/* Utilitários Vuetify com nomes de cores fixos seguem os papéis do tema. */
+:root[data-theme='dark'] .text-grey,
+:root[data-theme='dark'] .text-grey-darken-1,
+:root[data-theme='dark'] .text-grey-darken-2,
+:root[data-theme='dark'] .text-grey-darken-3,
+:root[data-theme='dark'] .text-blue-darken-1,
+:root[data-theme='dark'] .text-blue-darken-2,
+:root[data-theme='dark'] .text-blue-darken-3,
+:root[data-theme='dark'] .text-indigo-darken-1,
+:root[data-theme='dark'] .text-indigo-darken-2,
+:root[data-theme='dark'] .text-indigo-darken-3,
+:root[data-theme='dark'] .text-green-darken-1,
+:root[data-theme='dark'] .text-green-darken-2,
+:root[data-theme='dark'] .text-green-darken-3,
+:root[data-theme='dark'] .text-orange-darken-1,
+:root[data-theme='dark'] .text-orange-darken-2,
+:root[data-theme='dark'] .text-red-darken-1,
+:root[data-theme='dark'] .text-red-darken-2 {
+  color: var(--mt-text-muted) !important;
+}
+
+:root[data-theme='dark'] .text-green-darken-1,
+:root[data-theme='dark'] .text-green-darken-2,
+:root[data-theme='dark'] .text-green-darken-3,
+:root[data-theme='dark'] .text-blue-darken-1,
+:root[data-theme='dark'] .text-blue-darken-2,
+:root[data-theme='dark'] .text-blue-darken-3,
+:root[data-theme='dark'] .text-indigo-darken-1,
+:root[data-theme='dark'] .text-indigo-darken-2,
+:root[data-theme='dark'] .text-indigo-darken-3 {
+  color: rgb(var(--v-theme-primary)) !important;
+}
+
+:root[data-theme='dark'] .text-orange-darken-1,
+:root[data-theme='dark'] .text-orange-darken-2 {
+  color: rgb(var(--v-theme-warning)) !important;
+}
+
+:root[data-theme='dark'] .text-red-darken-1,
+:root[data-theme='dark'] .text-red-darken-2 {
+  color: rgb(var(--v-theme-error)) !important;
+}
+
+:root[data-theme='dark'] .bg-white,
+:root[data-theme='dark'] .bg-grey-lighten-3,
+:root[data-theme='dark'] .bg-grey-lighten-4,
+:root[data-theme='dark'] .bg-grey-lighten-5,
+:root[data-theme='dark'] .bg-green-lighten-4,
+:root[data-theme='dark'] .bg-green-lighten-5,
+:root[data-theme='dark'] .bg-blue-lighten-4,
+:root[data-theme='dark'] .bg-blue-lighten-5 {
+  background-color: var(--mt-surface-soft) !important;
+  color: var(--mt-ink);
+}
+
+:root[data-theme='dark'] .v-card,
+:root[data-theme='dark'] .v-dialog > .v-overlay__content > .v-card {
+  color: var(--mt-ink);
+}
+
 .full-bleed-page {
   width: 100vw;
   max-width: 100vw;
@@ -104,34 +164,50 @@
 
 /* Superfícies suaves para a visão operacional dos dashboards. */
 .v-application .v-container.dash {
-  background: #eaf1ec;
+  background: var(--mt-surface-soft);
 }
 .v-application .v-container.dash .panel {
-  background: var(--mt-white);
+  background: var(--mt-surface);
   border-color: var(--mt-border);
   box-shadow: 0 4px 18px rgba(0, 40, 26, 0.06);
 }
 .v-application .v-container.dash .panel-head {
-  background: #f0f5f1;
+  background: var(--mt-surface-soft);
   border-bottom-color: var(--mt-border);
 }
 .v-application .v-container.dash .kpi {
-  background: var(--mt-white);
+  background: var(--mt-surface);
   border-color: var(--mt-border);
   border-top: 3px solid var(--mt-green);
 }
 .v-application .v-container.dash .kpi--danger {
-  background: #fff5f3;
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 10%, var(--mt-surface));
   border-top-color: #b42318;
 }
 .v-application .v-container.dash .catalog {
-  background: var(--mt-white);
+  background: var(--mt-surface);
   border-color: var(--mt-border);
 }
 .v-application .v-container.dash .catalog-header {
-  background: #f0f5f1;
+  background: var(--mt-surface-soft);
   border-radius: 16px 16px 0 0;
 }
 .v-application .v-container.dash .alert-row:hover {
-  background: #edf6ef;
+  background: var(--mt-surface-soft);
+}
+
+/* Menus e tooltips são teletransportados para fora do tema local do componente. */
+:root[data-theme='dark'] .v-overlay-container .v-tooltip > .v-overlay__content {
+  border: 1px solid var(--mt-border);
+  background: var(--mt-surface-soft) !important;
+  color: var(--mt-ink) !important;
+}
+:root[data-theme='dark'] .v-overlay-container .v-menu > .v-overlay__content,
+:root[data-theme='dark'] .v-overlay-container .v-menu .v-card {
+  border-color: var(--mt-border) !important;
+  background: var(--mt-surface) !important;
+  color: var(--mt-ink) !important;
+}
+:root[data-theme='dark'] .v-overlay-container .v-menu .v-btn__overlay {
+  background: var(--mt-surface-soft) !important;
 }

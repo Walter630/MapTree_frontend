@@ -75,21 +75,27 @@ describe('RegisterComponent', () => {
     await cpfInput.setValue('12345678901')
     await phoneInput.setValue('(11) 98765-4321')
     const vm = wrapper.vm as unknown as {
-      formData: { name: string; email: string; password: string }
+      formData: { name: string; email: string; password: string; requestedOrganizationName: string; municipalityName: string; municipalityUf: string }
       registrar: () => Promise<void>
     }
     vm.formData.name = 'Usuário Teste'
     vm.formData.email = 'usuario@example.com'
     vm.formData.password = 'senha123'
+    vm.formData.requestedOrganizationName = 'Empresa Verde'
+    vm.formData.municipalityName = 'Tabuleiro do Norte'
+    vm.formData.municipalityUf = 'CE'
 
     await vm.registrar()
     await nextTick()
 
     expect(post).toHaveBeenCalledWith(
-      '/auth/register',
+      '/auth/manager-requests',
       expect.objectContaining({
         cpf: '12345678901',
         phone: '11987654321',
+        requestedOrganizationName: 'Empresa Verde',
+        municipalityName: 'Tabuleiro do Norte',
+        municipalityUf: 'CE',
       }),
     )
   })

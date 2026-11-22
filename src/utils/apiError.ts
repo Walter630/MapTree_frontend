@@ -40,16 +40,21 @@ export function getApiErrorMessage(
   }
 
   const status = apiError.response.status
+  const responseMessage = apiError.response.data?.message
+  const serverMessage = Array.isArray(responseMessage)
+    ? responseMessage.join(' ')
+    : responseMessage
 
   if (status === 401) {
     return MESSAGES.session
   }
 
-  if (status === 403) return 'Você não tem permissão para realizar esta ação.'
+  if (status === 403) {
+    return serverMessage || 'Você não tem permissão para realizar esta ação.'
+  }
 
   if (status === 409) {
-    const message = apiError.response.data?.message
-    return (Array.isArray(message) ? message.join(' ') : message) || fallback
+    return serverMessage || fallback
   }
 
   if (status === 400 || status === 422) {

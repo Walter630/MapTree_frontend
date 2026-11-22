@@ -148,7 +148,7 @@ export default defineComponent({
             .map(([s, q]) => `• ${s}: ${q}`)
             .join('<br/>')}
           <br/><br/>
-          <button id="report-${lat}-${lng}" style="cursor:pointer;color:#1976D2">
+          <button id="report-${lat}-${lng}" class="species-report-btn">
             Ver relatório
           </button>
         `
@@ -157,7 +157,7 @@ export default defineComponent({
           radius: 10,
           color: getSpeciesColor(dominantSpecies),
           fillOpacity: 0.8,
-        }).bindPopup(popupContent)
+        }).bindPopup(popupContent, { className: 'species-info-popup' })
 
         marker.on('popupopen', () => {
           const btn = document.getElementById(`report-${lat}-${lng}`)
@@ -198,6 +198,29 @@ export default defineComponent({
 </script>
 
 <style scoped>
+:deep(.species-info-popup .leaflet-popup-content-wrapper),
+:deep(.species-info-popup .leaflet-popup-tip) {
+  background: var(--mt-surface);
+  color: var(--mt-ink);
+}
+
+:deep(.species-report-btn) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--v-theme-primary));
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+:deep(.species-report-btn:focus-visible) {
+  outline: 2px solid var(--mt-focus);
+  outline-offset: 3px;
+}
+</style>
+
+<style scoped>
 .map-wrapper {
   position: relative;
 }
@@ -215,7 +238,8 @@ export default defineComponent({
   left: 10px;
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid #ccc;
-  background: white;
+  border: 1px solid var(--mt-border);
+  background: var(--mt-surface);
+  color: var(--mt-ink);
 }
 </style>

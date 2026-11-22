@@ -4,6 +4,7 @@ import { registerPlugins } from '@/plugins'
 import App from './App.vue'
 // Estilos globais da aplicação (classe .page-shell, resets, etc.)
 import '@/assets/main.css'
+import '@/assets/tailwind.css'
 
 const app = createApp(App)
 registerPlugins(app)

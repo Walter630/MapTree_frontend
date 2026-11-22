@@ -35,3 +35,8 @@ playwright-report/
 .env
 
 .agents/tasks/
+.agents/skills/impeccable/
+.codex/hooks.json
+MAPTREE_PLANO_UNIFICADO.md
+/docs/inventario-rotas-seguranca.md
+/docs/validacao-correcoes-mapa-podas-2026-11-19.md

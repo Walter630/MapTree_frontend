@@ -392,27 +392,27 @@ onMounted(load)
   flex-direction: column;
   gap: 10px;
   padding: 22px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--mt-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--mt-surface);
 }
 .resource-metrics span {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 .resource-metrics strong {
   font-size: 1.9rem;
   line-height: 1;
-  color: #1e293b;
+  color: var(--mt-ink);
 }
 .resource-metrics small {
   font-size: 0.73rem;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
 }
 .resource-table {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--mt-border);
   border-radius: 15px;
-  background: #fff;
+  background: var(--mt-surface);
   overflow: hidden;
 }
 .table-heading {
@@ -420,14 +420,14 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--mt-border);
 }
 .table-heading h2 {
   font-size: 1rem;
 }
 .table-heading p {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
   margin-top: 5px;
 }
 .resource-filters {
@@ -437,8 +437,8 @@ onMounted(load)
   padding: 20px 24px;
 }
 .resource-data :deep(th) {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--mt-surface-soft);
+  color: var(--mt-text-muted);
   font-size: 0.75rem;
 }
 .resource-data :deep(td) {

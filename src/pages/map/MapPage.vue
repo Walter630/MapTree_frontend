@@ -17,17 +17,12 @@ export default defineComponent({
 <style scoped>
 .full-map-page {
   width: 100%;
-  height: calc(100dvh - 68px);
+  height: 100vh;
+  height: 100dvh;
   padding: 0;
   margin: 0;
   overflow: hidden;
   position: relative;
-}
-
-@media (max-width: 1039px) {
-  .full-map-page {
-    height: calc(100dvh - 56px);
-  }
 }
 
 /* Remove padding do v-main para esta página */

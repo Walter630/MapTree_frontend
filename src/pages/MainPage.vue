@@ -23,7 +23,10 @@ onUnmounted(() => window.removeEventListener('resize', checkMobile))
 const route = useRoute()
 
 const HIDDEN_ROUTES = [
+  '/',
   '/login',
+  '/cadastro',
+  '/cadastro/solicitacao',
   '/register',
   '/recovery',
   '/recovery-code',

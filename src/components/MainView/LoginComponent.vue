@@ -1,155 +1,206 @@
 <template>
-  <v-container class="login-container" fluid>
-    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh">
-      <!-- Coluna do formulário -->
-      <v-col class="form-section" cols="12" md="6">
-        <!-- Logo fixo no canto superior esquerdo -->
-        <div class="logo-fixed">
-          <img src="/icons/LogoMapTree.png" alt="Logo" class="logo-img" />
-          <span class="logo-text">MapTree</span>
+  <main class="tw:min-h-screen tw:bg-white tw:text-slate-900 tw:lg:grid tw:lg:grid-cols-[43%_57%]">
+    <section class="tw:flex tw:min-h-screen tw:flex-col tw:px-6 tw:py-6 tw:sm:px-10 tw:lg:px-16">
+      <a
+        href="/"
+        class="tw:inline-flex tw:w-fit tw:items-center tw:gap-3 tw:text-slate-900 tw:no-underline"
+        aria-label="MapTree, início"
+        @click.prevent="$router.push('/')"
+      >
+        <img src="/icons/LogoMapTree.png" alt="" class="tw:h-11 tw:w-12 tw:object-contain" />
+        <span class="tw:text-lg tw:font-bold tw:tracking-tight">MapTree</span>
+      </a>
+
+      <div class="tw:mx-auto tw:flex tw:w-full tw:max-w-md tw:flex-1 tw:flex-col tw:justify-center tw:py-10">
+        <p class="tw:mb-2 tw:text-sm tw:font-semibold tw:uppercase tw:tracking-[0.14em] tw:text-emerald-700">
+          Acesso à plataforma
+        </p>
+        <h1 class="tw:text-3xl tw:font-bold tw:tracking-tight tw:sm:text-4xl">
+          {{ pendingGoogleCredential ? 'Confirme o vínculo com Google' : 'Acesse sua conta' }}
+        </h1>
+        <p class="tw:mt-3 tw:text-sm tw:leading-6 tw:text-slate-600">
+          {{ pendingGoogleCredential
+            ? 'Digite a senha da sua conta MapTree para concluir o vínculo com segurança.'
+            : 'Entre para consultar as árvores, acompanhar sua equipe e planejar atividades.' }}
+        </p>
+
+        <div
+          v-if="$route.query.reason === 'session-unavailable'"
+          class="tw:mt-6 tw:rounded-xl tw:border tw:border-sky-200 tw:bg-sky-50 tw:px-4 tw:py-3 tw:text-sm tw:text-sky-900"
+          role="status"
+          aria-live="polite"
+        >
+          <p>Não foi possível validar sua sessão agora. Ela foi preservada; tente novamente quando a conexão voltar.</p>
+          <button
+            type="button"
+            class="tw:mt-2 tw:font-semibold tw:underline tw:underline-offset-2 tw:focus-visible:rounded tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-sky-700"
+            @click="$router.push('/')"
+          >
+            Tentar acessar meu painel
+          </button>
         </div>
 
-        <div class="content-wrapper px-8">
-          <!-- Formulário -->
-          <div class="form-area">
-            <h2 class="title mb-8">Bem-vindo(a)!</h2>
+        <div
+          v-if="feedback.show"
+          class="tw:mt-5 tw:rounded-xl tw:border tw:border-red-200 tw:bg-red-50 tw:px-4 tw:py-3 tw:text-sm tw:text-red-800"
+          role="alert"
+          aria-live="assertive"
+        >
+          {{ feedback.message }}
+        </div>
 
-            <v-alert
-              v-if="$route.query.reason === 'session-unavailable'"
-              type="info"
-              variant="tonal"
-              class="mb-5"
-            >
-              Não foi possível validar sua sessão agora. Ela foi preservada; tente novamente quando
-              a conexão voltar.
-              <v-btn variant="text" class="mt-2" @click="$router.push('/')"
-                >Tentar acessar meu painel</v-btn
-              >
-            </v-alert>
-            <!-- Alerta inline integrado ao formulário -->
-            <v-expand-transition>
-              <div
-                v-if="feedback.show"
-                class="form-alert"
-                :class="feedback.type === 'success' ? 'form-alert--success' : 'form-alert--error'"
-              >
-                <v-icon size="18" class="form-alert__icon">
-                  {{ feedback.type === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}
-                </v-icon>
-                <span class="form-alert__text">{{ feedback.message }}</span>
-              </div>
-            </v-expand-transition>
+        <form class="tw:mt-7 tw:space-y-5" novalidate @submit.prevent="login">
+          <label
+            v-if="!pendingGoogleCredential"
+            for="login-email"
+            class="tw:block tw:text-sm tw:font-medium tw:text-slate-800"
+          >
+            E-mail
+            <input
+              id="login-email"
+              v-model.trim="username"
+              type="email"
+              name="email"
+              autocomplete="username"
+              required
+              class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:bg-white tw:px-3.5 tw:text-base tw:text-slate-900 tw:outline-none tw:transition tw:placeholder:text-slate-400 tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20"
+              placeholder="voce@empresa.com.br"
+            />
+          </label>
 
-            <v-form ref="form" v-model="valid" lazy-validation class="login-form">
-              <div v-if="!pendingGoogleCredential" class="field-group mb-6">
-                <label class="field-label">Email</label>
-                <v-text-field
-                  v-model="username"
-                  color="green"
-                  hide-details
-                  variant="outlined"
-                  placeholder="Digite seu email"
-                  required
-                  density="comfortable"
-                />
-              </div>
-
-              <div class="field-group mb-6">
-                <label class="field-label">{{
-                  pendingGoogleCredential ? 'Senha do MapTree' : 'Senha'
-                }}</label>
-                <v-text-field
-                  v-model="password"
-                  color="green"
-                  hide-details
-                  variant="outlined"
-                  placeholder="Digite sua senha"
-                  required
-                  density="comfortable"
-                  :type="showPassword ? 'text' : 'password'"
-                  @keyup.enter="login"
-                >
-                  <template #append-inner>
-                    <v-icon @click="showPassword = !showPassword">{{
-                      showPassword ? 'mdi-eye-off' : 'mdi-eye'
-                    }}</v-icon>
-                  </template>
-                </v-text-field>
-              </div>
-
-              <v-btn
-                block
-                class="mb-4 login-btn"
-                color="#C6F513"
-                size="large"
-                append-icon="mdi-arrow-right"
-                :loading="loading"
-                @click="login"
-              >
-                {{ pendingGoogleCredential ? 'Vincular Google' : 'entrar' }}
-              </v-btn>
-              <v-btn
-                v-if="pendingGoogleCredential"
-                variant="text"
-                class="mb-4"
-                :disabled="loading"
-                @click="cancelGoogleLink"
-                >Cancelar vínculo</v-btn
-              >
-
-              <div class="text-center mb-6">
-                <a class="forgot-password" @click="$router.push('/recovery')"
-                  >Esqueceu sua senha?</a
-                >
-              </div>
-
-              <div v-show="!pendingGoogleCredential" class="divider mb-6">
-                <span>ou</span>
-              </div>
-
-              <div
-                v-if="googleEnabled"
-                v-show="!pendingGoogleCredential"
-                ref="googleButton"
-                class="google-button-frame mb-3"
-                :class="{ 'google-button-frame--loading': loading }"
-                :aria-busy="loading"
-                aria-label="Entrar com Google"
+          <div class="tw:text-sm tw:font-medium tw:text-slate-800">
+            <label for="login-password">
+              {{ pendingGoogleCredential ? 'Senha da conta MapTree' : 'Senha' }}
+            </label>
+            <span class="tw:relative tw:mt-1.5 tw:block">
+              <input
+                id="login-password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                name="password"
+                autocomplete="current-password"
+                required
+                class="tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:bg-white tw:px-3.5 tw:pr-24 tw:text-base tw:text-slate-900 tw:outline-none tw:transition tw:placeholder:text-slate-400 tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20"
+                placeholder="Digite sua senha"
               />
-              <p v-if="!googleEnabled" class="social-hint mb-3">
-                Login com Google indisponível: configure o Client ID da aplicação.
-              </p>
+              <button
+                type="button"
+                class="tw:absolute tw:inset-y-0 tw:right-1 tw:my-auto tw:flex tw:min-h-10 tw:min-w-10 tw:items-center tw:justify-center tw:rounded tw:px-1 tw:text-xs tw:font-semibold tw:text-emerald-800 tw:underline tw:underline-offset-2 tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-700"
+                :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
+                :aria-pressed="showPassword"
+                aria-controls="login-password"
+                @click="showPassword = !showPassword"
+              >
+                {{ showPassword ? 'Ocultar' : 'Mostrar' }}
+              </button>
+            </span>
+          </div>
 
-              <div class="text-center mt-6">
-                Não possui uma conta?
-                <a class="register-link" @click="$router.push('/register')">Cadastre-se</a>
-              </div>
-            </v-form>
+          <button
+            type="submit"
+            class="tw:flex tw:min-h-12 tw:w-full tw:items-center tw:justify-center tw:gap-2 tw:rounded-lg tw:bg-lime-300 tw:px-5 tw:font-semibold tw:text-slate-950 tw:transition tw:hover:bg-lime-400 tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-700 tw:disabled:cursor-wait tw:disabled:opacity-60"
+            :disabled="loading"
+            :aria-busy="loading"
+          >
+            <span
+              v-if="loading"
+              class="tw:h-4 tw:w-4 tw:animate-spin tw:rounded-full tw:border-2 tw:border-slate-800 tw:border-t-transparent"
+              aria-hidden="true"
+            ></span>
+            {{ loading ? 'Entrando…' : pendingGoogleCredential ? 'Vincular Google' : 'Entrar' }}
+          </button>
+
+          <button
+            v-if="pendingGoogleCredential"
+            type="button"
+            class="tw:mx-auto tw:block tw:rounded tw:px-3 tw:py-2 tw:text-sm tw:font-semibold tw:text-slate-600 tw:underline tw:underline-offset-2 tw:hover:text-slate-900 tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-700"
+            :disabled="loading"
+            @click="cancelGoogleLink"
+          >
+            Cancelar vínculo
+          </button>
+        </form>
+
+        <div v-if="!pendingGoogleCredential" class="tw:mt-6">
+          <div class="tw:flex tw:items-center tw:gap-4 tw:text-sm tw:text-slate-500">
+            <span class="tw:h-px tw:flex-1 tw:bg-slate-200"></span>
+            <span>ou</span>
+            <span class="tw:h-px tw:flex-1 tw:bg-slate-200"></span>
+          </div>
+
+          <div
+            v-if="googleEnabled"
+            ref="googleButton"
+            class="google-button-frame tw:mt-5 tw:flex tw:min-h-11 tw:w-full tw:min-w-0 tw:max-w-full tw:justify-center tw:overflow-hidden"
+            :class="{ 'google-button-frame--loading': loading }"
+            :aria-busy="loading"
+            aria-label="Entrar com Google"
+          ></div>
+          <p v-else class="tw:mt-4 tw:text-center tw:text-xs tw:leading-5 tw:text-slate-500">
+            Login com Google indisponível: configure o Client ID da aplicação.
+          </p>
+        </div>
+
+        <p v-if="!pendingGoogleCredential" class="tw:mt-7 tw:text-center tw:text-sm tw:text-slate-600">
+          <a
+            href="/recovery"
+            class="tw:font-semibold tw:text-emerald-800 tw:underline tw:underline-offset-2 tw:hover:text-emerald-950 tw:focus-visible:rounded tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-emerald-700"
+            @click.prevent="$router.push('/recovery')"
+          >
+            Esqueceu sua senha?
+          </a>
+        </p>
+
+        <p v-if="!pendingGoogleCredential" class="tw:mt-7 tw:text-center tw:text-sm tw:text-slate-600">
+          Ainda não tem acesso?
+          <a
+            href="/register"
+            class="tw:font-semibold tw:text-emerald-800 tw:underline tw:underline-offset-2 tw:hover:text-emerald-950 tw:focus-visible:rounded tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-emerald-700"
+            @click.prevent="$router.push('/register')"
+          >
+            Solicite acesso
+          </a>
+        </p>
+      </div>
+
+      <p class="tw:mx-auto tw:w-full tw:max-w-xl tw:pb-2 tw:text-xs tw:text-slate-500">
+        MapTree · Gestão de árvores para planejar podas preventivas
+      </p>
+    </section>
+
+    <aside class="tw:hidden tw:min-h-screen tw:flex-col tw:justify-between tw:overflow-hidden tw:bg-gradient-to-br tw:from-emerald-500 tw:via-lime-400 tw:to-emerald-950 tw:p-12 tw:text-white tw:lg:flex tw:xl:p-16">
+      <div class="tw:flex tw:flex-wrap tw:gap-3 tw:text-sm tw:font-medium">
+        <span class="tw:rounded-full tw:border tw:border-white/40 tw:bg-white/10 tw:px-4 tw:py-2">Monitoramento</span>
+        <span class="tw:rounded-full tw:border tw:border-white/40 tw:bg-white/10 tw:px-4 tw:py-2">Mapas</span>
+        <span class="tw:rounded-full tw:border tw:border-white/40 tw:bg-white/10 tw:px-4 tw:py-2">Equipes</span>
+      </div>
+      <div class="tw:max-w-xl">
+        <div class="tw:mb-8 tw:grid tw:grid-cols-2 tw:gap-4 tw:opacity-90" aria-hidden="true">
+          <div class="tw:rounded-2xl tw:border tw:border-white/30 tw:bg-white/15 tw:p-5 tw:backdrop-blur">
+            <div class="tw:mb-4 tw:h-2 tw:w-2/3 tw:rounded tw:bg-white/70"></div>
+            <div class="tw:space-y-2">
+              <div class="tw:h-2 tw:rounded tw:bg-white/30"></div>
+              <div class="tw:h-2 tw:w-4/5 tw:rounded tw:bg-white/30"></div>
+              <div class="tw:h-2 tw:w-3/5 tw:rounded tw:bg-white/30"></div>
+            </div>
+          </div>
+          <div class="tw:flex tw:items-end tw:gap-2 tw:rounded-2xl tw:border tw:border-white/30 tw:bg-white/15 tw:p-5 tw:backdrop-blur">
+            <span class="tw:h-8 tw:flex-1 tw:rounded-t tw:bg-white/35"></span>
+            <span class="tw:h-14 tw:flex-1 tw:rounded-t tw:bg-white/60"></span>
+            <span class="tw:h-11 tw:flex-1 tw:rounded-t tw:bg-white/45"></span>
+            <span class="tw:h-20 tw:flex-1 tw:rounded-t tw:bg-white/80"></span>
           </div>
         </div>
-
-        <!-- Termos no rodapé -->
-        <div class="terms-footer">
-          <a href="#" @click.prevent="showTerms">Termos e Condições</a>
-          <span class="separator">•</span>
-          <a href="#" @click.prevent="showPrivacy">Política de Privacidade</a>
-        </div>
-      </v-col>
-
-      <!-- Coluna direita -->
-      <v-col
-        class="info-section"
-        cols="12"
-        md="6"
-        :style="isMobile ? 'display: none;' : 'padding: 20px; text-align: center;'"
-      >
-        <div class="info-text">
-          <h1>Gestão<br />inteligente de<br />vegetação</h1>
-        </div>
-        <div class="bottom-logo">MapTree</div>
-      </v-col>
-    </v-row>
-  </v-container>
+        <h2 class="tw:text-4xl tw:font-bold tw:leading-tight tw:xl:text-5xl">
+          Gestão de árvores para planejar podas preventivas.
+        </h2>
+        <p class="tw:mt-5 tw:max-w-lg tw:text-lg tw:leading-8 tw:text-white/90">
+          Organize a localização, as condições e o histórico de manutenção das árvores da sua região.
+        </p>
+      </div>
+      <span class="tw:self-end tw:text-xl tw:font-bold tw:tracking-tight">MapTree</span>
+    </aside>
+  </main>
 </template>
 
 <script lang="ts">
@@ -166,8 +217,6 @@ export default defineComponent({
       username: '',
       password: '',
       showPassword: false,
-      valid: false,
-      isMobile: false,
       loading: false,
       isUnmounted: false,
       googleButtonCleanup: null as (() => void) | null,
@@ -180,20 +229,14 @@ export default defineComponent({
     }
   },
   mounted() {
-    this.checkIsMobile()
-    window.addEventListener('resize', this.checkIsMobile)
     void this.mountGoogleButton()
   },
   beforeUnmount() {
-    window.removeEventListener('resize', this.checkIsMobile)
     this.isUnmounted = true
     this.googleButtonCleanup?.()
   },
   methods: {
     getLoginErrorMessage,
-    checkIsMobile() {
-      this.isMobile = window.innerWidth < 960 // Ajuste o valor conforme necessário
-    },
     notify(message: string, type: 'error' | 'success' = 'error') {
       this.feedback.message = message
       this.feedback.type = type
@@ -243,10 +286,9 @@ export default defineComponent({
         if (response.data) {
           // Save access token (refresh token comes via HTTP-only cookie) and user info in the store
           this.$api.setToken(response.data.accessToken)
-          // Save user info in the store
-          this.$store.setUser(response.data.user)
-          // Redirect based on user role
-          this.$router.push(`/${response.data.user.role.toLowerCase()}`)
+          const user = await this.loadRequestAwareUser(response.data.user)
+          this.$store.setUser(user)
+          this.$router.push(this.getPostLoginRoute(user))
         }
       } catch (error) {
         console.error('Login failed:', error)
@@ -254,6 +296,19 @@ export default defineComponent({
       } finally {
         this.loading = false
       }
+    },
+    async loadRequestAwareUser(user: LoginResponse['user']): Promise<LoginResponse['user']> {
+      if (user.role !== 'USER' || typeof this.$api.get !== 'function') return user
+      try {
+        const { data } = await this.$api.get<LoginResponse['user']>('/users/me/profile')
+        return { ...user, ...data }
+      } catch {
+        return user
+      }
+    },
+    getPostLoginRoute(user: LoginResponse['user']): string {
+      if (user.role === 'USER' && user.managerRequest) return '/cadastro/solicitacao'
+      return `/${user.role.toLowerCase()}`
     },
     cancelGoogleLink() {
       this.pendingGoogleCredential = ''
@@ -278,8 +333,9 @@ export default defineComponent({
         if (response.data) {
           this.cancelGoogleLink()
           this.$api.setToken(response.data.accessToken)
-          this.$store.setUser(response.data.user)
-          this.$router.push(`/${response.data.user.role.toLowerCase()}`)
+          const user = await this.loadRequestAwareUser(response.data.user)
+          this.$store.setUser(user)
+          this.$router.push(this.getPostLoginRoute(user))
         }
       } catch (error) {
         if (
@@ -298,14 +354,6 @@ export default defineComponent({
         this.loading = false
       }
     },
-    showTerms() {
-      console.log('Mostrar Termos e Condições')
-      // Aqui você pode abrir um dialog ou redirecionar
-    },
-    showPrivacy() {
-      console.log('Mostrar Política de Privacidade')
-      // Aqui você pode abrir um dialog ou redirecionar
-    },
   },
   computed: {
     googleEnabled(): boolean {
@@ -316,247 +364,12 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* Mantendo tudo o que você já tinha */
-.login-container {
-  height: 100vh;
-  width: 100%;
-  display: flex;
-  padding: 0;
-  margin: 0;
-}
-
-/* ✅ LOGO FIXO NO CANTO SUPERIOR ESQUERDO */
-.logo-fixed {
-  position: absolute;
-  top: 24px;
-  left: 32px;
-  display: flex;
-  align-items: center;
-  z-index: 10;
-}
-
-.logo-img {
-  width: 48px;
-  height: 42px;
-  margin-right: 8px;
-}
-
-.logo-text {
-  font-weight: bold;
-  font-size: 18px;
-  color: #000;
-}
-
-.content-wrapper {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 460px;
-  justify-content: center;
-  padding: 80px 0 40px;
-}
-
-.form-area {
-  width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
-}
-
-/* Mantendo o resto dos seus estilos originais */
-.form-section {
-  background-color: white;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  position: relative;
-  padding-top: 60px;
-}
-
-.title {
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 32px;
-  text-align: center;
-}
-
-/* Divider estilizado */
-.divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: #888;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #ddd;
-}
-
-.divider span {
-  padding: 0 16px;
-  font-size: 14px;
-}
-
-.info-section {
-  background-color: #c6f513;
-  display: flex;
-  position: relative;
-  align-items: center;
-  padding: 20px;
-  /* largura controlada pelo grid (md="6" = 50%) */
-}
-
-.info-text h1 {
-  font-size: clamp(2.5rem, 6vw, 5rem);
-  font-weight: bold;
-  color: #000;
-  font-family: 'K2D', sans-serif;
-  line-height: 1.2;
-  margin-left: 20px;
-  text-align: left;
-}
-
-.bottom-logo {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  font-weight: bold;
-  color: #000;
-}
-
-/* Termos no rodapé */
-.terms-footer {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: #888;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.terms-footer a {
-  color: #666;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.terms-footer a:hover {
-  color: #333;
-  text-decoration: underline;
-}
-
-.terms-footer .separator {
-  color: #ccc;
-}
-
-/* Labels dos campos */
-.field-label {
-  display: block;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #555;
-  margin-bottom: 6px;
-}
-
-/* Botões um pouco maiores (aumento sutil) */
-.login-form .v-btn {
-  min-height: 52px;
-  font-size: 1rem;
-  letter-spacing: 0.3px;
-}
-
-/* Dica abaixo dos botões sociais indisponíveis */
-.social-hint {
-  font-size: 0.8rem;
-  color: #888;
-  text-align: center;
-  margin-top: -4px;
-}
-
-.google-button-frame {
-  display: flex;
-  min-height: 44px;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 4px;
-  transition: opacity 0.2s ease;
+.google-button-frame :deep(iframe) {
+  max-width: 100% !important;
 }
 
 .google-button-frame--loading {
   opacity: 0.55;
   pointer-events: none;
-}
-
-/* Input fields */
-:deep(.v-field__input) {
-  font-size: 1rem;
-}
-
-/* Alerta inline integrado ao formulário */
-.form-alert {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 20px;
-  border: 1px solid transparent;
-  line-height: 1.3;
-}
-
-.form-alert__icon {
-  flex-shrink: 0;
-}
-
-.form-alert__text {
-  flex: 1;
-}
-
-.form-alert--error {
-  background-color: #fdecec;
-  border-color: #f6c6c6;
-  color: #b3261e;
-}
-
-.form-alert--success {
-  background-color: #eef9e7;
-  border-color: #cfe9bb;
-  color: #3d7a1f;
-}
-
-/* Link "Cadastre-se" */
-.register-link {
-  color: #1976d2;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  margin-left: 4px;
-}
-
-.register-link:hover {
-  text-decoration: underline;
-}
-
-/* Link "Esqueceu sua senha?" */
-.forgot-password {
-  color: #000;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.forgot-password:hover {
-  text-decoration: underline;
 }
 </style>

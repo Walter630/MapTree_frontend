@@ -484,7 +484,7 @@ onMounted(loadDashboard)
 .admin-dashboard {
   padding: 28px 32px 48px;
   min-height: calc(100dvh - 56px);
-  color: #253c30;
+  color: var(--mt-forest);
 }
 .admin-header {
   display: flex;
@@ -497,7 +497,7 @@ onMounted(loadDashboard)
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #52705e;
+  color: var(--mt-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -511,7 +511,7 @@ h1 {
 }
 .admin-header p,
 .section-heading p {
-  color: #607368;
+  color: var(--mt-text-muted);
   font-size: 0.86rem;
   margin-top: 7px;
 }
@@ -526,7 +526,7 @@ h1 {
   align-items: center;
   gap: 6px;
   font-size: 0.76rem;
-  color: #607368;
+  color: var(--mt-text-muted);
   flex-basis: 100%;
   justify-content: flex-end;
 }
@@ -557,7 +557,7 @@ h1 {
 }
 .kpi:focus-visible,
 .shortcuts a:focus-visible {
-  outline: 3px solid #32804b;
+  outline: 3px solid var(--mt-focus);
   outline-offset: 3px;
 }
 .kpi-top {
@@ -575,13 +575,13 @@ h1 {
   border-radius: 10px;
   width: 40px;
   height: 40px;
-  background: #dfeade;
-  color: #3b7049;
+  background: var(--mt-surface-soft);
+  color: var(--mt-teal);
   flex-shrink: 0;
 }
 .metric-arrow {
   margin-left: auto;
-  color: #6f8777;
+  color: var(--mt-text-muted);
 }
 .kpi-value {
   font-size: 2rem;
@@ -590,7 +590,7 @@ h1 {
 }
 .kpi-note {
   font-size: 0.74rem;
-  color: #607368;
+  color: var(--mt-text-muted);
 }
 .metric-skeleton {
   background: transparent;
@@ -624,7 +624,7 @@ h2 {
 }
 .panel-head p {
   font-size: 0.74rem;
-  color: #607368;
+  color: var(--mt-text-muted);
   margin-top: 5px;
 }
 .company-filters {
@@ -649,15 +649,15 @@ h2 {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #687d6e;
+  color: var(--mt-text-muted);
   font-weight: 600;
-  background: #e9eee6;
+  background: var(--mt-surface-soft);
   padding: 12px 20px;
   white-space: nowrap;
 }
 .company-table td {
   padding: 16px 20px;
-  border-bottom: 1px solid #dfe5dc;
+  border-bottom: 1px solid var(--mt-border);
   font-size: 0.8rem;
 }
 .company-table td strong {
@@ -666,14 +666,14 @@ h2 {
   overflow-wrap: anywhere;
 }
 .company-table td span:not(.v-chip) {
-  color: #718276;
+  color: var(--mt-text-muted);
   font-size: 0.7rem;
 }
 .company-table td:last-child {
   white-space: nowrap;
 }
 .company-table tbody tr:hover {
-  background: #e7eee3;
+  background: var(--mt-surface-soft);
 }
 .table-footer {
   display: flex;
@@ -682,7 +682,7 @@ h2 {
   flex-wrap: wrap;
   gap: 10px;
   padding: 13px 20px;
-  color: #708074;
+  color: var(--mt-text-muted);
   font-size: 0.73rem;
 }
 .side-panels {
@@ -699,7 +699,7 @@ h2 {
   margin-bottom: 13px;
 }
 .coverage-heading strong {
-  color: #376b46;
+  color: var(--mt-teal);
 }
 dl {
   margin-top: 20px;
@@ -715,7 +715,7 @@ dt {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #607368;
+  color: var(--mt-text-muted);
 }
 dd {
   font-weight: 700;
@@ -724,10 +724,10 @@ dd {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #5c8e69;
+  background: var(--mt-green);
 }
 .status-dot.inactive {
-  background: #a5afa5;
+  background: var(--mt-text-muted);
 }
 .shortcuts a {
   display: flex;
@@ -738,10 +738,10 @@ dd {
   text-decoration: none;
 }
 .shortcuts a + a {
-  border-top: 1px solid #dfe5dc;
+  border-top: 1px solid var(--mt-border);
 }
 .shortcuts a:hover {
-  background: #e3ecdf;
+  background: var(--mt-surface-soft);
 }
 .shortcuts a > div {
   flex: 1;
@@ -754,7 +754,7 @@ dd {
   font-size: 0.81rem;
 }
 .shortcuts a div span {
-  color: #708074;
+  color: var(--mt-text-muted);
   font-size: 0.7rem;
   margin-top: 3px;
 }
@@ -772,7 +772,7 @@ dd {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #687c6c;
+  color: var(--mt-text-muted);
   font-size: 0.72rem;
 }
 .maintenance-grid {
@@ -791,7 +791,7 @@ dd {
   margin-top: 15px;
 }
 .tool-card p {
-  color: #607368;
+  color: var(--mt-text-muted);
   font-size: 0.79rem;
   line-height: 1.65;
   margin: 8px 0 20px;
@@ -801,8 +801,8 @@ dd {
   width: 100%;
 }
 .cleanup-card .tool-icon {
-  background: #eee5d7;
-  color: #8a6b45;
+  background: var(--mt-surface-soft);
+  color: var(--mt-status-warning);
 }
 .empty-state {
   padding: 46px 20px;
@@ -811,11 +811,11 @@ dd {
   align-items: center;
   text-align: center;
   gap: 12px;
-  color: #657d6a;
+  color: var(--mt-text-muted);
 }
 .empty-state h3 {
   font-size: 0.95rem;
-  color: #354e3d;
+  color: var(--mt-forest);
 }
 .empty-state p {
   font-size: 0.8rem;

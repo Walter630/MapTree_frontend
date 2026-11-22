@@ -5,14 +5,21 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { nextTick } from 'vue'
 import { routerKey, routeLocationKey } from 'vue-router'
+import { createPinia } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import type { UserRole } from '@/plugins/apiConnect'
 
 const post = vi.fn()
 const get = vi.fn()
+const patch = vi.fn()
 
 vi.mock('@/plugins/apiConnect', () => ({
   apiConnect: {
     get: (...args: unknown[]) => get(...args),
     post: (...args: unknown[]) => post(...args),
+    patch: (...args: unknown[]) => patch(...args),
+    createTree: (payload: unknown, key: string) =>
+      post('/trees', payload, { headers: { 'Idempotency-Key': key } }),
   },
 }))
 
@@ -52,17 +59,39 @@ const species = [
   { id: 'sp-2', commonName: 'Oiti', scientificName: 'Licania tomentosa' },
 ]
 
-function mountPage() {
+const municipalityGeometry = {
+  type: 'Polygon',
+  coordinates: [[
+    [-39, -4],
+    [-38, -4],
+    [-38, -3],
+    [-39, -3],
+    [-39, -4],
+  ]],
+}
+
+function mountPage(role = 'USER') {
   const push = vi.fn()
+  const pinia = createPinia()
+  useAppStore(pinia).setUser({
+    id: 'employee-1',
+    name: 'Funcionário de teste',
+    cpf: '',
+    email: 'employee@example.test',
+    phone: '',
+    role: role as UserRole,
+    isActive: true,
+  })
   const wrapper = mount(TreeRegistrationPage, {
     global: {
-      plugins: [vuetify],
+      plugins: [vuetify, pinia],
       provide: {
         [routerKey as symbol]: { push, back: vi.fn(), currentRoute: { value: route } },
         [routeLocationKey as symbol]: route,
       },
       stubs: {
         PageHeader: true,
+        MunicipalityLocationPicker: true,
       },
     },
   })
@@ -73,8 +102,149 @@ describe('TreeRegistrationPage', () => {
   beforeEach(() => {
     post.mockReset()
     get.mockReset()
-    get.mockResolvedValue({ data: species })
+    localStorage.clear()
+    get.mockImplementation((url: string) => {
+      if (url === '/species') return Promise.resolve({ data: species })
+      if (url === '/users/me/profile') {
+        return Promise.resolve({ data: { organization: { id: 'company-1' } } })
+      }
+      if (url === '/organizations/company-1') {
+        return Promise.resolve({
+          data: {
+            id: 'company-1',
+            municipalityName: 'Fortaleza',
+            municipalityUf: 'CE',
+            municipalityGeometry,
+          },
+        })
+      }
+      return Promise.reject(new Error(`GET inesperado: ${url}`))
+    })
     post.mockResolvedValue({ status: 201, data: {} })
+    route.path = '/user'
+    route.params = {}
+    route.query = {}
+    patch.mockReset().mockResolvedValue({
+      data: { id: 'tree-9', updatedAt: '2026-11-17T14:00:00.000Z' },
+    })
+  })
+
+  it('preenche latitude e longitude vindas do mapa', async () => {
+    Object.assign(route.query, { latitude: '-3.731900', longitude: '-38.526700' })
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as { form: { latitude: string; longitude: string } }
+    expect(vm.form.latitude).toBe('-3.731900')
+    expect(vm.form.longitude).toBe('-38.526700')
+  })
+
+  it('oferece retorno ao mapa com região e posição depois de salvar', async () => {
+    Object.assign(route.query, {
+      latitude: '-3.7319',
+      longitude: '-38.5267',
+      returnMap: '/user/mapUser',
+      treeMapLat: '-3.73',
+      treeMapLng: '-38.52',
+      treeMapZoom: '16',
+      treeMapRegion: 'fortaleza',
+      treeMapFilter: 'CRITICAL',
+    })
+    post.mockResolvedValueOnce({ status: 201, data: { id: 'tree-9' } })
+    const { wrapper, push } = mountPage()
+    await flushPromises()
+
+    await fillAndSubmit(wrapper)
+    await wrapper.get('[data-testid="return-to-map"]').trigger('click')
+
+    expect(push).toHaveBeenCalledWith({
+      path: '/user/mapUser',
+      query: {
+        treeMapLat: '-3.73',
+        treeMapLng: '-38.52',
+        treeMapZoom: '16',
+        treeMapRegion: 'fortaleza',
+        treeMapFilter: 'CRITICAL',
+      },
+    })
+  })
+
+  it('carrega e atualiza apenas a árvore do funcionário com controle de versão', async () => {
+    const updatedAt = '2026-11-17T13:00:00.000Z'
+    route.path = '/user/trees/tree-9/edit'
+    route.params = { treeId: 'tree-9' }
+    route.query = { returnMap: '/user/mapUser' }
+    get.mockImplementation((url: string) => {
+      if (url === '/species') return Promise.resolve({ data: species })
+      if (url === '/trees/tree-9')
+        return Promise.resolve({
+          data: {
+            id: 'tree-9',
+            createdById: 'employee-1',
+            updatedAt,
+            idSpecies: 'sp-1',
+            latitude: -3.73,
+            longitude: -38.52,
+            age: '2018-01-01T00:00:00.000Z',
+            status: 'NORMAL',
+            vigor: 'GOOD',
+          },
+        })
+      throw new Error(`GET inesperado: ${url}`)
+    })
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as {
+      form: { speciesId: string; latitude: string; longitude: string; age: string }
+      submit: () => Promise<void>
+    }
+    expect(vm.form).toMatchObject({
+      speciesId: 'sp-1',
+      latitude: '-3.73',
+      longitude: '-38.52',
+      age: '2018',
+    })
+    vm.form.latitude = '-3.731'
+    await vm.submit()
+    await flushPromises()
+
+    expect(patch).toHaveBeenCalledWith(
+      '/trees/tree-9',
+      expect.objectContaining({
+        idSpecies: 'sp-1',
+        latitude: -3.731,
+        longitude: -38.52,
+        expectedUpdatedAt: new Date(updatedAt).toISOString(),
+      }),
+    )
+    expect(wrapper.text()).toContain('Árvore atualizada com sucesso.')
+    expect(vm.form.latitude).toBe('-3.731')
+  })
+
+  it('não abre a edição direta de árvore criada por outro funcionário', async () => {
+    route.path = '/user/trees/tree-9/edit'
+    route.params = { treeId: 'tree-9' }
+    get.mockImplementation((url: string) => {
+      if (url === '/species') return Promise.resolve({ data: species })
+      if (url === '/trees/tree-9')
+        return Promise.resolve({
+          data: {
+            id: 'tree-9',
+            createdById: 'employee-2',
+            updatedAt: '2026-11-17T13:00:00.000Z',
+          },
+        })
+      throw new Error(`GET inesperado: ${url}`)
+    })
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="edit-load-error"]').text()).toContain(
+      'Você só pode editar árvores cadastradas por você',
+    )
+    expect(wrapper.find('[data-testid="initial-height"]').exists()).toBe(false)
+    expect(patch).not.toHaveBeenCalled()
   })
 
   async function fillAndSubmit(
@@ -131,11 +301,16 @@ describe('TreeRegistrationPage', () => {
     await flushPromises()
   }
 
-  it('oferece cadastro dentro da lista e fecha o menu ao abrir o diálogo', async () => {
+  it('mostra a inclusão de espécie somente para ADMIN', async () => {
     const { wrapper } = mountPage()
     await flushPromises()
-    const vm = wrapper.vm as unknown as { speciesMenu: boolean; speciesDialog: boolean }
     expect(wrapper.find('[data-testid="create-species-option"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Solicite a inclusão ao administrador')
+    wrapper.unmount()
+
+    const admin = mountPage('ADMIN')
+    await flushPromises()
+    const vm = admin.wrapper.vm as unknown as { speciesMenu: boolean; speciesDialog: boolean }
     vm.speciesMenu = true
     await nextTick()
     await flushPromises()
@@ -147,7 +322,7 @@ describe('TreeRegistrationPage', () => {
     await nextTick()
     expect(vm.speciesMenu).toBe(false)
     expect(vm.speciesDialog).toBe(true)
-    wrapper.unmount()
+    admin.wrapper.unmount()
   })
 
   it('carrega as páginas seguintes para disponibilizar todo o catálogo', async () => {
@@ -158,7 +333,7 @@ describe('TreeRegistrationPage', () => {
     get.mockResolvedValueOnce({ data: batch }).mockResolvedValueOnce({ data: species })
     const { wrapper } = mountPage()
     await flushPromises()
-    expect(get).toHaveBeenNthCalledWith(2, '/species', { params: { page: 2, limit: 100 } })
+    expect(get).toHaveBeenCalledWith('/species', { params: { page: 2, limit: 100 } })
     expect((wrapper.vm as unknown as { species: unknown[] }).species).toHaveLength(102)
   })
 
@@ -166,7 +341,7 @@ describe('TreeRegistrationPage', () => {
     post.mockResolvedValueOnce({
       data: { id: 'sp-new', commonName: 'Oiticica', scientificName: 'Licania rigida' },
     })
-    const { wrapper } = mountPage()
+    const { wrapper } = mountPage('ADMIN')
     await flushPromises()
     await createSpecies(wrapper)
     expect(post).toHaveBeenCalledWith('/species', {
@@ -179,7 +354,7 @@ describe('TreeRegistrationPage', () => {
 
   it('preserva os dados do diálogo e informa falha da API', async () => {
     post.mockRejectedValueOnce(new Error('Falha de rede'))
-    const { wrapper } = mountPage()
+    const { wrapper } = mountPage('ADMIN')
     await flushPromises()
     await createSpecies(wrapper)
     const vm = wrapper.vm as unknown as {
@@ -193,7 +368,7 @@ describe('TreeRegistrationPage', () => {
   })
 
   it('reconhece espécie duplicada antes de enviar', async () => {
-    const { wrapper } = mountPage()
+    const { wrapper } = mountPage('ADMIN')
     await flushPromises()
     await createSpecies(wrapper, 'Ipê')
     expect(post).not.toHaveBeenCalled()
@@ -232,6 +407,22 @@ describe('TreeRegistrationPage', () => {
     expect('lng' in payload).toBe(false)
   })
 
+  it('explica quando o funcionário precisa de vínculo a uma empresa para cadastrar', async () => {
+    post.mockRejectedValueOnce({
+      response: {
+        status: 403,
+        data: { message: 'Vincule sua conta a uma empresa antes de cadastrar árvores.' },
+      },
+    })
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    await fillAndSubmit(wrapper, { latitude: '-3.7319' })
+
+    expect(wrapper.text()).toContain('Vincule sua conta a uma empresa antes de cadastrar árvores.')
+    expect((wrapper.vm as unknown as { form: { latitude: string } }).form.latitude).toBe('-3.7319')
+  })
+
   it('envia age em ISO quando preenchido', async () => {
     const { wrapper } = mountPage()
     await flushPromises()
@@ -260,6 +451,59 @@ describe('TreeRegistrationPage', () => {
     expect(post).not.toHaveBeenCalled()
   })
 
+  it('mostra o limite municipal e bloqueia coordenadas fora da empresa', async () => {
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    await fillAndSubmit(wrapper, { latitude: '-2.5', longitude: '-38.5' })
+
+    expect(wrapper.get('[data-testid="municipality-boundary-error"]').text()).toContain(
+      'A localização da árvore precisa estar dentro do limite de Fortaleza / CE',
+    )
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('mostra a mensagem e bloqueia o envio após um clique fora do limite', async () => {
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as {
+      rejectOutsideMapPick: () => void
+      submit: () => Promise<void>
+    }
+    vm.rejectOutsideMapPick()
+    await nextTick()
+
+    expect(wrapper.get('[data-testid="municipality-boundary-error"]').text()).toContain(
+      'Selecione um ponto dentro da área verde',
+    )
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    await vm.submit()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia o cadastro quando a empresa não tem geometria municipal', async () => {
+    get.mockImplementation((url: string) => {
+      if (url === '/species') return Promise.resolve({ data: species })
+      if (url === '/users/me/profile') {
+        return Promise.resolve({ data: { organization: { id: 'company-1' } } })
+      }
+      if (url === '/organizations/company-1') {
+        return Promise.resolve({ data: { id: 'company-1', municipalityName: 'Fortaleza' } })
+      }
+      return Promise.reject(new Error(`GET inesperado: ${url}`))
+    })
+    const { wrapper } = mountPage()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="municipality-boundary-load-error"]').text()).toContain(
+      'O limite municipal da empresa não está configurado',
+    )
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    await fillAndSubmit(wrapper)
+    expect(post).not.toHaveBeenCalled()
+  })
+
   it('mostra a tela de cadastro enquanto grava e tira o spinner do botão', async () => {
     let resolveTree!: (value: unknown) => void
     post.mockReturnValueOnce(
@@ -282,14 +526,15 @@ describe('TreeRegistrationPage', () => {
     const saving = vm.submit()
     await flushPromises()
 
-    const overlay = wrapper.find('[data-testid="tree-saving-overlay"]')
+    const progress = wrapper.find('[data-testid="tree-saving-progress"]')
     expect(vm.isSaving).toBe(true)
-    expect(overlay.exists()).toBe(true)
-    expect(overlay.text()).toContain('Cadastrando sua árvore')
-    // O botão não usa mais o spinner: fica apenas desabilitado.
+    expect(progress.exists()).toBe(true)
+    expect(progress.text()).toContain('Salvando árvore')
+    expect(progress.text()).toContain('0%')
+    // A barra fica próxima à ação e substitui a tela sobreposta.
     const submitButton = wrapper.get('button[type="submit"]')
     expect(submitButton.attributes('disabled')).toBeDefined()
-    expect(submitButton.find('.v-progress-circular').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tree-saving-overlay"]').exists()).toBe(false)
     expect(wrapper.get('form').attributes('inert')).toBeDefined()
 
     resolveTree({ data: {} })
@@ -330,13 +575,11 @@ describe('TreeRegistrationPage', () => {
 
   it('mostra a etapa da medição enquanto grava a medição', async () => {
     let resolveMeasurement!: (value: unknown) => void
-    post
-      .mockResolvedValueOnce({ data: { id: 'tree-9' } })
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveMeasurement = resolve
-        }),
-      )
+    post.mockResolvedValueOnce({ data: { id: 'tree-9' } }).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMeasurement = resolve
+      }),
+    )
     const { wrapper } = mountPage()
     await flushPromises()
     const vm = wrapper.vm as unknown as {
@@ -360,9 +603,8 @@ describe('TreeRegistrationPage', () => {
 
     const saving = vm.submit()
     await flushPromises()
-    expect(wrapper.get('[data-testid="tree-saving-overlay"]').text()).toContain(
-      'Registrando a medição',
-    )
+    expect(wrapper.get('[data-testid="tree-saving-progress"]').text()).toContain('Salvando medição')
+    expect(wrapper.get('[data-testid="tree-saving-progress"]').text()).toContain('50%')
 
     resolveMeasurement({ data: { id: 'm-1', treeId: 'tree-9' } })
     await saving

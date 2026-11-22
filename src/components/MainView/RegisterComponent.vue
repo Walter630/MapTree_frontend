@@ -1,453 +1,184 @@
 <template>
-  <v-container class="login-container" fluid>
-    <!-- ✅ Logo canto superior esquerdo -->
-    <div class="logo-container">
-      <img src="/icons/LogoMapTree.png" alt="Logo" class="logo-img" />
-      <span class="logo-text">MapTree</span>
-    </div>
+  <main class="tw:min-h-screen tw:bg-white tw:text-slate-900 tw:lg:grid tw:lg:grid-cols-[43%_57%]">
+    <section class="tw:flex tw:min-h-screen tw:flex-col tw:px-6 tw:py-6 tw:sm:px-10 tw:lg:px-16">
+      <a href="/" class="tw:inline-flex tw:w-fit tw:items-center tw:gap-3" aria-label="MapTree, início">
+        <img src="/icons/LogoMapTree.png" alt="" class="tw:h-11 tw:w-12 tw:object-contain" />
+        <span class="tw:text-lg tw:font-bold tw:tracking-tight">MapTree</span>
+      </a>
 
-    <v-row class="fill-height" style="margin: 0; padding: 0; height: 100vh">
-      <!-- Coluna do formulário -->
-      <v-col class="form-section" cols="12" md="6">
-        <div class="form-area">
-          <h2 class="title">Bem-vindo(a)!</h2>
+      <div class="tw:mx-auto tw:flex tw:w-full tw:max-w-xl tw:flex-1 tw:flex-col tw:justify-center tw:py-10">
+        <p class="tw:mb-2 tw:text-sm tw:font-semibold tw:uppercase tw:tracking-[0.14em] tw:text-emerald-700">Acesso à plataforma</p>
+        <h1 class="tw:text-3xl tw:font-bold tw:tracking-tight tw:sm:text-4xl">Solicite acesso como gestor</h1>
+        <p class="tw:mt-3 tw:text-sm tw:leading-6 tw:text-slate-600">
+          Enviaremos seus dados para análise da equipe MapTree. Você poderá acompanhar a solicitação depois de entrar.
+        </p>
 
-          <!-- Alerta inline integrado ao formulário -->
-          <v-expand-transition>
-            <div
-              v-if="feedback.show"
-              class="form-alert"
-              :class="feedback.type === 'success' ? 'form-alert--success' : 'form-alert--error'"
-            >
-              <v-icon size="18" class="form-alert__icon">
-                {{ feedback.type === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}
-              </v-icon>
-              <span class="form-alert__text">{{ feedback.message }}</span>
-            </div>
-          </v-expand-transition>
+        <div v-if="submitted" class="tw:mt-8 tw:rounded-2xl tw:border tw:border-emerald-200 tw:bg-emerald-50 tw:p-5" role="status" aria-live="polite">
+          <h2 class="tw:font-semibold tw:text-emerald-950">Cadastro recebido</h2>
+          <p class="tw:mt-2 tw:text-sm tw:leading-6 tw:text-emerald-900">
+            Sua solicitação será analisada pela equipe MapTree. Entre com seu e-mail e senha para acompanhar o andamento.
+          </p>
+          <button type="button" class="tw:mt-5 tw:rounded-lg tw:bg-emerald-800 tw:px-5 tw:py-3 tw:text-sm tw:font-semibold tw:text-white tw:hover:bg-emerald-900 tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-700" @click="router.push('/login')">
+            Ir para o login
+          </button>
+        </div>
 
-          <v-form ref="form" v-model="valid" lazy-validation>
-            <p class="field-label">Nome</p>
-            <v-text-field
-              v-model="formData.name"
-              color="green"
-              class="mb-3"
-              hide-details
-              variant="outlined"
-              placeholder="Digite seu nome"
-              required
-              density="comfortable"
-            ></v-text-field>
-
-            <p class="field-label">CPF</p>
-            <v-text-field
-              id="cpf-input"
-              v-model="cpfInput"
-              color="green"
-              class="mb-3"
-              hide-details
-              density="comfortable"
-              variant="outlined"
-              placeholder="Digite seu CPF"
-              inputmode="numeric"
-              maxlength="14"
-              required
-            ></v-text-field>
-
-            <p class="field-label">Telefone</p>
-            <v-text-field
-              id="phone-input"
-              v-model="phoneInput"
-              color="green"
-              class="mb-3"
-              hide-details
-              density="comfortable"
-              variant="outlined"
-              placeholder="Digite seu telefone"
-              inputmode="numeric"
-              maxlength="15"
-              required
-            ></v-text-field>
-
-            <p class="field-label">Email</p>
-            <v-text-field
-              v-model="formData.email"
-              class="mb-3"
-              color="green"
-              hide-details
-              density="comfortable"
-              variant="outlined"
-              placeholder="Digite seu email"
-              required
-            />
-
-            <p class="field-label">Senha</p>
-            <v-text-field
-              v-model="formData.password"
-              class="mb-3"
-              color="green"
-              hide-details
-              density="comfortable"
-              variant="outlined"
-              placeholder="Digite sua senha"
-              required
-              :type="showPassword ? 'text' : 'password'"
-            >
-              <template #append-inner>
-                <v-icon @click="showPassword = !showPassword">{{
-                  showPassword ? 'mdi-eye-off' : 'mdi-eye'
-                }}</v-icon>
-              </template>
-            </v-text-field>
-
-            <v-btn
-              block
-              class="mb-4 register-btn"
-              color="#C6F513"
-              size="large"
-              style="display: flex; align-items: center; flex-direction: row"
-              append-icon="mdi-arrow-right"
-              :loading="loading"
-              @click="registrar"
-            >
-              Registrar
-            </v-btn>
-
-            <div class="text-center mt-4">
-              Já possui uma conta?
-              <a
-                class="register-link"
-                style="color: blue; text-decoration: none; cursor: pointer"
-                @click="router.push('/login')"
-              >
-                Fazer Login
-              </a>
-              <v-icon color="blue">mdi-chevron-right</v-icon>
-            </div>
-          </v-form>
-
-          <div class="terms-privacy">
-            Termos e Condições
-            <v-icon small>mdi-circle-small</v-icon>
-            Política de Privacidade
+        <form v-else class="tw:mt-7 tw:space-y-4" @submit.prevent="registrar">
+          <div v-if="feedback" class="tw:rounded-lg tw:border tw:border-red-200 tw:bg-red-50 tw:px-4 tw:py-3 tw:text-sm tw:text-red-800" role="alert" aria-live="assertive">
+            {{ feedback }}
           </div>
-        </div>
-      </v-col>
 
-      <!-- Coluna direita -->
-      <v-col
-        class="info-section"
-        cols="12"
-        md="6"
-        :style="isMobile ? 'display: none;' : 'padding: 20px; text-align: center;'"
-      >
-        <div class="info-text">
-          <h1>Gestão<br />inteligente de<br />vegetação</h1>
+          <div class="tw:grid tw:gap-4 tw:sm:grid-cols-2">
+            <label class="tw:block tw:text-sm tw:font-medium tw:sm:col-span-2" for="manager-name">
+              Nome completo
+              <input id="manager-name" v-model.trim="formData.name" autocomplete="name" required maxlength="120" class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium" for="cpf-input">
+              CPF
+              <input id="cpf-input" v-model="cpfInput" autocomplete="off" inputmode="numeric" maxlength="14" required aria-describedby="cpf-hint" class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+              <span id="cpf-hint" class="tw:sr-only">Digite os onze números do CPF.</span>
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium" for="phone-input">
+              Telefone com DDD
+              <input id="phone-input" v-model="phoneInput" autocomplete="tel" inputmode="tel" maxlength="15" required class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium tw:sm:col-span-2" for="manager-email">
+              E-mail
+              <input id="manager-email" v-model.trim="formData.email" autocomplete="email" type="email" required maxlength="254" class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium tw:sm:col-span-2" for="organization-name">
+              Empresa
+              <input id="organization-name" v-model.trim="formData.requestedOrganizationName" autocomplete="organization" required maxlength="120" class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium" for="municipality-name">
+              Município
+              <input id="municipality-name" v-model.trim="formData.municipalityName" autocomplete="address-level2" required maxlength="100" class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium" for="municipality-uf">
+              UF
+              <select id="municipality-uf" v-model="formData.municipalityUf" required class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:bg-white tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20">
+                <option disabled value="">Selecione</option>
+                <option v-for="uf in ufs" :key="uf" :value="uf">{{ uf }}</option>
+              </select>
+            </label>
+            <label class="tw:block tw:text-sm tw:font-medium tw:sm:col-span-2" for="manager-password">
+              Senha
+              <input id="manager-password" v-model="formData.password" autocomplete="new-password" type="password" minlength="8" maxlength="72" required class="tw:mt-1.5 tw:min-h-12 tw:w-full tw:rounded-lg tw:border tw:border-slate-300 tw:px-3.5 tw:text-base tw:outline-none tw:transition tw:focus:border-emerald-700 tw:focus:ring-2 tw:focus:ring-emerald-700/20" />
+              <span class="tw:mt-1 tw:block tw:text-xs tw:font-normal tw:text-slate-500">Use pelo menos 8 caracteres.</span>
+            </label>
+          </div>
+
+          <button type="submit" class="tw:flex tw:min-h-12 tw:w-full tw:items-center tw:justify-center tw:gap-2 tw:rounded-lg tw:bg-lime-300 tw:px-5 tw:font-semibold tw:text-slate-950 tw:transition tw:hover:bg-lime-400 tw:focus-visible:outline tw:focus-visible:outline-2 tw:focus-visible:outline-offset-2 tw:focus-visible:outline-emerald-700 tw:disabled:cursor-wait tw:disabled:opacity-60" :disabled="loading">
+            <span v-if="loading" class="tw:h-4 tw:w-4 tw:animate-spin tw:rounded-full tw:border-2 tw:border-slate-800 tw:border-t-transparent" aria-hidden="true"></span>
+            {{ loading ? 'Enviando solicitação…' : 'Solicitar acesso' }}
+          </button>
+          <p class="tw:text-center tw:text-sm tw:text-slate-600">
+            Já possui uma conta?
+            <a href="/login" class="tw:font-semibold tw:text-emerald-800 tw:underline tw:underline-offset-2" @click.prevent="router.push('/login')">Fazer login</a>
+          </p>
+        </form>
+      </div>
+      <p class="tw:mx-auto tw:w-full tw:max-w-xl tw:pb-2 tw:text-xs tw:text-slate-500">MapTree · Gestão de árvores e planejamento de podas preventivas</p>
+    </section>
+
+    <aside class="tw:hidden tw:min-h-screen tw:flex-col tw:justify-between tw:overflow-hidden tw:bg-gradient-to-br tw:from-emerald-500 tw:via-lime-400 tw:to-emerald-950 tw:p-12 tw:text-white tw:lg:flex tw:xl:p-16">
+      <div class="tw:flex tw:gap-3 tw:text-sm tw:font-medium">
+        <span class="tw:rounded-full tw:border tw:border-white/40 tw:bg-white/10 tw:px-4 tw:py-2">Monitoramento</span>
+        <span class="tw:rounded-full tw:border tw:border-white/40 tw:bg-white/10 tw:px-4 tw:py-2">Mapas</span>
+        <span class="tw:rounded-full tw:border tw:border-white/40 tw:bg-white/10 tw:px-4 tw:py-2">Equipes</span>
+      </div>
+      <div class="tw:max-w-xl">
+        <div class="tw:mb-8 tw:grid tw:grid-cols-2 tw:gap-4 tw:opacity-90" aria-hidden="true">
+          <div class="tw:rounded-2xl tw:border tw:border-white/30 tw:bg-white/15 tw:p-5 tw:backdrop-blur">
+            <div class="tw:mb-4 tw:h-2 tw:w-2/3 tw:rounded tw:bg-white/70"></div><div class="tw:space-y-2"><div class="tw:h-2 tw:rounded tw:bg-white/30"></div><div class="tw:h-2 tw:w-4/5 tw:rounded tw:bg-white/30"></div><div class="tw:h-2 tw:w-3/5 tw:rounded tw:bg-white/30"></div></div>
+          </div>
+          <div class="tw:flex tw:items-end tw:gap-2 tw:rounded-2xl tw:border tw:border-white/30 tw:bg-white/15 tw:p-5 tw:backdrop-blur"><span class="tw:h-8 tw:flex-1 tw:rounded-t tw:bg-white/35"></span><span class="tw:h-14 tw:flex-1 tw:rounded-t tw:bg-white/60"></span><span class="tw:h-11 tw:flex-1 tw:rounded-t tw:bg-white/45"></span><span class="tw:h-20 tw:flex-1 tw:rounded-t tw:bg-white/80"></span></div>
         </div>
-        <div class="bottom-logo">MapTree</div>
-      </v-col>
-    </v-row>
-  </v-container>
+        <h2 class="tw:text-4xl tw:font-bold tw:leading-tight tw:xl:text-5xl">Gestão inteligente de vegetação</h2>
+        <p class="tw:mt-5 tw:max-w-lg tw:text-lg tw:leading-8 tw:text-white/90">Organize a localização, as condições e o histórico de manutenção para planejar o trabalho das equipes.</p>
+      </div>
+      <span class="tw:self-end tw:text-xl tw:font-bold tw:tracking-tight">MapTree</span>
+    </aside>
+  </main>
 </template>
 
 <script lang="ts">
+import { defineComponent } from 'vue'
 import { useRouter } from 'vue-router'
-import type { User } from '@/plugins/apiConnect.ts'
-import { onlyDigits, formatCpf, formatPhone } from '@/utils/masks'
+import { formatCpf, formatPhone, onlyDigits } from '@/utils/masks'
 
-export default {
+const BRAZIL_UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+
+export default defineComponent({
   name: 'CadastroComponent',
-
-  setup() {
-    return { router: useRouter() }
-  },
-
+  setup() { return { router: useRouter() } },
   data() {
     return {
-      formData: {
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        cpf: '',
-        isActive: true,
-      },
-      showPassword: false,
-      valid: true,
-      isMobile: window.innerWidth < 768,
+      ufs: BRAZIL_UFS,
+      formData: { name: '', cpf: '', phone: '', email: '', password: '', requestedOrganizationName: '', municipalityName: '', municipalityUf: '' },
       loading: false,
-      feedback: {
-        show: false,
-        message: '',
-        type: 'error' as 'error' | 'success',
-      },
+      submitted: false,
+      feedback: '',
     }
   },
-
-  mounted() {
-    window.addEventListener('resize', this.checkMobile)
-  },
-
-  beforeUnmount() {
-    window.removeEventListener('resize', this.checkMobile)
-  },
-
   computed: {
     cpfInput: {
-      get() {
-        return this.formData.cpf
-      },
-      set(value: string) {
-        this.formData.cpf = formatCpf(value)
-      },
+      get(): string { return this.formData.cpf },
+      set(value: string) { this.formData.cpf = formatCpf(value) },
     },
     phoneInput: {
-      get() {
-        return this.formData.phone
-      },
-      set(value: string) {
-        this.formData.phone = formatPhone(value)
-      },
+      get(): string { return this.formData.phone },
+      set(value: string) { this.formData.phone = formatPhone(value) },
     },
   },
-
   methods: {
-    notify(message: string, type: 'error' | 'success' = 'error') {
-      this.feedback.message = message
-      this.feedback.type = type
-      this.feedback.show = true
-    },
-    validateForm(): string | null {
-      const { name, cpf, phone, email, password } = this.formData
-      if (!name || !cpf || !phone || !email || !password) {
-        return 'Preencha todos os campos para se cadastrar.'
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
-        return 'Informe um e-mail válido.'
-      }
-      if (password.length < 6) {
-        return 'A senha deve ter pelo menos 6 caracteres.'
-      }
-      return null
-    },
     async registrar() {
-      this.feedback.show = false
-
-      const validationError = this.validateForm()
-      if (validationError) {
-        this.notify(validationError)
+      this.feedback = ''
+      if (this.formData.password.length < 8) {
+        this.feedback = 'A senha deve ter pelo menos 8 caracteres.'
         return
       }
-
+      const digitsCpf = onlyDigits(this.formData.cpf)
+      const digitsPhone = onlyDigits(this.formData.phone)
+      if (digitsCpf.length !== 11) {
+        this.feedback = 'Informe os onze números do CPF.'
+        return
+      }
+      if (![10, 11].includes(digitsPhone.length)) {
+        this.feedback = 'Informe um telefone brasileiro com DDD.'
+        return
+      }
       this.loading = true
       try {
-        const payload = {
-          ...this.formData,
-          cpf: onlyDigits(this.formData.cpf),
-          phone: onlyDigits(this.formData.phone),
-        }
-        const response = await this.$api.post<User>('/auth/register', payload)
-        if (response.status === 201 || response.status === 200) {
-          this.notify('Cadastro realizado com sucesso! Redirecionando para o login...', 'success')
-          setTimeout(() => this.router.push('/login'), 1200)
-        } else {
-          this.notify('Não foi possível concluir o cadastro. Tente novamente.')
-        }
+        const response = await this.$api.post('/auth/manager-requests', {
+          name: this.formData.name.trim(),
+          cpf: digitsCpf,
+          phone: digitsPhone,
+          email: this.formData.email.trim().toLowerCase(),
+          password: this.formData.password,
+          requestedOrganizationName: this.formData.requestedOrganizationName.trim(),
+          municipalityName: this.formData.municipalityName.trim(),
+          municipalityUf: this.formData.municipalityUf,
+        })
+        if (response.status === 202 || response.status === 201) this.submitted = true
+        else this.feedback = 'Não foi possível enviar a solicitação. Tente novamente.'
       } catch (error) {
-        console.error('Erro no registro: ', error)
-        this.notify(this.getRegisterErrorMessage(error))
+        this.feedback = this.getRegisterErrorMessage(error)
       } finally {
         this.loading = false
       }
     },
     getRegisterErrorMessage(error: unknown): string {
-      const err = error as {
-        response?: { status?: number; data?: { message?: string | string[] } }
-      }
-
-      if (!err.response) {
-        return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
-      }
-
+      const err = error as { response?: { status?: number; data?: { message?: string | string[] } } }
+      if (!err.response) return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
       const status = err.response.status
       const backendMsg = err.response.data?.message
-      const msgText = Array.isArray(backendMsg) ? backendMsg.join(', ') : backendMsg
-
-      // 409 (conflito) ou mensagem do backend mencionando duplicidade
-      if (status === 409 || (msgText && /já|exist|cadastrad|duplicat/i.test(msgText))) {
-        return msgText || 'E-mail ou CPF já cadastrado.'
-      }
-      if (status === 400) {
-        return msgText || 'Dados inválidos. Verifique os campos e tente novamente.'
-      }
-      if (status && status >= 500) {
-        return 'Erro no servidor. Tente novamente em instantes.'
-      }
-
-      return msgText || 'Não foi possível concluir o cadastro. Tente novamente.'
-    },
-    checkMobile() {
-      this.isMobile = window.innerWidth < 768
+      const message = Array.isArray(backendMsg) ? backendMsg.join(', ') : backendMsg
+      if (status === 409) return message || 'E-mail ou CPF já cadastrado.'
+      if (status === 400) return message || 'Confira os dados informados.'
+      if (status && status >= 500) return 'Erro no servidor. Tente novamente em instantes.'
+      return message || 'Não foi possível enviar a solicitação.'
     },
   },
-}
+})
 </script>
-
-<style scoped>
-/* Layout principal */
-.login-container {
-  height: 100vh;
-  width: 100%;
-  display: flex;
-  padding: 0;
-  margin: 0;
-  position: relative;
-}
-
-/* ✅ Logo canto superior esquerdo */
-.logo-container {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  display: flex;
-  align-items: center;
-  z-index: 10;
-}
-
-.logo-img {
-  width: 59px;
-  height: 52px;
-  margin-right: 8px;
-}
-
-.logo-text {
-  font-weight: bold;
-  font-size: 18px;
-  color: #000;
-}
-
-/* Seção esquerda (formulário) */
-.form-section {
-  background-color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-}
-
-/* Área do formulário (largura controlada, centralizada) */
-.form-area {
-  width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
-}
-
-/* Títulos */
-.title {
-  font-size: 32px;
-  font-weight: bold;
-  margin-bottom: 28px;
-}
-
-/* Labels dos campos */
-.field-label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #555;
-  margin-bottom: 6px;
-}
-
-/* Botão um pouco maior (aumento sutil) */
-.register-btn {
-  min-height: 52px;
-  font-size: 1rem;
-  letter-spacing: 0.3px;
-}
-
-/* Inputs com um pouco mais de presença */
-:deep(.v-field__input) {
-  font-size: 1rem;
-}
-
-/* Links */
-.register-link {
-  color: #000;
-  font-weight: 500;
-  text-decoration: underline;
-}
-
-.register-link:hover {
-  text-decoration: underline;
-}
-
-/* Seção direita */
-.info-section {
-  background-color: #c6f513;
-  display: flex;
-  position: relative;
-  align-items: center;
-  padding: 20px;
-  /* largura controlada pelo grid (md="6" = 50%) */
-}
-
-.info-text h1 {
-  font-size: clamp(2.5rem, 6vw, 5rem);
-  font-weight: bold;
-  color: #000;
-  font-family: 'K2D', sans-serif;
-  line-height: 1.2;
-  margin-left: 20px;
-  text-align: left;
-}
-
-.bottom-logo {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  font-weight: bold;
-  color: #000;
-}
-
-/* Termos */
-.terms-privacy {
-  font-size: 12px;
-  margin-top: 40px;
-  color: gray;
-  text-align: center;
-}
-
-/* Alerta inline integrado ao formulário */
-.form-alert {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 20px;
-  border: 1px solid transparent;
-  line-height: 1.3;
-}
-
-.form-alert__icon {
-  flex-shrink: 0;
-}
-
-.form-alert__text {
-  flex: 1;
-}
-
-.form-alert--error {
-  background-color: #fdecec;
-  border-color: #f6c6c6;
-  color: #b3261e;
-}
-
-.form-alert--success {
-  background-color: #eef9e7;
-  border-color: #cfe9bb;
-  color: #3d7a1f;
-}
-</style>
