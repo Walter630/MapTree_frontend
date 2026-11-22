@@ -5,41 +5,35 @@
       "has": [
         {
           "type": "host",
-          "key": "host",
           "value": "app.maptree.com.br"
         }
       ],
       "destination": "/login",
-      "permanent": false,
-      "preserveQueryParams": true
+      "permanent": false
     },
     {
       "source": "/:path((?!$).*)",
       "has": [
         {
           "type": "host",
-          "key": "host",
           "value": {
             "re": "^(www\\.)?maptree\\.com\\.br$"
           }
         }
       ],
       "destination": "https://app.maptree.com.br/:path*",
-      "permanent": false,
-      "preserveQueryParams": true
+      "permanent": false
     },
     {
       "source": "/",
       "has": [
         {
           "type": "host",
-          "key": "host",
           "value": "www.maptree.com.br"
         }
       ],
       "destination": "https://maptree.com.br/",
-      "permanent": true,
-      "preserveQueryParams": true
+      "permanent": true
     }
   ],
   "rewrites": [
