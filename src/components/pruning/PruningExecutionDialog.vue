@@ -95,7 +95,7 @@ async function save(next: boolean) {
         <div class="selected-tree">
           <v-icon size="30" color="green-darken-3">mdi-tree-outline</v-icon>
           <div>
-            <strong>{{ tree.species?.commonName || 'Árvore' }}</strong
+            <strong>{{ tree.species?.commonName || 'Árvore sem espécie' }}</strong
             ><span class="tree-id">Identificação: {{ tree.id }}</span
             ><span>{{ treeCoordinates(tree) }}</span
             ><span v-if="tree.species?.scientificName" class="font-italic">{{
@@ -175,8 +175,8 @@ async function save(next: boolean) {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: #edf4ed;
-  border: 1px solid #cbdccc;
+  background: var(--mt-surface-soft);
+  border: 1px solid var(--mt-border);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
@@ -188,7 +188,7 @@ async function save(next: boolean) {
 }
 .selected-tree span {
   font-size: 0.78rem;
-  color: #506656;
+  color: var(--mt-text-muted);
   margin-top: 4px;
 }
 .tree-id {

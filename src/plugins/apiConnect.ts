@@ -7,6 +7,12 @@
 
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { App } from 'vue'
+import type {
+  LandingDocument,
+  LandingDraftResponse,
+  LandingPublishedResponse,
+  LandingRevisionSummary,
+} from '@/types/landing'
 
 /* ===================================
    TIPOS — Autenticação
@@ -59,6 +65,40 @@ export enum Vigor {
    TIPOS — Entidades
 =================================== */
 
+export type ManagerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+export interface ManagerRequestHistoryItem {
+  revision: number
+  version: number
+  status: ManagerRequestStatus
+  requestedOrganizationName: string
+  municipalityName: string
+  municipalityUf: string
+  municipalityCode?: string | null
+  actorUserId?: string | null
+  reason?: string | null
+  createdAt: string
+}
+
+export interface ManagerRequest {
+  id: string
+  status: ManagerRequestStatus
+  version: number
+  revision: number
+  requestedOrganizationName: string
+  municipalityName: string
+  municipalityUf: string
+  municipalityCode?: string | null
+  rejectionReason?: string | null
+  reviewerId?: string | null
+  organizationId?: string | null
+  decidedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  applicant?: { id?: string; name?: string; email?: string; cpf?: string; phone?: string }
+  history?: ManagerRequestHistoryItem[]
+}
+
 export interface User {
   id: string
   name: string
@@ -66,10 +106,12 @@ export interface User {
   email: string
   phone: string
   role: UserRole
+  organizationId?: string | null
   organization?: {
     id: string
     name: string
   }
+  managerRequest?: Pick<ManagerRequest, 'id' | 'status' | 'version' | 'requestedOrganizationName' | 'municipalityName' | 'municipalityUf' | 'rejectionReason' | 'createdAt' | 'updatedAt'> | null
   isActive: boolean
 }
 
@@ -188,9 +230,11 @@ export interface TreeWithAi {
   id: string
   commonName: string
   status: TreeStatus
-  aiPrediction: AiPrediction
+  effectiveStatus?: TreeStatus | string
+  lastPruneDate?: string | null
+  aiPrediction: AiPrediction | null
   soil?: Soil
-  vigor: Vigor
+  vigor?: Vigor
   measurements?: Measurement[]
   maintenanceSchedule?: MaintenanceSchedule[]
 }
@@ -387,9 +431,17 @@ class ApiConnect {
    * Busca árvores dentro de uma área geográfica (bounding box)
    * Útil para carregar apenas árvores visíveis no mapa
    */
-  public getTreesInBounds(north: number, south: number, east: number, west: number, limit = 10000) {
+  public getTreesInBounds(
+    north: number,
+    south: number,
+    east: number,
+    west: number,
+    limit = 500,
+    signal?: AbortSignal,
+  ) {
     return this.axiosInstance.get<any[]>('/trees/bounds', {
       params: { north, south, east, west, limit },
+      signal,
     })
   }
 
@@ -397,9 +449,9 @@ class ApiConnect {
    * Busca árvores próximas a uma coordenada (raio em km)
    * Útil para carregar árvores da localização do usuário
    */
-  public getTreesNearby(lat: number, lng: number, radiusKm = 5, limit = 5000) {
+  public getTreesNearby(lat: number, lng: number, radiusKm = 5, limit = 5000, compact = false) {
     return this.axiosInstance.get<any[]>('/trees/nearby', {
-      params: { lat, lng, radius: radiusKm, limit },
+      params: { lat, lng, radius: radiusKm, limit, ...(compact ? { compact: 'true' } : {}) },
     })
   }
 
@@ -479,6 +531,12 @@ class ApiConnect {
     return this.axiosInstance.post<T>(url, data, config)
   }
 
+  public createTree<T = unknown>(data: unknown, idempotencyKey: string) {
+    return this.axiosInstance.post<T>('/trees', data, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    })
+  }
+
   public put<T = unknown>(url: string, data?: unknown, config = {}) {
     return this.axiosInstance.put<T>(url, data, config)
   }
@@ -491,8 +549,82 @@ class ApiConnect {
     return this.axiosInstance.delete<T>(url, config)
   }
 
-  public getAiPrediction(treeId: string) {
-    return this.axiosInstance.get(`/trees/${treeId}/ai-prediction`)
+  public getPublishedLanding() {
+    return this.axiosInstance.get<LandingPublishedResponse>('/landing/published')
+  }
+
+  public getLandingDraft() {
+    return this.axiosInstance.get<LandingDraftResponse>('/admin/landing/draft')
+  }
+
+  public saveLandingDraft(expectedVersion: number, content: LandingDocument) {
+    return this.axiosInstance.put<LandingDraftResponse>('/admin/landing/draft', {
+      expectedVersion,
+      content,
+    })
+  }
+
+  public getLandingPreview() {
+    return this.axiosInstance.get<{ version: number; content: LandingDocument }>(
+      '/admin/landing/preview',
+    )
+  }
+
+  public getLandingRevisions() {
+    return this.axiosInstance.get<LandingRevisionSummary[]>('/admin/landing/revisions')
+  }
+
+  public publishLanding(
+    expectedDraftVersion: number,
+    expectedPublishedVersion: number,
+    idempotencyKey: string,
+  ) {
+    return this.axiosInstance.post('/admin/landing/publish', {
+      expectedDraftVersion,
+      expectedPublishedVersion,
+      idempotencyKey,
+    })
+  }
+
+  public restoreLandingRevision(
+    revisionId: string,
+    expectedDraftVersion: number,
+    expectedPublishedVersion: number,
+    idempotencyKey: string,
+  ) {
+    return this.axiosInstance.post(`/admin/landing/revisions/${revisionId}/restore`, {
+      expectedDraftVersion,
+      expectedPublishedVersion,
+      idempotencyKey,
+    })
+  }
+
+  public uploadLandingMedia(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return this.axiosInstance.post<{
+      id: string
+      mimeType: string
+      width: number
+      height: number
+      byteSize: number
+    }>('/admin/landing/media', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+
+  public getAdminLandingMedia(assetId: string) {
+    return this.axiosInstance.get<Blob>(`/admin/landing/media/${assetId}`, {
+      responseType: 'blob',
+    })
+  }
+
+  public getAiPrediction(treeId: string, referenceWireHeightM?: number) {
+    const params =
+      Number.isFinite(referenceWireHeightM) && Number(referenceWireHeightM) > 0
+        ? { referenceWireHeightM }
+        : undefined
+    return this.axiosInstance.get(`/trees/${treeId}/ai-prediction`, { params })
   }
 
   /* ---------- Novas Importações IA ---------- */

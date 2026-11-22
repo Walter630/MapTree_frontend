@@ -9,7 +9,7 @@
 
     <!-- Cards de Resumo -->
     <v-row class="mb-6" dense>
-      <v-col cols="6" md="3">
+      <v-col cols="6" md="4">
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
             <span class="kpi-label">Total de Podas</span>
@@ -19,7 +19,7 @@
           <div class="kpi-subtitle">Registradas</div>
         </v-card>
       </v-col>
-      <v-col cols="6" md="3">
+      <v-col cols="6" md="4">
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
             <span class="kpi-label">Este Mês</span>
@@ -29,7 +29,7 @@
           <div class="kpi-subtitle">Realizadas</div>
         </v-card>
       </v-col>
-      <v-col cols="6" md="3">
+      <v-col cols="6" md="4">
         <v-card class="kpi-card" flat>
           <div class="kpi-header">
             <span class="kpi-label">Árvores Podadas</span>
@@ -37,16 +37,6 @@
           </div>
           <div class="kpi-value">{{ totalTreesPruned }}</div>
           <div class="kpi-subtitle">Únicas</div>
-        </v-card>
-      </v-col>
-      <v-col cols="6" md="3">
-        <v-card class="kpi-card" flat>
-          <div class="kpi-header">
-            <span class="kpi-label">Equipes</span>
-            <v-icon size="20" color="purple-darken-2">mdi-account-group</v-icon>
-          </div>
-          <div class="kpi-value">{{ activeTeams }}</div>
-          <div class="kpi-subtitle">Ativas</div>
         </v-card>
       </v-col>
     </v-row>
@@ -63,13 +53,21 @@
             <span class="text-subtitle-1 font-weight-bold">Podas por Período</span>
           </div>
           <v-skeleton-loader v-if="loading" height="250" type="image" />
-          <div v-else class="chart-placeholder">
+          <div v-else-if="hasPeriodData" class="chart-placeholder">
             <div class="bar-chart">
               <div v-for="(bar, i) in periodChartData" :key="i" class="bar-wrapper">
-                <div class="bar" :style="{ height: bar.value + '%', backgroundColor: bar.color }" />
+                <div
+                  class="bar"
+                  :title="`${bar.count} podas`"
+                  :aria-label="`${bar.label}: ${bar.count} podas`"
+                  :style="{ height: bar.value + '%', backgroundColor: bar.color }"
+                />
                 <span class="bar-label">{{ bar.label }}</span>
               </div>
             </div>
+          </div>
+          <div v-else class="text-center py-8 text-medium-emphasis">
+            Nenhuma poda nos últimos seis meses.
           </div>
         </v-card>
       </v-col>
@@ -284,6 +282,7 @@
 import { defineComponent } from 'vue'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
+import { buildMonthlyPruningSeries } from '@/utils/pruningReportSeries'
 
 interface ReportTree {
   latitude?: number | null
@@ -322,18 +321,23 @@ export default defineComponent({
         { title: 'Ações', key: 'actions', sortable: false, align: 'center' as const },
       ],
 
-      periodChartData: [
-        { label: 'Jan', value: 65, color: '#C5E11F' },
-        { label: 'Fev', value: 45, color: '#9ed013' },
-        { label: 'Mar', value: 80, color: '#C5E11F' },
-        { label: 'Abr', value: 55, color: '#9ed013' },
-        { label: 'Mai', value: 70, color: '#C5E11F' },
-        { label: 'Jun', value: 40, color: '#9ed013' },
-      ],
     }
   },
 
   computed: {
+    periodChartData(): { label: string; value: number; count: number; color: string }[] {
+      return buildMonthlyPruningSeries(this.prunings, 6).map((month, index) => ({
+        label: month.label,
+        value: month.percent,
+        count: month.count,
+        color: index === 5 ? '#C5E11F' : index % 2 === 0 ? '#C5E11F' : '#9ed013',
+      }))
+    },
+
+    hasPeriodData(): boolean {
+      return this.periodChartData.some((month) => month.count > 0)
+    },
+
     totalPrunings(): number {
       return this.prunings.length
     },
@@ -350,10 +354,6 @@ export default defineComponent({
     totalTreesPruned(): number {
       const uniqueTrees = new Set(this.prunings.map((p) => p.idTree))
       return uniqueTrees.size
-    },
-
-    activeTeams(): number {
-      return 3 // Mock - seria calculado de dados reais
     },
 
     pruningStats(): { label: string; value: number; color: string }[] {
@@ -483,8 +483,8 @@ export default defineComponent({
 <style scoped>
 /* Cards KPI */
 .kpi-card {
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 12px;
   padding: 16px;
   height: 100%;
@@ -505,26 +505,26 @@ export default defineComponent({
 .kpi-label {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #666;
+  color: var(--mt-text-muted);
 }
 
 .kpi-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #333;
+  color: var(--mt-forest);
   line-height: 1;
 }
 
 .kpi-subtitle {
   font-size: 0.75rem;
-  color: #888;
+  color: var(--mt-text-muted);
   margin-top: 4px;
 }
 
 /* Cards de Gráficos */
 .chart-card {
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 20px;
   height: 100%;
@@ -554,7 +554,7 @@ export default defineComponent({
   height: 200px;
   width: 100%;
   padding: 0 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .bar-wrapper {
@@ -572,14 +572,14 @@ export default defineComponent({
 
 .bar-label {
   font-size: 0.75rem;
-  color: #666;
+  color: var(--mt-text-muted);
   margin-top: 8px;
 }
 
 /* Card de Relatório */
 .report-card {
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 24px;
 }
@@ -596,7 +596,7 @@ export default defineComponent({
 
 .report-table :deep(th) {
   font-weight: 600 !important;
-  color: #555 !important;
+  color: var(--mt-text-muted) !important;
   font-size: 0.8rem !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -643,13 +643,13 @@ export default defineComponent({
 
 .legend-label {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--mt-text-muted);
 }
 
 .legend-value {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #333;
+  color: var(--mt-forest);
   margin-left: auto;
 }
 
@@ -683,7 +683,7 @@ export default defineComponent({
 }
 .report-detail-content {
   padding: 24px 28px;
-  background: #f7f9f5;
+  background: var(--mt-surface-soft);
 }
 .report-detail-grid {
   display: grid;
@@ -696,9 +696,9 @@ export default defineComponent({
   align-items: center;
   gap: 12px;
   padding: 14px;
-  border: 1px solid #e8ede5;
+  border: 1px solid var(--mt-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--mt-surface);
 }
 .report-detail-tile div {
   display: grid;
@@ -706,29 +706,29 @@ export default defineComponent({
   gap: 3px;
 }
 .report-detail-tile span {
-  color: #778278;
+  color: var(--mt-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
 }
 .report-detail-tile strong {
   overflow-wrap: anywhere;
-  color: #25372b;
+  color: var(--mt-forest);
   font-size: 0.85rem;
   font-weight: 650;
 }
 .report-detail-notes {
   padding: 16px;
-  border: 1px solid #e1e9cf;
-  border-left: 4px solid #a7c92b;
+  border: 1px solid var(--mt-border);
+  border-left: 4px solid var(--mt-lime);
   border-radius: 14px;
-  background: linear-gradient(120deg, #f1f6e5, #fbfcf8 72%);
+  background: var(--mt-surface-soft);
 }
 .report-detail-notes p {
   padding: 13px 14px;
-  border: 1px solid #e8ede5;
+  border: 1px solid var(--mt-border);
   border-radius: 10px;
-  background: white;
-  color: #37463a;
+  background: var(--mt-surface);
+  color: var(--mt-ink);
   font-size: 0.86rem;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -737,7 +737,7 @@ export default defineComponent({
 .report-detail-actions {
   justify-content: flex-end;
   padding: 8px 20px 18px;
-  background: #f7f9f5;
+  background: var(--mt-surface-soft);
 }
 @media (max-width: 520px) {
   .report-detail-hero {

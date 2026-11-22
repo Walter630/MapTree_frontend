@@ -3,6 +3,7 @@ export type TreeUrgency = 'CRITICAL' | 'HIGH' | 'MEDIUM'
 export interface TreePriorityInput {
   id?: string | number
   status?: string | null
+  effectiveStatus?: string | null
   lat?: number | string | null
   lng?: number | string | null
   latitude?: number | string | null
@@ -46,7 +47,7 @@ export function getTreeHeightRatio(tree: TreePriorityInput): number | null {
 }
 
 export function isTreeForPruning(tree: TreePriorityInput): boolean {
-  const status = String(tree.status || '').toUpperCase()
+  const status = String(tree.effectiveStatus || tree.status || '').toUpperCase()
   const ratio = getTreeHeightRatio(tree)
   const prediction = tree.aiPrediction
 
@@ -58,7 +59,7 @@ export function isTreeForPruning(tree: TreePriorityInput): boolean {
 }
 
 export function prioritizeTree<T extends TreePriorityInput>(tree: T): PrioritizedTree<T> {
-  const status = String(tree.status || '').toUpperCase()
+  const status = String(tree.effectiveStatus || tree.status || '').toUpperCase()
   const ratio = getTreeHeightRatio(tree)
   const prediction = tree.aiPrediction
   const daysToWire = numberOrNull(prediction?.days_to_wire)

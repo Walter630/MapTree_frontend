@@ -293,8 +293,8 @@ onMounted(loadOptions)
 }
 .entity-form-panel {
   padding: 28px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
 }
 .form-section-heading {
@@ -303,14 +303,14 @@ onMounted(loadOptions)
   gap: 12px;
   padding-bottom: 24px;
   margin-bottom: 26px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--mt-border);
 }
 .form-section-heading h2 {
   font-size: 1rem;
-  color: #1e293b;
+  color: var(--mt-forest);
 }
 .form-section-heading p {
-  color: #64748b;
+  color: var(--mt-text-muted);
   font-size: 0.77rem;
   margin-top: 5px;
 }
@@ -323,7 +323,7 @@ onMounted(loadOptions)
   grid-column: 1/-1;
 }
 .form-actions {
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--mt-border);
   padding-top: 22px;
   margin-top: 8px;
   display: flex;
@@ -332,26 +332,26 @@ onMounted(loadOptions)
 }
 .form-guide {
   padding: 26px;
-  background: #edf2f9;
-  border: 1px solid #dde5f0;
+  background: var(--mt-surface-soft);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
 }
 .guide-eyebrow {
   font-size: 0.65rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
 }
 .form-guide h3 {
-  color: #334155;
+  color: var(--mt-forest);
   font-size: 1.2rem;
   line-height: 1.4;
   margin: 12px 0;
 }
 .form-guide > p,
 .guide-step p {
-  color: #64748b;
+  color: var(--mt-text-muted);
   font-size: 0.8rem;
   line-height: 1.7;
 }
@@ -366,14 +366,14 @@ onMounted(loadOptions)
   flex-shrink: 0;
   width: 26px;
   height: 26px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--mt-border);
   border-radius: 50%;
   font-size: 0.75rem;
-  color: #475569;
+  color: var(--mt-ink);
 }
 .guide-step strong {
   font-size: 0.8rem;
-  color: #334155;
+  color: var(--mt-forest);
 }
 .guide-step p {
   margin-top: 4px;

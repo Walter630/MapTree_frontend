@@ -1,0 +1,21 @@
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme) prefix(tw);
+@import 'tailwindcss/utilities.css' layer(utilities) prefix(tw) important;
+
+@theme inline {
+  --color-mt-forest: var(--mt-forest);
+  --color-mt-teal: var(--mt-teal);
+  --color-mt-green: var(--mt-green);
+  --color-mt-lime: var(--mt-lime);
+  --color-mt-ink: var(--mt-ink);
+  --color-mt-canvas: var(--mt-canvas);
+  --color-mt-surface: var(--mt-surface);
+  --color-mt-surface-soft: var(--mt-surface-soft);
+  --color-mt-border: var(--mt-border);
+  --color-mt-text-muted: var(--mt-text-muted);
+  --font-heading: 'K2D', 'Poppins', sans-serif;
+  --font-sans: 'Poppins', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --breakpoint-tablet: 56.25rem;
+  --breakpoint-compact: 43.75rem;
+}

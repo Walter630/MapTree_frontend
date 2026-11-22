@@ -2,8 +2,18 @@
 import type { TreeApiRecord } from '@/types/treeApi'
 import { isAxiosError } from 'axios'
 import { NEST_ICON, speciesIcon } from '@/utils/speciesDisplay'
-import { defineComponent, onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue'
+import {
+  defineAsyncComponent,
+  defineComponent,
+  onMounted,
+  onUnmounted,
+  ref,
+  computed,
+  nextTick,
+  watch,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAppStore } from '@/stores/app'
 import * as L from 'leaflet'
 import { HeatLayer } from 'leaflet.heat'
 import 'leaflet/dist/leaflet.css'
@@ -11,12 +21,10 @@ import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { apiConnect, type Measurement, type TreeWithAi } from '@/plugins/apiConnect'
-import TreeAiStats from '@/components/functions/TreeAiStats.vue'
 import TreeFieldMeasurement from '@/components/functions/TreeFieldMeasurement.vue'
 import { SOIL_TYPES, getSoilInfo } from '@/utils/soilData'
-import { readDailyRouteSnapshot, type DailyRouteStopSnapshot } from '@/utils/dailyRouteStorage'
+import type { DailyRouteStopSnapshot } from '@/utils/dailyRouteStorage'
 import { getDailyRouteSchedules, getPendingMapStops } from '@/utils/dailyRouteSchedules'
-import { isTreeForPruning, prioritizeTrees } from '@/utils/treePriority'
 import 'leaflet-routing-machine'
 import {
   CEARA_REGIONS,
@@ -32,13 +40,23 @@ import {
   countTreesBySpecies,
   estimateTotalCrownAreaM2,
   getTreeDensityCategories,
-  getTreeDensityCategory,
   getTreeDensityHeatPoints,
   isValidGeoPoint,
   type TreeDensityDimension,
 } from '@/utils/treeDensity'
 import { getDensestTreeMapCluster, uniqueTreeMapPoints } from '@/utils/treeMapViewport'
+import { selectTreeMapTrees, type TreeMapQuickFilter } from '@/utils/treeMapSelection'
+import { clearTreeCreateAttemptKey, getTreeCreateAttemptKey } from '@/utils/treeCreateAttempt'
+import { getApiErrorMessage } from '@/utils/apiError'
+import { localDate } from '@/utils/pruningWorkflow'
+import {
+  isMunicipalityGeometry,
+  isPointInsideMunicipality,
+  type MunicipalityGeometry,
+} from '@/utils/municipalityGeometry'
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
+
+const TreeAiStats = defineAsyncComponent(() => import('@/components/functions/TreeAiStats.vue'))
 
 /* =====================================================
    ESTRUTURA DO COMPONENTE PRUNINGMAP
@@ -105,15 +123,21 @@ import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
 interface TreeOnMap {
   id: string
+  createdById?: string
+  updatedAt?: string
   latitude: number
   longitude: number
+  address?: string
   status: string
+  registeredStatus?: string
+  lastPruneDate?: string | null
   pruningLabel?: string
   speciesName: string
   scientificName: string
   family: string
   nearPowerLine: boolean
   soilQuality?: string
+  soilStatus?: string
   vigor: string
   currentHeight?: number
   wireHeight?: number
@@ -131,6 +155,12 @@ interface MarkedLocation {
   notes: string
   timestamp: Date
   marker?: L.Marker
+}
+
+interface QuickTreeOrganizationBoundary {
+  municipalityGeometry?: unknown
+  municipalityName?: string | null
+  municipalityUf?: string | null
 }
 
 // Tipos — adiciona junto com os outros interfaces no topo
@@ -250,11 +280,10 @@ const pruningDateFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
 })
 
-function getStatusCfg(status: string, danger: boolean): StatusInfo {
+function getStatusCfg(status: string): StatusInfo {
   const s = String(status).toUpperCase()
 
-  // SE ESTIVER EM PERIGO (por altura/IA), forçamos CRÍTICO (Vermelho)
-  if (danger || s === 'CRITICAL' || s === 'DANGER') {
+  if (s === 'CRITICAL' || s === 'DANGER') {
     return STATUS_CONFIG['CRITICAL'] || STATUS_CONFIG['DANGER'] || DEFAULT_STATUS
   }
 
@@ -277,10 +306,12 @@ export default defineComponent({
 
   setup() {
     const currentRoute = useRoute()
+    const appStore = useAppStore()
 
     /* ---------- Map refs ---------- */
     let map: L.Map | null = null
     let treeClusterGroup: L.MarkerClusterGroup | null = null
+    const treeMarkerCache = new Map<string, { marker: L.Marker; signature: string }>()
     let userMarker: L.Marker | null = null
     let userAccuracyCircle: L.Circle | null = null
     let markedMarkersLayer: L.LayerGroup | null = null
@@ -296,16 +327,41 @@ export default defineComponent({
     let isDestroyed = false
     let streetLayer: L.TileLayer | null = null
     let satelliteLayer: L.TileLayer | null = null
-    let routingControl: L.Routing.Control | null = null
     let dailyRoadRoutingControl: L.Routing.Control | null = null
     let dailyRouteLayer: L.LayerGroup | null = null
     let treeDensityLayer: HeatLayer | null = null
+    let quickTreeMunicipalityLayer: L.GeoJSON | null = null
 
     /* ---------- Estado Reativo ---------- */
     const trees = ref<TreeOnMap[]>([])
-    const showTreeDensityLayer = ref(false)
-    const treeDensityDimension = ref<TreeDensityDimension>('species')
-    const treeDensityCategory = ref('all')
+    const requestedDimension = currentRoute.query.treeMapDimension
+    const validDimensions: TreeDensityDimension[] = [
+      'species',
+      'status',
+      'vigor',
+      'proximity',
+      'nests',
+      'canopy',
+    ]
+    const treeDensityDimension = ref<TreeDensityDimension>(
+      typeof requestedDimension === 'string' &&
+        validDimensions.includes(requestedDimension as TreeDensityDimension)
+        ? (requestedDimension as TreeDensityDimension)
+        : 'species',
+    )
+    const treeDensityCategory = ref(
+      typeof currentRoute.query.treeMapCategory === 'string'
+        ? currentRoute.query.treeMapCategory
+        : 'all',
+    )
+    const selectedSpecies = ref(
+      requestedDimension === 'species' && typeof currentRoute.query.treeMapCategory === 'string'
+        ? currentRoute.query.treeMapCategory
+        : 'all',
+    )
+    const showTreeDensityLayer = ref(
+      currentRoute.query.treeMapHeat === 'true' || currentRoute.query.camada === 'calor',
+    )
     watch(
       () => currentRoute.query,
       (query) => {
@@ -313,6 +369,7 @@ export default defineComponent({
         treeDensityDimension.value = 'species'
         treeDensityCategory.value =
           (typeof query.especie === 'string' && query.especie.trim()) || 'all'
+        selectedSpecies.value = treeDensityCategory.value
         showTreeDensityLayer.value = true
       },
       { immediate: true },
@@ -335,12 +392,95 @@ export default defineComponent({
     const searching = ref(false)
     const isMobile = ref(window.innerWidth < 768)
     const sidebarOpen = ref(!isMobile.value)
-    const activeFilter = ref<string>('PRIORITY')
+    const requestedFilter = currentRoute.query.treeMapFilter
+    const activeFilter = ref<TreeMapQuickFilter>(
+      requestedFilter === 'CRITICAL' || requestedFilter === 'TO_PRUNE' ? requestedFilter : 'ALL',
+    )
     const mapStyle = ref<'street' | 'satellite'>('street')
     const snackbar = ref(false)
     const snackbarText = ref('')
     const snackbarColor = ref('success')
     const selectedTree = ref<TreeOnMap | null>(null)
+    const locationEditTree = ref<TreeOnMap | null>(null)
+    const locationDraft = ref<{ latitude: number; longitude: number } | null>(null)
+    const locationOriginalPosition = ref<{ latitude: number; longitude: number } | null>(null)
+    const locationLatitudeInput = ref('')
+    const locationLongitudeInput = ref('')
+    const locationAddressInput = ref('')
+    const locationEditDialog = ref(false)
+    const locationEditLoading = ref(false)
+    const locationSaving = ref(false)
+    const locationEditError = ref('')
+    const locationEditConflict = ref(false)
+    let locationEditMarker: L.Marker | null = null
+    let locationOriginalIcon: L.Icon | L.DivIcon | undefined
+    let locationOriginalZIndex = 0
+    let locationDragListener: (() => void) | null = null
+    let locationDragEndListener: (() => void) | null = null
+    const locationInputsValid = computed(() => {
+      if (!locationLatitudeInput.value.trim() || !locationLongitudeInput.value.trim()) return false
+      return isValidGeoPoint(Number(locationLatitudeInput.value), Number(locationLongitudeInput.value))
+    })
+    const locationPositionChanged = computed(() => {
+      const original = locationOriginalPosition.value
+      const draft = locationDraft.value
+      return Boolean(original && draft &&
+        (original.latitude !== draft.latitude || original.longitude !== draft.longitude))
+    })
+    const canSaveLocation = computed(() =>
+      Boolean(locationEditTree.value?.updatedAt && locationPositionChanged.value &&
+        locationInputsValid.value && !locationSaving.value && !locationEditConflict.value),
+    )
+    watch([locationLatitudeInput, locationLongitudeInput], ([latitude, longitude]) => {
+      if (!locationEditMarker || !latitude.trim() || !longitude.trim()) return
+      const parsedLatitude = Number(latitude)
+      const parsedLongitude = Number(longitude)
+      if (!isValidGeoPoint(parsedLatitude, parsedLongitude)) return
+      locationDraft.value = { latitude: parsedLatitude, longitude: parsedLongitude }
+      locationEditMarker.setLatLng([parsedLatitude, parsedLongitude])
+    })
+    const treeRegistrationMode = ref(false)
+    const treeRegistrationPoint = ref<{ lat: number; lng: number } | null>(null)
+    let treeRegistrationMarker: L.Marker | null = null
+    const quickTreeMunicipalityGeometry = ref<MunicipalityGeometry | null>(null)
+    const quickTreeMunicipalityName = ref('')
+    const quickTreeBoundaryLoading = ref(false)
+    const quickTreeBoundaryError = ref('')
+    const quickTreeRequiresMunicipalityBoundary = computed(() => appStore.user?.role !== 'ADMIN')
+    const quickTreeSpecies = ref<Array<{ id: string; commonName: string; scientificName?: string; family?: string }>>([])
+    const quickTreeSpeciesId = ref('')
+    const quickSpeciesDialog = ref(false)
+    const quickSpeciesLoading = ref(false)
+    const quickSpeciesError = ref('')
+    const quickTreeSaving = ref(false)
+    const quickTreeSaveError = ref('')
+    const selectedQuickTreeSpecies = computed(
+      () => quickTreeSpecies.value.find(({ id }) => id === quickTreeSpeciesId.value) ?? null,
+    )
+    const quickTreePointOutsideMunicipality = computed(() => {
+      const point = treeRegistrationPoint.value
+      const geometry = quickTreeMunicipalityGeometry.value
+      return Boolean(
+        point &&
+        quickTreeRequiresMunicipalityBoundary.value &&
+        geometry &&
+        !isPointInsideMunicipality(point.lng, point.lat, geometry),
+      )
+    })
+    const quickTreeCanSave = computed(() => {
+      const boundaryReady =
+        !quickTreeRequiresMunicipalityBoundary.value ||
+        (!quickTreeBoundaryLoading.value &&
+          !quickTreeBoundaryError.value &&
+          Boolean(quickTreeMunicipalityGeometry.value))
+      return Boolean(
+        treeRegistrationPoint.value &&
+          selectedQuickTreeSpecies.value &&
+          boundaryReady &&
+          !quickTreePointOutsideMunicipality.value &&
+          !quickTreeSaving.value,
+      )
+    })
     const nestObservationDialog = ref(false)
     const savingNestObservation = ref(false)
     const nestObservationForm = ref({
@@ -349,10 +489,7 @@ export default defineComponent({
       averageSizeCm: '',
       notes: '',
     })
-    const isRouting = ref(false)
     const isSimulationMode = ref(false)
-    const loadingRoute = ref(false)
-    const currentRouteDest = ref<{ lat: number; lng: number } | null>(null)
     const dailyRouteDate = computed(() => {
       const value = currentRoute.query.routeDate
       return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
@@ -365,7 +502,6 @@ export default defineComponent({
       Boolean(dailyRouteDate.value && dailyRouteStops.value.length),
     )
     const nextDailyRouteStop = computed(() => dailyRouteStops.value[0] || null)
-    let lastPosition: L.LatLng | null = null
 
     /* ---------- Carregamento Progressivo ---------- */
     const loadRadius = ref(2) // Raio inicial em km
@@ -376,7 +512,10 @@ export default defineComponent({
     const followUserPosition = ref(false) // Se true, mapa segue o usuário automaticamente
     const userHasMovedMap = ref(false) // Detecta se usuário navegou manualmente no mapa
     const loadedTreeIds = new Set<string>() // Cache para evitar duplicatas
-    const blockingMapLoading = computed(() => isInitialMapLoading.value || loadingRoute.value)
+    const partialBoundsView = ref(false)
+    let boundsRequestId = 0
+    let boundsRequestController: AbortController | null = null
+    const blockingMapLoading = computed(() => isInitialMapLoading.value)
 
     /* ---------- Sistema de Regiões ---------- */
     const availableRegions = ref<Region[]>(CEARA_REGIONS)
@@ -446,109 +585,79 @@ export default defineComponent({
     const fieldMeasurement = ref<Measurement>()
     const fieldWireHeight = ref<number>()
     let treeDetailsRequest = 0
-    const loadingAiData = ref(false)
+    const aiDetailsError = ref('')
+    const aiPredictionState = ref<'loading' | 'available' | 'unavailable' | 'error'>('loading')
+
+    watch(
+      aiDrawerOpen,
+      (isOpen) => {
+        if (isOpen) return
+
+        // Respostas iniciadas antes de fechar não podem repovoar o card oculto.
+        treeDetailsRequest += 1
+      },
+      { flush: 'sync' },
+    )
 
     /* ---------- Computed ---------- */
-    const activeHeatSpecies = computed(() =>
-      showTreeDensityLayer.value &&
-      treeDensityDimension.value === 'species' &&
-      treeDensityCategory.value !== 'all'
-        ? treeDensityCategory.value
-        : null,
+    const categoryFilteredTrees = computed(() =>
+      selectTreeMapTrees(
+        densityTrees.value,
+        'ALL',
+        selectedSpecies.value === 'all' ? treeDensityDimension.value : 'species',
+        selectedSpecies.value === 'all' ? treeDensityCategory.value : selectedSpecies.value,
+      ),
     )
-
-    const filteredTrees = computed(() => {
-      const species = activeHeatSpecies.value
-      const candidates =
-        species === null
-          ? trees.value
-          : densityTrees.value.filter((tree) => getTreeDensityCategory(tree, 'species') === species)
-
-      if (dailyRouteVisible.value) {
-        const routeIds = new Set(dailyRouteStops.value.map((stop) => stop.id))
-        return candidates.filter((tree) => routeIds.has(tree.id))
-      }
-      if (activeFilter.value === 'PRIORITY') {
-        return prioritizeTrees(candidates)
-          .filter((item) => isTreeForPruning(item.tree))
-          .map((item) => item.tree)
-      }
-      if (activeFilter.value === 'ALL') return candidates
-      if (activeFilter.value === 'PRUNED') {
-        return candidates.filter((tree) => tree.pruningLabel || tree.status === 'PRUNED')
-      }
-      if (activeFilter.value === 'CRITICAL') {
-        return prioritizeTrees(candidates)
-          .filter((item) => item.urgency === 'CRITICAL')
-          .map((item) => item.tree)
-      }
-      return candidates.filter((tree) => tree.status === activeFilter.value)
-    })
-
+    const filteredTrees = computed(() =>
+      selectTreeMapTrees(
+        densityTrees.value,
+        activeFilter.value,
+        selectedSpecies.value === 'all' ? treeDensityDimension.value : 'species',
+        selectedSpecies.value === 'all' ? treeDensityCategory.value : selectedSpecies.value,
+      ),
+    )
+    const statusFilteredTrees = computed(() =>
+      densityTrees.value.filter(
+        (tree) => activeFilter.value === 'ALL' || tree.status === activeFilter.value,
+      ),
+    )
     const treeDensityCategories = computed(() =>
-      getTreeDensityCategories(densityTrees.value, treeDensityDimension.value),
+      getTreeDensityCategories(statusFilteredTrees.value, treeDensityDimension.value),
     )
     const treeDensityHeatPoints = computed(() =>
-      getTreeDensityHeatPoints(
-        densityTrees.value,
-        treeDensityDimension.value,
-        treeDensityCategory.value,
-      ),
+      getTreeDensityHeatPoints(filteredTrees.value, treeDensityDimension.value, 'all'),
     )
     const treeDensityCells = computed(() =>
-      buildTreeDensityCells(
-        densityTrees.value,
-        treeDensityDimension.value,
-        250,
-        treeDensityCategory.value,
-      ),
+      buildTreeDensityCells(filteredTrees.value, treeDensityDimension.value, 250, 'all'),
     )
     const topDensityCell = computed(() => treeDensityCells.value[0] || null)
-    const speciesDistribution = computed(() => countTreesBySpecies(densityTrees.value))
-    const crownAreaEstimate = computed(() => estimateTotalCrownAreaM2(densityTrees.value))
+    const speciesDistribution = computed(() => countTreesBySpecies(statusFilteredTrees.value))
+    const crownAreaEstimate = computed(() => estimateTotalCrownAreaM2(filteredTrees.value))
     const densityDimensionItems: Array<{ title: string; value: TreeDensityDimension }> = [
       { title: 'Espécie', value: 'species' },
       { title: 'Status', value: 'status' },
       { title: 'Vigor', value: 'vigor' },
-      { title: 'Indicador de risco', value: 'proximity' },
+      { title: 'Risco operacional', value: 'proximity' },
       { title: `${NEST_ICON} Ninhos registrados`, value: 'nests' },
       { title: 'Área de copa estimada', value: 'canopy' },
     ]
 
-    // ESCOPOS DOS CONTADORES (regra adotada — ver FEAT-003):
-    // - treeCount: árvores CARREGADAS em memória (depende do modo nearby/bounds/city/tile).
-    //   NÃO é o total do banco; é o que foi trazido para o cliente.
-    // - visibleTreeCount: árvores nos bounds atuais, respeitando a rota e o recorte por espécie.
-    // - cityStats.total: TOTAL global na cidade (vem do servidor via getCityStats), escopo distinto.
-    // Esses três contadores medem coisas diferentes e NÃO devem ser forçados a bater.
-    const treeCount = computed(() => trees.value.length)
-    const dangerCount = computed(() => trees.value.filter((t) => t.nearPowerLine).length)
-    // criticalCount = "Precisa de poda" (isTreeForPruning): status TO_PRUNE/CRITICAL,
-    // altura >=90% da fiação ou previsão de alcançar o fio. É o escopo do filtro PRIORITY/"Pendentes".
-    const criticalCount = computed(
-      () => prioritizeTrees(trees.value).filter((item) => isTreeForPruning(item.tree)).length,
+    // Contagens rápidas respeitam status e categoria; a camada de inventário usa a mesma seleção.
+    const treeCount = computed(() => filteredTrees.value.length)
+    const allFilterCount = computed(() => categoryFilteredTrees.value.length)
+    const dangerCount = computed(
+      () =>
+        categoryFilteredTrees.value.filter((tree) =>
+          ['CRITICAL', 'TO_PRUNE', 'DANGER'].includes(tree.status.toUpperCase()),
+        ).length,
     )
-    // criticalUrgencyCount = "Críticos": apenas urgência CRITICAL (contato/risco iminente na fiação).
-    // É um subconjunto de criticalCount e é o escopo coerente com o filtro CRITICAL (activeFilter === 'CRITICAL').
-    const criticalUrgencyCount = computed(
-      () => prioritizeTrees(trees.value).filter((item) => item.urgency === 'CRITICAL').length,
+    const criticalCount = computed(
+      () => categoryFilteredTrees.value.filter((tree) => tree.status === 'CRITICAL').length,
+    )
+    const toPruneCount = computed(
+      () => categoryFilteredTrees.value.filter((tree) => tree.status === 'TO_PRUNE').length,
     )
     const markedCount = computed(() => markedLocations.value.length)
-    const statusCounts = computed(() => {
-      const counts: Record<string, number> = {
-        NORMAL: 0,
-        TO_PRUNE: 0,
-        UNDER_OBSERVATION: 0,
-        PRUNED: 0,
-        CRITICAL: 0,
-      }
-      trees.value.forEach((t) => {
-        counts[t.status] = (counts[t.status] || 0) + 1
-        if (t.pruningLabel && t.status !== 'PRUNED') counts.PRUNED = (counts.PRUNED || 0) + 1
-      })
-      return counts
-    })
-
     // Refs reativas para bounds do mapa (para tornar visibleTreeCount reativo)
     const mapBounds = ref<L.LatLngBounds | null>(null)
     const mapZoom = ref<number>(DEFAULT_ZOOM)
@@ -557,10 +666,7 @@ export default defineComponent({
     // Os bounds só mudam no 'moveend', não a cada frame. Conta com loop simples, sem alocar
     // array intermediário, para suportar volumes grandes sem travar.
     const visibleTreeCount = computed(() => {
-      const list =
-        dailyRouteVisible.value || activeHeatSpecies.value !== null
-          ? filteredTrees.value
-          : trees.value
+      const list = filteredTrees.value
       const bounds = mapBounds.value
       if (!map || !bounds) return list.length
       let count = 0
@@ -648,13 +754,16 @@ export default defineComponent({
           offset: [0, -15],
           className: 'daily-route-tooltip',
         })
-        marker.bindPopup(`
+        marker.bindPopup(
+          `
           <div style="min-width:180px;font-family:system-ui,sans-serif;">
-            <strong style="color:#2E7D32;">Parada ${stop.order}</strong>
+            <strong style="color:var(--mt-status-success);">Parada ${stop.order}</strong>
             <p style="margin:6px 0 2px;font-weight:700;">${escapeHtml(stop.label || `Árvore #${stop.id.slice(-6)}`)}</p>
-            <p style="margin:0;color:#64748b;font-size:12px;">${stop.latitude.toFixed(5)}, ${stop.longitude.toFixed(5)}</p>
+            <p style="margin:0;color:var(--mt-text-muted);font-size:12px;">${stop.latitude.toFixed(5)}, ${stop.longitude.toFixed(5)}</p>
           </div>
-        `)
+        `,
+          { className: 'daily-route-popup' },
+        )
         dailyRouteLayer!.addLayer(marker)
       })
 
@@ -674,8 +783,7 @@ export default defineComponent({
       try {
         const schedules = await getDailyRouteSchedules(date)
         if (isDestroyed || request !== dailyRouteRequest) return
-        const cached = readDailyRouteSnapshot(date)?.stops ?? []
-        dailyRouteStops.value = getPendingMapStops(schedules, cached)
+        dailyRouteStops.value = getPendingMapStops(schedules)
         if (dailyRouteStops.value.length) dailyRouteState.value = 'ready'
         else if (schedules.some((stop) => stop.status === 'PENDING'))
           dailyRouteState.value = 'empty'
@@ -708,8 +816,8 @@ export default defineComponent({
     watch(dailyRouteDate, loadDailyRoute)
 
     /* ---------- Ícones ---------- */
-    const createTreeIcon = (status: string, danger: boolean, species: string): L.DivIcon => {
-      const cfg = getStatusCfg(status, danger)
+    const createTreeIcon = (status: string, species: string): L.DivIcon => {
+      const cfg = getStatusCfg(status)
       return L.divIcon({
         html: `<div style="
           background: linear-gradient(135deg, ${cfg.bg}, ${cfg.border});
@@ -720,7 +828,6 @@ export default defineComponent({
           transform: rotate(-45deg);
           box-shadow: -3px 3px 8px rgba(0,0,0,0.4);
           cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          ${danger ? 'animation:pulsePin 1.2s infinite;' : ''}
         " onmouseover="this.style.transform='rotate(-45deg) scale(1.15)'" onmouseout="this.style.transform='rotate(-45deg) scale(1)'">
           <span aria-hidden="true" style="transform: rotate(45deg); font-size: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">${speciesIcon(species)}</span>
         </div>`,
@@ -730,6 +837,20 @@ export default defineComponent({
         className: 'tree-icon-marker',
       })
     }
+
+    const createLocationEditIcon = (): L.DivIcon =>
+      L.divIcon({
+        html: `<div aria-hidden="true" style="
+          width:42px;height:42px;border:4px solid #fff;border-radius:50% 50% 50% 0;
+          transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;
+          background:#f59e0b;box-shadow:0 0 0 5px rgba(245,158,11,.35),0 4px 12px rgba(0,0,0,.45);
+          font-size:20px;cursor:grab;
+        "><span style="transform:rotate(45deg)">↕</span></div>`,
+        iconSize: [46, 46],
+        iconAnchor: [23, 42],
+        popupAnchor: [0, -42],
+        className: 'tree-location-edit-marker',
+      })
 
     const createUserIcon = (): L.DivIcon =>
       L.divIcon({
@@ -756,12 +877,6 @@ export default defineComponent({
         className: 'mark-icon-marker',
       })
 
-    const checkNearPowerLine = (lat: number, lng: number): boolean => {
-      void lat
-      void lng
-      return false
-    }
-
     /* ---------- API ---------- */
 
     /**
@@ -785,10 +900,8 @@ export default defineComponent({
         t.estimated_height_m ??
         t.aiPrediction?.estimated_height_m
       const wireH = t.wireHeight ?? t.wire_height_m ?? t.aiPrediction?.wire_height_m
-      const treeStatus = t.measuredStatus || t.status || 'NORMAL'
-      const isDanger =
-        checkNearPowerLine(lat, lng) ||
-        (wireH !== undefined && wireH > 0 && curH !== undefined && curH / wireH >= 0.9)
+      const treeStatus = t.effectiveStatus || t.measuredStatus || t.status || 'NORMAL'
+      const isDanger = ['CRITICAL', 'TO_PRUNE', 'DANGER'].includes(treeStatus.toUpperCase())
       const pruningDate = t.lastPruneDate ? Date.parse(t.lastPruneDate) : NaN
       const pruningLabel = Number.isFinite(pruningDate)
         ? `Última poda em ${pruningDateFormatter.format(pruningDate)}`
@@ -798,20 +911,30 @@ export default defineComponent({
 
       // Extrair dados de solo se disponíveis
       const soilQuality = t.soil?.quality || t.soilQuality || 'UNKNOWN'
-      const vigor = t.vigor || t.soil?.vigor || 'GOOD'
+      const vigor = t.vigor || t.soil?.vigor || 'UNKNOWN'
       const nestObservation = Array.isArray(t.nestObservations) ? t.nestObservations[0] : null
 
       return {
         id: t.id,
+        createdById: t.createdById || undefined,
+        updatedAt: t.updatedAt
+          ? t.updatedAt instanceof Date
+            ? t.updatedAt.toISOString()
+            : String(t.updatedAt)
+          : undefined,
         latitude: lat,
         longitude: lng,
+        address: t.address ?? undefined,
         status: treeStatus,
+        registeredStatus: t.status || undefined,
+        lastPruneDate: t.lastPruneDate ?? null,
         pruningLabel,
         speciesName: t.species?.commonName || 'Espécie não identificada',
         scientificName: t.species?.scientificName || '',
         family: t.species?.family || '',
         nearPowerLine: isDanger,
         soilQuality: soilQuality,
+        soilStatus: t.soilStatus,
         vigor: vigor,
         currentHeight: curH,
         wireHeight: wireH,
@@ -839,6 +962,7 @@ export default defineComponent({
      * Inicia com 2km e permite expandir até o máximo definido
      */
     const fetchTreesNearby = async (reset = false, silent = false) => {
+      if (isMobile.value) return fetchTreesInBounds(silent, true)
       console.log(
         '[PruningMap] fetchTreesNearby chamado. userLat:',
         userLat.value,
@@ -904,6 +1028,7 @@ export default defineComponent({
         const status = isAxiosError(err) ? err.response?.status : undefined
         if (status === 500 || status === 404) {
           console.log('[PruningMap] API /trees/nearby indisponível, usando fallback /trees')
+          if (isMobile.value) return fetchTreesInBounds(silent, true)
           if (!silent) notify('Usando modo de compatibilidade para carregar árvores', 'warning')
           return fetchTreesLegacy(silent) // Fallback para endpoint tradicional
         }
@@ -925,40 +1050,81 @@ export default defineComponent({
       await fetchTreesNearby(false)
     }
 
+    const zoomInToSeeMoreTrees = () => map?.zoomIn()
+
     /**
      * Carrega árvores da área visível no mapa (bounds)
      * Útil quando usuário navega para outra região
      */
-    const fetchTreesInBounds = async (silent = false) => {
-      if (!map) return
+    const fetchTreesInBounds = async (silent = false, replaceVisibleArea = isMobile.value) => {
+      if (!map) return false
 
       const bounds = map.getBounds()
       const north = bounds.getNorth()
       const south = bounds.getSouth()
       const east = bounds.getEast()
       const west = bounds.getWest()
+      const requestId = ++boundsRequestId
+      boundsRequestController?.abort()
+      const controller = new AbortController()
+      boundsRequestController = controller
 
       loadingTrees.value = true
       try {
-        const res = await apiConnect.getTreesInBounds(north, south, east, west, 500)
+        const res = await apiConnect.getTreesInBounds(
+          north,
+          south,
+          east,
+          west,
+          500,
+          controller.signal,
+        )
+        if (requestId !== boundsRequestId || isDestroyed || !map || !map.getBounds().equals(bounds))
+          return false
 
-        const newTrees: TreeOnMap[] = []
-        ;(res.data || []).forEach((t: TreeApiRecord) => {
-          if (!loadedTreeIds.has(t.id)) {
-            const parsed = parseTreeData(t)
-            if (parsed) {
-              loadedTreeIds.add(t.id)
-              newTrees.push(parsed)
-            }
-          }
-        })
+        const records = res.data || []
+        const areaTrees = uniqueTreeMapPoints(
+          records
+            .map((tree: TreeApiRecord) => parseTreeData(tree))
+            .filter((tree): tree is TreeOnMap => tree !== null),
+        )
+        partialBoundsView.value = records.length >= 500
+        totalTreesInArea.value = records.length
+        hasMoreTrees.value = partialBoundsView.value
 
-        trees.value = [...trees.value, ...newTrees]
-        if (!silent) notify(`${newTrees.length} árvore(s) da área visível carregada(s)`, 'success')
+        if (replaceVisibleArea) {
+          clearTreeLoadCache()
+          areaTrees.forEach((tree) => loadedTreeIds.add(tree.id))
+          trees.value = areaTrees
+        } else {
+          const current = new Map(trees.value.map((tree) => [tree.id, tree]))
+          areaTrees.forEach((tree) => {
+            current.set(tree.id, tree)
+            loadedTreeIds.add(tree.id)
+          })
+          trees.value = [...current.values()]
+        }
+
+        if (!silent) {
+          notify(
+            partialBoundsView.value
+              ? 'Exibindo até 500 árvores. Aproxime o mapa para detalhar esta área.'
+              : `${areaTrees.length} árvore(s) da área visível carregada(s)`,
+            partialBoundsView.value ? 'info' : 'success',
+          )
+        }
+        return true
       } catch (err) {
-        console.error('Erro ao buscar árvores na área:', err)
+        if (!controller.signal.aborted) {
+          console.error('Erro ao buscar árvores na área:', err)
+          if (!silent) notify('Não foi possível carregar as árvores desta área.', 'error')
+        }
+        return false
       } finally {
-        loadingTrees.value = false
+        if (requestId === boundsRequestId) {
+          loadingTrees.value = false
+          boundsRequestController = null
+        }
       }
     }
 
@@ -972,10 +1138,10 @@ export default defineComponent({
         const tree = cluster[0]!
         map.setView([tree.latitude, tree.longitude], 14)
       } else {
-        map.fitBounds(
-          L.latLngBounds(cluster.map((tree) => [tree.latitude, tree.longitude])),
-          { padding: [50, 50], maxZoom: 15 },
-        )
+        map.fitBounds(L.latLngBounds(cluster.map((tree) => [tree.latitude, tree.longitude])), {
+          padding: [50, 50],
+          maxZoom: 15,
+        })
       }
 
       isInitialLoad.value = false
@@ -1073,7 +1239,7 @@ export default defineComponent({
     const fetchTrees = fetchTreesNearby
 
     /* ---------- Carregamento por Região ---------- */
-    const fetchTreesByRegion = async (region: Region, reset = true) => {
+    const fetchTreesByRegion = async (region: Region, reset = true, preserveViewport = false) => {
       if (reset) {
         trees.value = []
         clearTreeLoadCache()
@@ -1130,7 +1296,7 @@ export default defineComponent({
         notify(`${regionTreeList.length} árvores carregadas de ${region.name}`, 'success')
 
         // Centraliza no mapa
-        if (map) {
+        if (map && !preserveViewport) {
           map.flyTo([region.center.lat, region.center.lng], 13, { duration: 1 })
         }
       } catch (err) {
@@ -1178,6 +1344,10 @@ export default defineComponent({
       if (map) {
         map.flyTo([region.center.lat, region.center.lng], 13, { duration: 1 })
       }
+      if (isMobile.value) {
+        await loadCityStats(region)
+        return
+      }
       await Promise.all([loadCityStats(region), fetchTreesByRegion(region, true)])
     }
 
@@ -1185,6 +1355,8 @@ export default defineComponent({
     let isLoadingTiles = false
     const loadVisibleTiles = async (silent = false) => {
       if (!map || isLoadingTiles) return false
+
+      if (isMobile.value) return fetchTreesInBounds(silent, true)
 
       const bounds = map.getBounds()
       const zoom = map.getZoom()
@@ -1401,75 +1573,6 @@ export default defineComponent({
       notify(showSoilLayer.value ? 'Camada de solo ativada' : 'Camada de solo oculta', 'info')
     }
 
-    /* ---------- Roteirização ---------- */
-    const stopRouting = () => {
-      if (routingControl && map) {
-        map.removeControl(routingControl)
-        routingControl = null
-      }
-      isRouting.value = false
-      currentRouteDest.value = null
-      notify('Rota finalizada', 'info')
-    }
-
-    const startRouting = async (destLat: number, destLng: number, destName: string) => {
-      if (!userLat.value || !userLng.value) {
-        notify('Sua localização ainda não foi encontrada!', 'warning')
-        await goToUserLocation()
-        return
-      }
-
-      if (!map) return
-
-      // Limpar rota anterior se houver
-      if (routingControl) {
-        map.removeControl(routingControl)
-      }
-
-      routingControl = L.Routing.control({
-        waypoints: [L.latLng(userLat.value, userLng.value), L.latLng(destLat, destLng)],
-
-        lineOptions: {
-          extendToWaypoints: true,
-          missingRouteTolerance: 10,
-          styles: [
-            { color: '#000', opacity: 0.1, weight: 10 }, // Shadow
-            { color: '#007bff', opacity: 0.85, weight: 6 }, // Main line
-          ],
-        },
-        addWaypoints: false,
-        plan: L.Routing.plan([L.latLng(userLat.value, userLng.value), L.latLng(destLat, destLng)], {
-          addWaypoints: false,
-          draggableWaypoints: false,
-          createMarker: () => false,
-        }),
-
-        fitSelectedRoutes: true,
-        showAlternatives: false,
-
-        show: false, // Esconde o painel de instruções branco
-      }).addTo(map)
-
-      currentRouteDest.value = { lat: destLat, lng: destLng }
-      loadingRoute.value = true
-      isRouting.value = true
-
-      routingControl.on('routesfound', () => {
-        loadingRoute.value = false
-        notify(`Rota calculada com sucesso para: ${destName}`, 'success')
-      })
-
-      routingControl.on('routingerror', (e: L.LeafletEvent) => {
-        loadingRoute.value = false
-        isRouting.value = false
-        console.error('Routing error:', e)
-        notify('Não foi possível calcular a rota. Servidor OSRM ocupado ou inacessível.', 'error')
-      })
-
-      // Fechar popups abertos
-      if (map) map.closePopup()
-    }
-
     const toggleSimulationMode = () => {
       isSimulationMode.value = !isSimulationMode.value
       if (isSimulationMode.value) {
@@ -1494,133 +1597,61 @@ export default defineComponent({
         console.error('[PruningMap] treeClusterGroup não existe!')
         return
       }
-      treeClusterGroup.clearLayers()
-      if (dailyRouteVisible.value) return
-
-      if (filteredTrees.value.length === 0) {
-        console.warn('[PruningMap] Nenhuma árvore para renderizar')
+      if (dailyRouteVisible.value) {
+        treeClusterGroup.clearLayers()
+        treeMarkerCache.clear()
         return
+      }
+
+      const visibleIds = new Set(filteredTrees.value.map((tree) => tree.id))
+      for (const [id, cached] of treeMarkerCache) {
+        if (visibleIds.has(id)) continue
+        treeClusterGroup.removeLayer(cached.marker)
+        treeMarkerCache.delete(id)
       }
 
       const markersArray: L.Marker[] = []
       filteredTrees.value.forEach((t) => {
         if (isNaN(t.latitude) || isNaN(t.longitude)) return
-        const icon = createTreeIcon(t.status, t.nearPowerLine, t.speciesName)
+        const signature = JSON.stringify(t)
+        const existing = treeMarkerCache.get(t.id)
+        if (existing?.signature === signature) {
+          if (!treeClusterGroup!.hasLayer(existing.marker)) markersArray.push(existing.marker)
+          return
+        }
+        if (existing) treeClusterGroup!.removeLayer(existing.marker)
+
+        const icon = createTreeIcon(t.status, t.speciesName)
         const marker = L.marker([t.latitude, t.longitude], {
           icon,
           title: t.speciesName,
           alt: t.speciesName,
+          keyboard: true,
         })
-        const cfg = getStatusCfg(t.status, t.nearPowerLine)
-        const popupTreeId = encodeURIComponent(String(t.id)).replace(/[^a-zA-Z0-9_-]/g, '_')
-
-        const popupHtml = `
-          <div style="width:240px; font-family:sans-serif; background:#fff; border-radius:12px; overflow:hidden;">
-            <div style="background:${cfg.bg}; color:#fff; padding:14px; text-align:center;">
-              <div style="font-size:17px; font-weight:800;">${speciesIcon(t.speciesName)} ${escapeHtml(t.speciesName)}</div>
-              <div style="font-size:11px; opacity:0.8; margin-top:2px;">${escapeHtml(t.scientificName)}</div>
-            </div>
-            <div style="padding:16px;">
-              <div style="display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <div style="flex:1;">
-                  <h3 style="margin:0; font-size:18px; color:#333;">${escapeHtml(t.speciesName)}</h3>
-                  <p style="margin:0; font-size:12px; color:#666; font-style:italic;">${escapeHtml(t.scientificName)}</p>
-                  <p style="margin:4px 0 0; font-size:10px; color:${t.vigor === 'EXCELLENT' ? '#22c55e' : t.vigor === 'GOOD' ? '#84cc16' : t.vigor === 'POOR' ? '#f59e0b' : '#ef4444'}; font-weight:800; border:1px solid currentColor; display:inline-block; padding:0 6px; border-radius:4px;">
-                    HEALTH: ${escapeHtml(t.vigor)}
-                  </p>
-                </div>
-                <div style="text-align:right;">
-                  <p style="margin:0; font-size:10px; color:#999; font-weight:700;">RISCO</p>
-                  <p style="margin:0; font-size:12px; font-weight:700; color:${cfg.color}">${cfg.label}</p>
-                </div>
-              </div>
-
-              ${t.pruningLabel ? `<p style="margin:0 0 12px; color:#2E7D32;">${escapeHtml(t.pruningLabel)}</p>` : ''}
-
-              <!-- Novo Bloco de Solo Unificado -->
-              <div style="
-                background: ${getSoilInfo(t.soilQuality || 'UNKNOWN').color}15;
-                border: 1px solid ${getSoilInfo(t.soilQuality || 'UNKNOWN').color}33;
-                border-radius: 8px;
-                padding: 10px;
-                margin-bottom: 16px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-              ">
-                <div style="font-size: 20px;">🌱</div>
-                <div>
-                  <p style="margin: 0; font-size: 10px; color: #666; font-weight: 700; text-transform: uppercase;">Inteligência de Solo</p>
-                  <p style="margin: 0; font-size: 12px; font-weight: 700; color: ${getSoilInfo(t.soilQuality || 'UNKNOWN').color};">
-                    ${getSoilInfo(t.soilQuality || 'UNKNOWN').name}
-                  </p>
-                  <p style="margin: 2px 0 0; font-size: 10px; color: #7f8c8d; line-height: 1.2;">
-                    ${getSoilInfo(t.soilQuality || 'UNKNOWN').description}
-                  </p>
-                </div>
-              </div>
-
-              <p style="margin:0; font-size:11px; color:#888; text-align:center;">Coordenadas: ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</p>
-              <div style="display:flex; gap:8px; margin-top:16px;">
-                <button id="btn-route-${popupTreeId}" style="
-                  flex:1; background:#007bff; color:#fff; border:none;
-                  padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
-                  font-size:12px; text-transform:uppercase;
-                  box-shadow: 0 4px 12px rgba(0,123,255,0.3); transition: transform 0.2s;
-                " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                  🚀 ROTA
-                </button>
-                <button id="btn-ai-${popupTreeId}" style="
-                  flex:1; background:linear-gradient(135deg,#7B1FA2,#AB47BC); color:#fff; border:none;
-                  padding:10px; border-radius:8px; cursor:pointer; font-weight:700;
-                  font-size:12px; text-transform:uppercase;
-                  box-shadow: 0 4px 12px rgba(123,31,162,0.3); transition: transform 0.2s;
-                " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                  🧠 VER IA
-                </button>
-              </div>
-            </div>
-          </div>
-        `
-
-        // Popup vinculado SEM abertura automática no clique
-        // (autoClose/closeOnClick não importam porque não chamamos openPopup no click).
-        marker.bindPopup(popupHtml, { maxWidth: 280, className: 'tree-popup' })
-
-        marker.on('popupopen', () => {
-          const btnRoute = document.getElementById(`btn-route-${popupTreeId}`)
-          if (btnRoute) {
-            btnRoute.onclick = () => startRouting(t.latitude, t.longitude, t.speciesName)
-          }
-          const btnAi = document.getElementById(`btn-ai-${popupTreeId}`)
-          if (btnAi) {
-            btnAi.onclick = () => openAiDrawer(t)
-          }
+        marker.on('add', () => {
+          const element = marker.getElement()
+          if (!element) return
+          element.setAttribute('role', 'button')
+          element.setAttribute('aria-label', `Analisar ${t.speciesName}, identificação ${t.id}`)
+          element.tabIndex = 0
+          element.addEventListener('keydown', (event) => {
+            if (event.key !== ' ') return
+            event.preventDefault()
+            void openAiDrawer(t)
+          })
         })
-
-        // Clique ESQUERDO abre a análise da IA DIRETO (1 clique), em vez de
-        // exigir abrir o popup e depois clicar em "Ver IA".
-        // O Leaflet abriria o popup no clique por padrão; como queremos o
-        // drawer, fechamos qualquer popup e abrimos a IA.
-        marker.off('click')
-        marker.on('click', () => {
-          selectedTree.value = t
-          marker.closePopup()
-          openAiDrawer(t)
-        })
-
-        // Clique DIREITO (contextmenu) mostra o popup detalhado com Rota/preview.
-        marker.on('contextmenu', () => {
-          marker.openPopup()
-        })
+        marker.on('click', () => void openAiDrawer(t))
+        marker.on('contextmenu', () => void openAiDrawer(t))
 
         markersArray.push(marker)
+        treeMarkerCache.set(t.id, { marker, signature })
       })
-      treeClusterGroup!.addLayers(markersArray)
+      if (markersArray.length) treeClusterGroup.addLayers(markersArray)
     }
 
     const renderTreeDensity = () => {
-      treeDensityLayer?.setLatLngs(showTreeDensityLayer.value ? treeDensityHeatPoints.value : [])
+      const heatVisible = showTreeDensityLayer.value && !dailyRouteDate.value
+      treeDensityLayer?.setLatLngs(heatVisible ? treeDensityHeatPoints.value : [])
     }
 
     const drawPowerLines = () => {
@@ -1731,19 +1762,6 @@ export default defineComponent({
             map.panTo([latitude, longitude], { animate: true, duration: 0.5 })
           }
 
-          // Otimização: Só atualiza roteamento se moveu mais de 10 metros
-          const currentPos = L.latLng(latitude, longitude)
-          if (isRouting.value && routingControl && currentRouteDest.value) {
-            const dist = lastPosition ? currentPos.distanceTo(lastPosition) : 999
-            if (dist > 10) {
-              routingControl.setWaypoints([
-                currentPos,
-
-                L.latLng(currentRouteDest.value.lat, currentRouteDest.value.lng),
-              ])
-              lastPosition = currentPos
-            }
-          }
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 5000 },
@@ -1784,6 +1802,7 @@ export default defineComponent({
 
     /* ---------- Ações ---------- */
     const toggleMarkMode = () => {
+      if (treeRegistrationMode.value) toggleTreeRegistrationMode(false)
       markMode.value = !markMode.value
       notify(
         markMode.value
@@ -1791,6 +1810,520 @@ export default defineComponent({
           : '📌 Modo marcação desativado',
         'info',
       )
+    }
+
+    const removeQuickTreeMunicipalityLayer = () => {
+      if (quickTreeMunicipalityLayer && map) {
+        map.removeLayer(quickTreeMunicipalityLayer)
+      }
+      quickTreeMunicipalityLayer = null
+    }
+
+    const drawQuickTreeMunicipalityLayer = (geometry: MunicipalityGeometry) => {
+      if (!map || isDestroyed) return
+      removeQuickTreeMunicipalityLayer()
+      const paneName = 'quickTreeMunicipalityPane'
+      if (!map.getPane(paneName)) map.createPane(paneName)
+      const pane = map.getPane(paneName)
+      if (pane) pane.style.zIndex = '420'
+
+      quickTreeMunicipalityLayer = L.geoJSON(geometry as unknown as GeoJSON.GeoJsonObject, {
+        pane: paneName,
+        interactive: false,
+        style: () => ({
+          color: '#16803c',
+          weight: 3,
+          opacity: 0.96,
+          dashArray: '8 5',
+          fillColor: '#4caf50',
+          fillOpacity: 0.13,
+        }),
+      }).addTo(map)
+
+      const bounds = quickTreeMunicipalityLayer.getBounds()
+      if (!bounds.isValid()) return
+      const leftPadding = !isMobile.value && sidebarOpen.value ? 360 : 32
+      map.fitBounds(bounds.pad(0.04), {
+        paddingTopLeft: [leftPadding, 32],
+        paddingBottomRight: [32, 32],
+        maxZoom: 12,
+        animate: false,
+      })
+    }
+
+    const loadQuickTreeMunicipalityBoundary = async () => {
+      if (!quickTreeRequiresMunicipalityBoundary.value) return
+      quickTreeBoundaryError.value = ''
+      if (quickTreeMunicipalityGeometry.value) {
+        drawQuickTreeMunicipalityLayer(quickTreeMunicipalityGeometry.value)
+        return
+      }
+      if (quickTreeBoundaryLoading.value) return
+
+      quickTreeBoundaryLoading.value = true
+      try {
+        const { data: profile } = await apiConnect.get<{
+          organizationId?: string | null
+          organization?: { id?: string | null }
+        }>('/users/me/profile')
+        const organizationId = profile.organization?.id ?? profile.organizationId
+        if (!organizationId) {
+          throw new Error('Sua conta precisa estar vinculada a uma empresa com município configurado.')
+        }
+
+        const { data: organization } = await apiConnect.get<QuickTreeOrganizationBoundary>(
+          `/organizations/${encodeURIComponent(organizationId)}`,
+        )
+        if (!isMunicipalityGeometry(organization.municipalityGeometry)) {
+          throw new Error('O limite municipal oficial da empresa não está configurado.')
+        }
+        if (isDestroyed) return
+
+        quickTreeMunicipalityGeometry.value = organization.municipalityGeometry
+        quickTreeMunicipalityName.value =
+          [organization.municipalityName?.trim(), organization.municipalityUf?.trim()]
+            .filter(Boolean)
+            .join(' / ') || 'município da empresa'
+        drawQuickTreeMunicipalityLayer(organization.municipalityGeometry)
+      } catch (error: unknown) {
+        if (isDestroyed) return
+        const response = (error as { response?: unknown })?.response
+        quickTreeBoundaryError.value =
+          !response && error instanceof Error
+            ? error.message
+            : getApiErrorMessage(
+                error,
+                'Não foi possível carregar o limite municipal oficial da empresa.',
+              )
+      } finally {
+        quickTreeBoundaryLoading.value = false
+      }
+    }
+
+    const treeRegistrationPinIcon = (outsideMunicipality: boolean) =>
+      L.divIcon({
+        html: `<div class="tree-registration-pin${outsideMunicipality ? ' tree-registration-pin--outside' : ''}"><span>+</span></div>`,
+        iconSize: [38, 44],
+        iconAnchor: [19, 42],
+        className: 'tree-registration-pin-shell',
+      })
+
+    const setTreeRegistrationPoint = (point: L.LatLng) => {
+      if (
+        quickTreeRequiresMunicipalityBoundary.value &&
+        !quickTreeMunicipalityGeometry.value
+      ) {
+        notify(
+          quickTreeBoundaryError.value || 'Aguarde o carregamento do limite municipal oficial.',
+          'warning',
+        )
+        return
+      }
+
+      treeRegistrationPoint.value = { lat: point.lat, lng: point.lng }
+      quickTreeSaveError.value = ''
+      const outsideMunicipality = quickTreePointOutsideMunicipality.value
+      if (treeRegistrationMarker) {
+        treeRegistrationMarker.setLatLng(point)
+        treeRegistrationMarker.setIcon(treeRegistrationPinIcon(outsideMunicipality))
+        return
+      }
+      treeRegistrationMarker = L.marker(point, {
+        icon: treeRegistrationPinIcon(outsideMunicipality),
+        keyboard: true,
+        title: 'Local escolhido para cadastro da árvore',
+      }).addTo(map!)
+    }
+
+    const toggleTreeRegistrationMode = (enabled = !treeRegistrationMode.value) => {
+      treeRegistrationMode.value = enabled
+      markMode.value = false
+      isSimulationMode.value = false
+      if (!enabled) {
+        treeRegistrationPoint.value = null
+        if (treeRegistrationMarker && map) map.removeLayer(treeRegistrationMarker)
+        treeRegistrationMarker = null
+        quickTreeSaveError.value = ''
+        removeQuickTreeMunicipalityLayer()
+      } else {
+        quickSpeciesDialog.value = true
+        void loadQuickTreeSpecies()
+        void loadQuickTreeMunicipalityBoundary()
+      }
+      notify(
+        enabled
+          ? 'Escolha a espécie para iniciar o cadastro rápido.'
+          : 'Cadastro pelo mapa cancelado.',
+        'info',
+      )
+    }
+
+    const loadQuickTreeSpecies = async () => {
+      quickSpeciesLoading.value = true
+      quickSpeciesError.value = ''
+      try {
+        const { data } = await apiConnect.get<Array<{ id: string; commonName: string; scientificName?: string; family?: string }>>(
+          '/species',
+          { params: { page: 1, limit: 100 } },
+        )
+        quickTreeSpecies.value = (data || []).sort((a, b) =>
+          a.commonName.localeCompare(b.commonName, 'pt-BR'),
+        )
+      } catch {
+        quickSpeciesError.value = 'Não foi possível carregar as espécies. Tente novamente.'
+      } finally {
+        quickSpeciesLoading.value = false
+      }
+    }
+
+    const confirmQuickTreeSpecies = () => {
+      if (!quickTreeSpeciesId.value) return
+      quickSpeciesDialog.value = false
+      notify('Agora toque no ponto da árvore e confirme o cadastro.', 'info')
+    }
+
+    const confirmTreeRegistrationLocation = () => {
+      if (!treeRegistrationPoint.value || !map) return
+      const profileBase = currentRoute.path.startsWith('/admin')
+        ? '/admin'
+        : currentRoute.path.startsWith('/manager')
+          ? '/manager'
+          : '/user'
+      const mapPath = profileBase === '/user' ? '/user/mapUser' : `${profileBase}/map`
+      const center = map.getCenter()
+      const point = treeRegistrationPoint.value
+      const query: Record<string, string> = {
+        latitude: String(point.lat),
+        longitude: String(point.lng),
+        returnMap: mapPath,
+        treeMapLat: String(center.lat),
+        treeMapLng: String(center.lng),
+        treeMapZoom: String(map.getZoom()),
+        treeMapFilter: activeFilter.value,
+        treeMapDimension: treeDensityDimension.value,
+        treeMapCategory: treeDensityCategory.value,
+        treeMapHeat: String(showTreeDensityLayer.value),
+      }
+      if (selectedRegion.value) query.treeMapRegion = selectedRegion.value.id
+      if (dailyRouteDate.value) query.routeDate = dailyRouteDate.value
+      void router.push({ path: `${profileBase}/trees/new`, query })
+    }
+
+    const saveQuickTree = async () => {
+      const point = treeRegistrationPoint.value
+      const selectedSpecies = selectedQuickTreeSpecies.value
+      if (!point || !selectedSpecies || !quickTreeCanSave.value) return
+
+      const payload = {
+        idSpecies: selectedSpecies.id,
+        latitude: point.lat,
+        longitude: point.lng,
+        status: 'NORMAL',
+        vigor: 'GOOD',
+      }
+      const key = await getTreeCreateAttemptKey(payload)
+      quickTreeSaving.value = true
+      quickTreeSaveError.value = ''
+      try {
+        const { data } = await apiConnect.createTree<{
+          id?: string
+          createdById?: string
+          soilStatus?: string
+        }>(payload, key)
+        if (!data?.id) throw new Error('A API não confirmou o identificador da árvore.')
+        const savedTree: TreeOnMap = {
+          id: data.id,
+          createdById: data.createdById || appStore.user?.id || undefined,
+          latitude: point.lat,
+          longitude: point.lng,
+          status: 'NORMAL',
+          speciesName: selectedSpecies.commonName,
+          scientificName: selectedSpecies.scientificName || '',
+          family: selectedSpecies.family || '',
+          nearPowerLine: false,
+          soilQuality: 'UNKNOWN',
+          soilStatus: data.soilStatus || 'PENDING',
+          vigor: 'GOOD',
+        }
+        trees.value = [...trees.value.filter(({ id }) => id !== savedTree.id), savedTree]
+        renderTrees()
+        clearTreeCreateAttemptKey(key)
+
+        treeRegistrationPoint.value = null
+        if (treeRegistrationMarker && map) map.removeLayer(treeRegistrationMarker)
+        treeRegistrationMarker = null
+        notify(`Árvore cadastrada · ${selectedSpecies.commonName}. Solo em processamento.`, 'success')
+      } catch (error) {
+        const response = (error as {
+          response?: { status?: number; data?: { message?: string | string[] } }
+        })?.response
+        const responseMessage = Array.isArray(response?.data?.message)
+          ? response.data.message.join(' ')
+          : response?.data?.message || ''
+        quickTreeSaveError.value =
+          response?.status === 400 && /localização.*(município|limite)/i.test(responseMessage)
+            ? `O ponto precisa estar dentro do limite oficial de ${quickTreeMunicipalityName.value}. Escolha outro local no mapa.`
+            : getApiErrorMessage(
+                error,
+                'Não foi possível confirmar o cadastro. Tente novamente no mesmo ponto.',
+              )
+      } finally {
+        quickTreeSaving.value = false
+      }
+    }
+
+    const openTreePruning = (tree: TreeOnMap) => {
+      const profileBase = currentRoute.path.startsWith('/admin')
+        ? '/admin'
+        : currentRoute.path.startsWith('/manager')
+          ? '/manager'
+          : '/user'
+      void router.push({
+        path: `${profileBase}/podas/nova`,
+        query: { treeId: tree.id, date: dailyRouteDate.value || localDate() },
+      })
+    }
+
+    const canEditTree = (tree: TreeOnMap) =>
+      appStore.user?.role === 'USER' &&
+      Boolean(appStore.user.id) &&
+      tree.createdById === appStore.user.id
+
+    const canEditTreeLocation = (tree: TreeOnMap) => {
+      const user = appStore.user
+      if (!user?.id) return false
+      if (user.role === 'MANAGER') return true
+      return user.role === 'USER' && tree.createdById === user.id
+    }
+
+    const updateTreeCaches = (updatedTree: TreeOnMap) => {
+      const replace = (items: TreeOnMap[]) =>
+        items.map((tree) => tree.id === updatedTree.id ? updatedTree : tree)
+      trees.value = replace(trees.value)
+      for (const [regionId, items] of regionTrees.value) {
+        regionTrees.value.set(regionId, replace(items))
+      }
+      for (const [tileId, items] of tileCache.value) {
+        tileCache.value.set(tileId, replace(items))
+      }
+      if (selectedTree.value?.id === updatedTree.id) selectedTree.value = updatedTree
+    }
+
+    const finishTreeLocationEdit = (restoreOriginal: boolean) => {
+      const marker = locationEditMarker
+      if (marker) {
+        if (restoreOriginal && locationOriginalPosition.value) {
+          marker.setLatLng([
+            locationOriginalPosition.value.latitude,
+            locationOriginalPosition.value.longitude,
+          ])
+        }
+        if (locationDragListener) marker.off('drag', locationDragListener)
+        if (locationDragEndListener) marker.off('dragend', locationDragEndListener)
+        marker.dragging?.disable()
+        if (locationOriginalIcon) marker.setIcon(locationOriginalIcon)
+        marker.setZIndexOffset(locationOriginalZIndex)
+      }
+
+      locationEditMarker = null
+      locationOriginalIcon = undefined
+      locationDragListener = null
+      locationDragEndListener = null
+      locationEditTree.value = null
+      locationDraft.value = null
+      locationOriginalPosition.value = null
+      locationLatitudeInput.value = ''
+      locationLongitudeInput.value = ''
+      locationAddressInput.value = ''
+      locationEditDialog.value = false
+      locationEditError.value = ''
+      locationEditConflict.value = false
+    }
+
+    const openTreeLocationEdit = async (tree: TreeOnMap) => {
+      if (!canEditTreeLocation(tree) || locationEditLoading.value || locationEditTree.value) return
+
+      closeAiDrawer()
+      locationEditLoading.value = true
+      locationEditError.value = ''
+      try {
+        const { data } = await apiConnect.get<TreeApiRecord>(`/trees/${encodeURIComponent(tree.id)}`)
+        const freshTree = parseTreeData(data)
+        if (freshTree && !canEditTreeLocation(freshTree)) {
+          throw new Error('Você não tem permissão para alterar a localização desta árvore.')
+        }
+        if (!freshTree?.updatedAt || !Number.isFinite(new Date(freshTree.updatedAt).getTime())) {
+          throw new Error('A API não retornou a versão atual da árvore. Recarregue o mapa e tente novamente.')
+        }
+
+        updateTreeCaches(freshTree)
+        renderTrees()
+        const marker = treeMarkerCache.get(freshTree.id)?.marker
+        if (!marker) throw new Error('O marcador não está visível no mapa. Aplique os filtros e tente novamente.')
+
+        locationEditTree.value = freshTree
+        locationEditMarker = marker
+        locationOriginalIcon = marker.options.icon
+        locationOriginalZIndex = marker.options.zIndexOffset ?? 0
+        locationOriginalPosition.value = {
+          latitude: freshTree.latitude,
+          longitude: freshTree.longitude,
+        }
+        locationDraft.value = { ...locationOriginalPosition.value }
+        locationLatitudeInput.value = String(freshTree.latitude)
+        locationLongitudeInput.value = String(freshTree.longitude)
+        locationAddressInput.value = freshTree.address || ''
+        locationEditConflict.value = false
+        marker.setIcon(createLocationEditIcon())
+        marker.setZIndexOffset(1200)
+        marker.dragging?.enable()
+
+        const syncDraftFromMarker = () => {
+          const point = marker.getLatLng()
+          locationLatitudeInput.value = String(point.lat)
+          locationLongitudeInput.value = String(point.lng)
+          locationDraft.value = { latitude: point.lat, longitude: point.lng }
+        }
+        locationDragListener = syncDraftFromMarker
+        locationDragEndListener = () => {
+          syncDraftFromMarker()
+          locationEditError.value = ''
+          locationEditDialog.value = true
+        }
+        marker.on('drag', locationDragListener)
+        marker.on('dragend', locationDragEndListener)
+        map?.closePopup()
+      } catch (error) {
+        locationEditError.value = getApiErrorMessage(
+          error,
+          error instanceof Error ? error.message : 'Não foi possível abrir a edição da localização.',
+        )
+        notify(locationEditError.value, 'error')
+      } finally {
+        locationEditLoading.value = false
+      }
+    }
+
+    const reviewTreeLocation = () => {
+      if (!locationEditTree.value) return
+      locationEditDialog.value = true
+    }
+
+    const cancelTreeLocationEdit = () => finishTreeLocationEdit(true)
+
+    const reloadTreeAfterLocationConflict = async () => {
+      const tree = locationEditTree.value
+      if (!tree) return
+      locationEditLoading.value = true
+      try {
+        const { data } = await apiConnect.get<TreeApiRecord>(`/trees/${encodeURIComponent(tree.id)}`)
+        const latestTree = parseTreeData(data)
+        finishTreeLocationEdit(false)
+        if (latestTree) {
+          updateTreeCaches(latestTree)
+          renderTrees()
+          if (dailyRouteDate.value) void loadDailyRoute()
+        }
+        notify('A localização atual foi recarregada. Confira o marcador antes de editar novamente.', 'warning')
+      } catch (error) {
+        locationEditError.value = getApiErrorMessage(error, 'Não foi possível recarregar a árvore atualizada.')
+      } finally {
+        locationEditLoading.value = false
+      }
+    }
+
+    const saveTreeLocation = async () => {
+      const tree = locationEditTree.value
+      const draft = locationDraft.value
+      if (!tree?.updatedAt || !draft || !canSaveLocation.value) return
+
+      locationSaving.value = true
+      locationEditError.value = ''
+      locationEditConflict.value = false
+      try {
+        const { data } = await apiConnect.patch<TreeApiRecord>(
+          `/trees/${encodeURIComponent(tree.id)}/location`,
+          {
+            latitude: draft.latitude,
+            longitude: draft.longitude,
+            address: locationAddressInput.value.trim(),
+            expectedUpdatedAt: tree.updatedAt,
+          },
+        )
+        const savedTree = parseTreeData(data)
+        if (!savedTree) throw new Error('A API não confirmou a nova localização da árvore.')
+
+        finishTreeLocationEdit(false)
+        updateTreeCaches(savedTree)
+        renderTrees()
+        if (dailyRouteDate.value) void loadDailyRoute()
+        notify('Localização da árvore atualizada e registrada no histórico.', 'success')
+      } catch (error) {
+        const status = isAxiosError(error) ? error.response?.status : undefined
+        if (status === 409) {
+          locationEditConflict.value = true
+          locationEditError.value = 'Outra pessoa atualizou esta árvore enquanto você editava. Recarregue a versão atual para revisar a posição.'
+        } else {
+          locationEditError.value = getApiErrorMessage(
+            error,
+            error instanceof Error ? error.message : 'Não foi possível salvar a localização. Seus dados continuam no rascunho.',
+          )
+        }
+      } finally {
+        locationSaving.value = false
+      }
+    }
+
+    const openTreeEdit = (tree: TreeOnMap) => {
+      const user = appStore.user
+      if (user?.role !== 'USER' || !user.id || tree.createdById !== user.id) return
+
+      const query: Record<string, string> = { returnMap: '/user/mapUser' }
+      for (const key of [
+        'treeMapLat',
+        'treeMapLng',
+        'treeMapZoom',
+        'treeMapRegion',
+        'treeMapFilter',
+        'treeMapDimension',
+        'treeMapCategory',
+        'treeMapHeat',
+        'routeDate',
+      ]) {
+        const value = currentRoute.query[key]
+        if (typeof value === 'string' && value) query[key] = value
+      }
+      if (map) {
+        const center = map.getCenter()
+        query.treeMapLat = String(center.lat)
+        query.treeMapLng = String(center.lng)
+        query.treeMapZoom = String(map.getZoom())
+        query.treeMapFilter = activeFilter.value
+        query.treeMapDimension = treeDensityDimension.value
+        query.treeMapCategory = treeDensityCategory.value
+        query.treeMapHeat = String(showTreeDensityLayer.value)
+      }
+
+      void router.push({
+        path: `/user/trees/${encodeURIComponent(tree.id)}/edit`,
+        query,
+      })
+    }
+
+    const showTreesNearPowerLine = () => {
+      treeDensityDimension.value = 'proximity'
+      treeDensityCategory.value = 'Risco operacional ativo'
+      showTreeDensityLayer.value = true
+      activeFilter.value = 'ALL'
+      activeTab.value = 'arvores'
+      sidebarOpen.value = true
+    }
+
+    const setSpeciesFilter = (speciesName: string) => {
+      const nextSpecies = selectedSpecies.value === speciesName ? 'all' : speciesName
+      if (treeDensityDimension.value !== 'species') treeDensityDimension.value = 'species'
+      treeDensityCategory.value = nextSpecies
+      selectedSpecies.value = nextSpecies
     }
 
     const removeMarkedLocation = (id: string) => {
@@ -1801,13 +2334,16 @@ export default defineComponent({
 
     const createMarkingAt = (latlng: L.LatLng, notes: string) => {
       const marker = L.marker([latlng.lat, latlng.lng], { icon: createMarkIcon() })
-      marker.bindPopup(`
+      marker.bindPopup(
+        `
         <div style="min-width:160px;font-family:system-ui;">
-          <div style="font-weight:700;color:#7B1FA2;margin-bottom:4px;">📌 Marcação</div>
+          <div style="font-weight:700;color:var(--mt-status-info);margin-bottom:4px;">📌 Marcação</div>
           <p style="margin:2px 0;font-size:13px;">${escapeHtml(notes || 'Sem nota')}</p>
-          <p style="margin:2px 0;font-size:11px;color:#888;">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</p>
+          <p style="margin:2px 0;font-size:11px;color:var(--mt-text-muted);">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</p>
         </div>
-      `)
+      `,
+        { className: 'marked-location-popup' },
+      )
       markedMarkersLayer!.addLayer(marker)
       marker.openPopup()
       markedLocations.value.push({
@@ -1912,13 +2448,32 @@ export default defineComponent({
     }
 
     /* ---------- IA Drawer ---------- */
+    const toTreeWithAiSummary = (
+      tree: TreeOnMap,
+      details: Partial<TreeApiRecord> = {},
+      aiPrediction: TreeWithAi['aiPrediction'] = null,
+    ): TreeWithAi => ({
+      id: tree.id,
+      commonName: details.species?.commonName || tree.speciesName || 'Árvore Independente',
+      status: (details.status ?? tree.registeredStatus ?? tree.status) as TreeWithAi['status'],
+      effectiveStatus: details.effectiveStatus ?? details.measuredStatus ?? tree.status,
+      lastPruneDate:
+        details.lastPruneDate !== undefined ? details.lastPruneDate : (tree.lastPruneDate ?? null),
+      aiPrediction,
+      soil: details.soil || details.solo?.[0],
+      vigor: (details.vigor || details.soil?.vigor || tree.vigor) as TreeWithAi['vigor'],
+      measurements: details.measurements || [],
+      maintenanceSchedule: details.maintenanceSchedule || [],
+    })
+
     const openAiDrawer = async (t: TreeOnMap, savedMeasurement?: Measurement) => {
       const request = ++treeDetailsRequest
       const isCurrent = () => !isDestroyed && request === treeDetailsRequest
       selectedTree.value = t
       aiDrawerOpen.value = true
-      loadingAiData.value = true
-      aiTreeData.value = null
+      aiDetailsError.value = ''
+      aiPredictionState.value = 'loading'
+      aiTreeData.value = toTreeWithAiSummary(t)
       fieldMeasurement.value = savedMeasurement
       if (!savedMeasurement) fieldWireHeight.value = undefined
 
@@ -1927,76 +2482,82 @@ export default defineComponent({
         const res = await apiConnect.get<TreeApiRecord>(`/trees/${t.id}`)
         if (!isCurrent()) return
         const data: Partial<TreeApiRecord> = res.data || {}
-        fieldMeasurement.value =
-          data.measurements?.find(({ height }) => Number.isFinite(height) && height >= 0) ??
-          savedMeasurement
-        fieldWireHeight.value = data.wireHeight
-        if (savedMeasurement) {
-          const updated = parseTreeData({
-            ...data,
-            id: t.id,
-            latitude: t.latitude,
-            longitude: t.longitude,
-          })
-          if (updated) {
-            trees.value = trees.value.map((tree) => (tree.id === t.id ? updated : tree))
-            selectedTree.value = updated
-          }
+        const updatedTree = parseTreeData({
+          ...t,
+          ...data,
+          id: t.id,
+          latitude: data.latitude ?? data.lat ?? t.latitude,
+          longitude: data.longitude ?? data.lng ?? t.longitude,
+        } as TreeApiRecord)
+        if (updatedTree) {
+          updateTreeCaches(updatedTree)
+          selectedTree.value = updatedTree
+          renderTrees()
         }
-
-        // Valida se um objeto tem o formato mínimo de uma predição de IA.
-        // Evita passar a resposta bruta de /trees/:id (que NÃO tem os campos de
-        // predição) como se fosse uma predição válida — isso faria o painel exibir
-        // zeros/defaults enganosos em vez do estado "sem análise".
-        const isValidPrediction = (p: unknown): boolean => {
-          if (!p || typeof p !== 'object') return false
-          const pred = p as { estimated_height_m?: unknown; wire_height_m?: unknown }
+        const summaryTree = updatedTree ?? t
+        const isValidPrediction = (
+          prediction: unknown,
+        ): prediction is NonNullable<TreeWithAi['aiPrediction']> => {
+          if (!prediction || typeof prediction !== 'object') return false
+          const candidate = prediction as { estimated_height_m?: unknown; wire_height_m?: unknown }
+          const estimatedHeight = candidate.estimated_height_m
+          const wireHeight = candidate.wire_height_m
           return (
-            Number.isFinite(Number(pred.estimated_height_m)) ||
-            Number.isFinite(Number(pred.wire_height_m))
+            typeof estimatedHeight === 'number' &&
+            Number.isFinite(estimatedHeight) &&
+            estimatedHeight > 0 &&
+            typeof wireHeight === 'number' &&
+            Number.isFinite(wireHeight) &&
+            wireHeight > 0
           )
         }
 
-        // Se não tiver predição nos dados básicos, tenta buscar no novo endpoint
         let aiPrediction = isValidPrediction(data.aiPrediction) ? data.aiPrediction : null
-        if (!aiPrediction && data.aiPrediction === undefined) {
+        aiTreeData.value = toTreeWithAiSummary(summaryTree, data, aiPrediction)
+        aiPredictionState.value = aiPrediction ? 'available' : 'loading'
+
+        fieldMeasurement.value =
+          data.measurements?.find(({ height }) => Number.isFinite(height) && height >= 0) ??
+          savedMeasurement
+        fieldWireHeight.value = data.wireHeight ?? data.wire_height_m
+
+        // Se não tiver predição nos dados básicos, tenta buscar no novo endpoint
+        if (!aiPrediction) {
           try {
-            const predRes = await apiConnect.getAiPrediction(t.id)
+            const referenceWireHeightM = Number(data.wireHeight ?? data.wire_height_m)
+            const predRes = await apiConnect.getAiPrediction(
+              t.id,
+              Number.isFinite(referenceWireHeightM) && referenceWireHeightM > 0
+                ? referenceWireHeightM
+                : undefined,
+            )
+            if (!isCurrent()) return
             aiPrediction = isValidPrediction(predRes.data) ? predRes.data : null
+            aiPredictionState.value = aiPrediction ? 'available' : 'unavailable'
           } catch (pErr) {
-            console.warn('Predição IA não encontrada para esta árvore', pErr)
+            if (!isCurrent()) return
+            const predictionStatus = isAxiosError(pErr) ? pErr.response?.status : undefined
+            aiPredictionState.value = predictionStatus === 404 ? 'unavailable' : 'error'
+            if (predictionStatus !== 404)
+              console.warn('Falha ao consultar previsão da árvore', pErr)
           }
         }
 
         if (!isCurrent()) return
-        // Só montamos o objeto quando há predição válida. Sem predição, deixamos
-        // aiTreeData nulo para que o drawer mostre o estado "sem análise disponível".
-        if (aiPrediction) {
-          aiTreeData.value = {
-            id: t.id,
-            commonName: data.species?.commonName || t.speciesName || 'Árvore Independente',
-            status: (data.measuredStatus || data.status || t.status) as TreeWithAi['status'],
-            aiPrediction,
-            soil: data.soil || data.solo?.[0] || undefined,
-            vigor: (data.vigor || 'GOOD') as TreeWithAi['vigor'],
-            measurements: data.measurements || [],
-            maintenanceSchedule: data.maintenanceSchedule || [],
-          }
-        } else {
-          aiTreeData.value = null
-        }
+        aiTreeData.value = toTreeWithAiSummary(summaryTree, data, aiPrediction)
       } catch (err) {
         if (!isCurrent()) return
         console.error('Erro ao buscar dados completos da árvore:', err)
-        notify(
-          savedMeasurement
-            ? 'Medição registrada. Abra a árvore novamente para atualizar a classificação no mapa.'
-            : 'Erro ao carregar detalhes. Tente novamente.',
-          'error',
-        )
-      } finally {
-        if (isCurrent()) loadingAiData.value = false
+        aiDetailsError.value = savedMeasurement
+          ? 'Medição registrada. Não foi possível atualizar os detalhes agora.'
+          : getApiErrorMessage(err, 'Não foi possível consultar os detalhes da árvore.')
+        aiPredictionState.value = 'error'
       }
+    }
+
+    const retryAiAnalysis = () => {
+      const tree = selectedTree.value
+      if (tree) void openAiDrawer(tree)
     }
 
     const fieldMeasurementSaved = (measurement: Measurement) => {
@@ -2008,8 +2569,6 @@ export default defineComponent({
 
     const closeAiDrawer = () => {
       aiDrawerOpen.value = false
-      // Omitimos o clearing de aiTreeData aqui para evitar erros de "patch node"
-      // durante a animação de fechamento do drawer.
     }
 
     const openNestObservationDialog = () => {
@@ -2082,11 +2641,23 @@ export default defineComponent({
         renderTimeout = null
       }, 100)
     })
-    watch([showTreeDensityLayer, treeDensityHeatPoints], renderTreeDensity)
+    watch([showTreeDensityLayer, treeDensityHeatPoints, dailyRouteDate], renderTreeDensity)
+    watch(dailyRouteVisible, () => {
+      renderTrees()
+      renderTreeDensity()
+    })
     watch(
       treeDensityDimension,
       () => {
         treeDensityCategory.value = 'all'
+        selectedSpecies.value = 'all'
+      },
+      { flush: 'sync' },
+    )
+    watch(
+      [treeDensityDimension, treeDensityCategory],
+      ([dimension, category]) => {
+        if (dimension === 'species') selectedSpecies.value = category
       },
       { flush: 'sync' },
     )
@@ -2111,9 +2682,18 @@ export default defineComponent({
         return
       }
 
+      const restoredLatitude = Number(currentRoute.query.treeMapLat)
+      const restoredLongitude = Number(currentRoute.query.treeMapLng)
+      const hasRestoredMapPosition = isValidGeoPoint(restoredLatitude, restoredLongitude)
+      const restoredZoom = Number(currentRoute.query.treeMapZoom)
+      const initialZoom =
+        Number.isFinite(restoredZoom) && restoredZoom >= 3 && restoredZoom <= 20
+          ? restoredZoom
+          : DEFAULT_ZOOM
+      if (hasRestoredMapPosition) isInitialLoad.value = false
       map = L.map('pruning-map-container', { zoomControl: false }).setView(
-        [DEFAULT_LAT, DEFAULT_LNG],
-        DEFAULT_ZOOM,
+        hasRestoredMapPosition ? [restoredLatitude, restoredLongitude] : [DEFAULT_LAT, DEFAULT_LNG],
+        initialZoom,
       )
       console.log('[PruningMap] Mapa criado:', !!map)
 
@@ -2215,6 +2795,11 @@ export default defineComponent({
           return
         }
 
+        if (treeRegistrationMode.value) {
+          setTreeRegistrationPoint(ev.latlng)
+          return
+        }
+
         if (!markMode.value) return
         pendingMarkLatLng = ev.latlng
         noteText.value = ''
@@ -2223,17 +2808,44 @@ export default defineComponent({
 
       // Carrega o inventário sem esperar os até 10s da geolocalização.
       console.log('[PruningMap] Iniciando mapa...')
-      void goToUserLocation(true).then((success) => {
+      void goToUserLocation(!hasRestoredMapPosition).then((success) => {
         console.log('[PruningMap] Localização:', success ? 'obtida' : 'falhou/indisponível')
         startWatchingPosition()
       })
       console.log('[PruningMap] Carregando árvores...')
-      void fetchTrees()
+      const loadInitialTrees = async () => {
+        if (dailyRouteDate.value) {
+          trees.value = []
+          isInitialMapLoading.value = false
+          return
+        }
+        if (isMobile.value) {
+          await fetchTreesInBounds(true, true)
+          return
+        }
+        const regionId = currentRoute.query.treeMapRegion
+        if (typeof regionId === 'string' && regionId) {
+          let region = availableRegions.value.find((item) => item.id === regionId)
+          if (!region) {
+            await loadRegionsFromApi()
+            region = availableRegions.value.find((item) => item.id === regionId)
+          }
+          if (region) {
+            selectedRegion.value = region
+            void loadCityStats(region)
+            await fetchTreesByRegion(region, true, hasRestoredMapPosition)
+            return
+          }
+        }
+        await fetchTrees()
+      }
+      void loadInitialTrees()
         .then(() => {
           console.log(`[PruningMap] Árvores carregadas: ${trees.value.length}`)
           renderTrees()
           console.log('[PruningMap] Marcadores renderizados no cluster')
-          if (!userLat.value || !userLng.value) focusInitialTreeCluster()
+          if (!hasRestoredMapPosition && (!userLat.value || !userLng.value))
+            focusInitialTreeCluster()
         })
         .catch((err) => {
           console.error('[PruningMap] Erro ao carregar árvores:', err)
@@ -2341,6 +2953,7 @@ export default defineComponent({
         map.remove()
         map = null
       }
+      quickTreeMunicipalityLayer = null
       dailyRoadRoutingControl = null
       dailyRouteLayer = null
     })
@@ -2357,6 +2970,8 @@ export default defineComponent({
       showTreeDensityLayer,
       treeDensityDimension,
       treeDensityCategory,
+      selectedSpecies,
+      setSpeciesFilter,
       treeDensityCategories,
       treeDensityHeatPoints,
       topDensityCell,
@@ -2368,6 +2983,8 @@ export default defineComponent({
       confirmMarking,
       cancelMarking,
       loadingTrees,
+      partialBoundsView,
+      zoomInToSeeMoreTrees,
       blockingMapLoading,
       locating,
       locationError,
@@ -2380,16 +2997,56 @@ export default defineComponent({
       snackbarText,
       snackbarColor,
       selectedTree,
+      locationEditTree,
+      locationLatitudeInput,
+      locationLongitudeInput,
+      locationAddressInput,
+      locationEditDialog,
+      locationOriginalPosition,
+      locationEditLoading,
+      locationSaving,
+      locationEditError,
+      locationEditConflict,
+      locationInputsValid,
+      canSaveLocation,
+      reviewTreeLocation,
+      cancelTreeLocationEdit,
+      reloadTreeAfterLocationConflict,
+      saveTreeLocation,
       treeCount,
+      allFilterCount,
       visibleTreeCount,
       dangerCount,
       criticalCount,
-      criticalUrgencyCount,
+      toPruneCount,
       markedCount,
-      statusCounts,
       isMobile,
       goToUserLocation,
       toggleMarkMode,
+      treeRegistrationMode,
+      treeRegistrationPoint,
+      quickTreeRequiresMunicipalityBoundary,
+      quickTreeMunicipalityName,
+      quickTreeBoundaryLoading,
+      quickTreeBoundaryError,
+      quickTreeMunicipalityGeometry,
+      quickTreePointOutsideMunicipality,
+      quickTreeCanSave,
+      toggleTreeRegistrationMode,
+      confirmTreeRegistrationLocation,
+      saveQuickTree,
+      quickTreeSpecies,
+      quickTreeSpeciesId,
+      quickSpeciesDialog,
+      quickSpeciesLoading,
+      quickSpeciesError,
+      quickTreeSaving,
+      quickTreeSaveError,
+      confirmQuickTreeSpecies,
+      loadQuickTreeSpecies,
+      loadQuickTreeMunicipalityBoundary,
+      selectedQuickTreeSpecies,
+      showTreesNearPowerLine,
       toggleExpand,
       toggleMapStyle,
       setFollowUserPosition,
@@ -2398,11 +3055,8 @@ export default defineComponent({
       searchAddress,
       flyToTree,
       STATUS_CONFIG,
-      isRouting,
-      stopRouting,
       isSimulationMode,
       toggleSimulationMode,
-      loadingRoute,
       dailyRouteDate,
       dailyRouteStops,
       dailyRouteState,
@@ -2415,9 +3069,16 @@ export default defineComponent({
       fieldMeasurement,
       fieldWireHeight,
       fieldMeasurementSaved,
-      loadingAiData,
+      aiDetailsError,
+      aiPredictionState,
+      retryAiAnalysis,
       openAiDrawer,
       closeAiDrawer,
+      openTreePruning,
+      openTreeEdit,
+      openTreeLocationEdit,
+      canEditTree,
+      canEditTreeLocation,
       nestObservationDialog,
       savingNestObservation,
       nestObservationForm,
@@ -2503,8 +3164,7 @@ export default defineComponent({
 
     <!-- =====================================================
          SEÇÃO 2: OVERLAY DE LOADING
-         - Mostra spinner quando: buscando localização,
-           carregando árvores, calculando rota
+         - Mostra spinner quando busca localização ou carrega dados iniciais
          ===================================================== -->
     <Transition name="fade">
       <div v-if="blockingMapLoading" class="locating-overlay glass-overlay">
@@ -2513,13 +3173,7 @@ export default defineComponent({
           class="text-white mt-5 font-weight-bold"
           style="font-size: 18px; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7)"
         >
-          {{
-            loadingRoute
-              ? 'Calculando melhor rota...'
-              : locating
-                ? 'Buscando sua localização...'
-                : 'Carregando dados iniciais do mapa...'
-          }}
+          {{ locating ? 'Buscando sua localização...' : 'Carregando dados iniciais do mapa...' }}
         </p>
       </div>
     </Transition>
@@ -2578,6 +3232,150 @@ export default defineComponent({
       </template>
     </v-card>
 
+    <v-card v-if="treeRegistrationMode" class="tree-registration-pick-card" elevation="8">
+      <div class="d-flex align-center ga-2 mb-2">
+        <v-icon color="green-darken-3">mdi-map-marker-plus-outline</v-icon>
+        <strong>Cadastro rápido</strong>
+      </div>
+      <p class="text-body-2 mb-3">
+        <template v-if="selectedQuickTreeSpecies">
+          Espécie: <strong>{{ selectedQuickTreeSpecies.commonName }}</strong>. Marque a árvore no
+          mapa e confirme para salvar.
+        </template>
+        <template v-else>Escolha uma espécie para começar.</template>
+      </p>
+      <v-btn
+        v-if="!selectedQuickTreeSpecies"
+        size="small"
+        variant="tonal"
+        class="mb-2"
+        prepend-icon="mdi-leaf"
+        @click="quickSpeciesDialog = true"
+        >Escolher espécie</v-btn
+      >
+      <v-btn
+        v-if="selectedQuickTreeSpecies"
+        size="small"
+        variant="text"
+        class="mb-2 px-0"
+        prepend-icon="mdi-pencil"
+        @click="quickSpeciesDialog = true"
+        >Alterar espécie</v-btn
+      >
+      <v-alert
+        v-if="quickTreeRequiresMunicipalityBoundary && quickTreeBoundaryLoading"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        role="status"
+      >
+        Carregando o limite municipal oficial da empresa…
+      </v-alert>
+      <v-alert
+        v-else-if="quickTreeRequiresMunicipalityBoundary && quickTreeBoundaryError"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        role="alert"
+      >
+        <div>{{ quickTreeBoundaryError }}</div>
+        <v-btn
+          variant="text"
+          size="small"
+          :loading="quickTreeBoundaryLoading"
+          @click="loadQuickTreeMunicipalityBoundary"
+        >
+          Tentar carregar o limite novamente
+        </v-btn>
+      </v-alert>
+      <v-alert
+        v-else-if="quickTreeRequiresMunicipalityBoundary && quickTreeMunicipalityGeometry && !quickTreePointOutsideMunicipality"
+        type="success"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        data-testid="quick-tree-boundary-status"
+        role="status"
+      >
+        Área permitida: <strong>{{ quickTreeMunicipalityName }}</strong>. O contorno e o
+        preenchimento verdes mostram o limite oficial; escolha um ponto dentro dele.
+      </v-alert>
+      <v-alert
+        v-else-if="!quickTreeRequiresMunicipalityBoundary"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        role="status"
+      >
+        Esta conta ADMIN pode cadastrar árvores fora de uma área municipal vinculada.
+      </v-alert>
+      <v-alert
+        v-if="quickTreePointOutsideMunicipality"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        data-testid="quick-tree-outside-boundary"
+        role="alert"
+      >
+        Este ponto está fora do limite oficial de <strong>{{ quickTreeMunicipalityName }}</strong>.
+        Escolha outro local dentro da área verde.
+      </v-alert>
+      <p v-if="treeRegistrationPoint" class="text-caption mb-3" role="status">
+        {{ treeRegistrationPoint.lat.toFixed(6) }}, {{ treeRegistrationPoint.lng.toFixed(6) }}
+      </p>
+      <v-alert v-if="quickTreeSaveError" type="error" variant="tonal" density="compact" class="mb-3">
+        {{ quickTreeSaveError }}
+      </v-alert>
+      <div class="d-flex flex-wrap justify-end ga-2">
+        <v-btn variant="text" :disabled="quickTreeSaving" @click="toggleTreeRegistrationMode(false)">
+          Cancelar
+        </v-btn>
+        <v-btn
+          v-if="treeRegistrationPoint"
+          variant="outlined"
+          prepend-icon="mdi-form-select"
+          @click="confirmTreeRegistrationLocation"
+          >Cadastro completo</v-btn
+        >
+        <v-btn
+          color="green-darken-3"
+          variant="flat"
+          prepend-icon="mdi-check"
+          :loading="quickTreeSaving"
+          :disabled="!quickTreeCanSave"
+          @click="saveQuickTree"
+          >Salvar e continuar</v-btn
+        >
+      </div>
+    </v-card>
+
+    <v-card
+      v-if="locationEditTree && !locationEditDialog"
+      class="tree-location-edit-card"
+      elevation="10"
+      role="region"
+      aria-label="Reposicionar marcador da árvore"
+    >
+      <div class="d-flex align-center ga-2 mb-2">
+        <v-icon color="amber-darken-3">mdi-map-marker-move</v-icon>
+        <strong>Editar localização</strong>
+      </div>
+      <p class="text-body-2 mb-3">
+        Arraste o marcador dourado até o ponto correto e solte para revisar. Você também pode
+        informar as coordenadas manualmente.
+      </p>
+      <div class="d-flex flex-wrap justify-end ga-2">
+        <v-btn variant="text" @click="cancelTreeLocationEdit">Cancelar</v-btn>
+        <v-btn color="amber-darken-3" variant="tonal" @click="reviewTreeLocation">
+          Revisar posição
+        </v-btn>
+      </div>
+    </v-card>
+
     <!-- ============ BARRA DE BUSCA DE ENDEREÇO (Nominatim) ============ -->
     <div class="top-search-bar">
       <v-text-field
@@ -2589,7 +3387,7 @@ export default defineComponent({
         placeholder="Buscar endereço no Brasil…"
         prepend-inner-icon="mdi-magnify"
         :loading="searching"
-        bg-color="white"
+        bg-color="surface"
         class="search-input"
         @keyup.enter="searchAddress"
       >
@@ -2610,28 +3408,45 @@ export default defineComponent({
         rounded="pill"
         class="filter-toggle"
       >
-        <v-btn value="PRIORITY" class="toggle-btn" :aria-pressed="activeFilter === 'PRIORITY'">
+        <v-btn value="CRITICAL" class="toggle-btn" :aria-pressed="activeFilter === 'CRITICAL'">
+          <v-icon start color="red">mdi-alert-decagram</v-icon>
+          Críticos ({{ criticalCount }})
+        </v-btn>
+        <v-btn value="TO_PRUNE" class="toggle-btn" :aria-pressed="activeFilter === 'TO_PRUNE'">
           <v-icon start color="orange-darken-2">mdi-content-cut</v-icon>
-          Pendentes ({{ criticalCount }})
+          Para podar ({{ toPruneCount }})
         </v-btn>
         <v-btn value="ALL" class="toggle-btn" :aria-pressed="activeFilter === 'ALL'">
           <v-icon start>mdi-tree</v-icon>
-          Todas ({{ treeCount }})
-        </v-btn>
-        <v-btn value="CRITICAL" class="toggle-btn" :aria-pressed="activeFilter === 'CRITICAL'">
-          <v-icon start color="red">mdi-alert-decagram</v-icon>
-          Críticos ({{ criticalUrgencyCount }})
-        </v-btn>
-        <v-btn
-          value="UNDER_OBSERVATION"
-          class="toggle-btn"
-          :aria-pressed="activeFilter === 'UNDER_OBSERVATION'"
-        >
-          <v-icon start color="amber">mdi-eye</v-icon>
-          Obs. ({{ statusCounts['UNDER_OBSERVATION'] || 0 }})
+          Todos ({{ allFilterCount }})
         </v-btn>
       </v-btn-toggle>
     </div>
+
+    <v-alert
+      v-if="partialBoundsView && !dailyRouteDate"
+      class="bounds-limit-alert"
+      type="info"
+      density="compact"
+      variant="tonal"
+      role="status"
+    >
+      <div class="bounds-limit-content">
+        <span>Esta área tem mais de 500 árvores. Aproxime o mapa para ver mais detalhes.</span>
+        <v-btn size="small" variant="tonal" @click="zoomInToSeeMoreTrees">Aproximar</v-btn>
+      </div>
+    </v-alert>
+
+    <v-alert
+      v-if="!dailyRouteDate && !loadingTrees && !blockingMapLoading && filteredTrees.length === 0"
+      class="map-filter-empty-card"
+      type="info"
+      variant="tonal"
+      density="comfortable"
+      role="status"
+    >
+      Nenhuma árvore para estes filtros
+    </v-alert>
 
     <!-- ============ BOTÕES FLUTUANTES DIREITA ============ -->
     <div class="floating-actions-right">
@@ -2710,6 +3525,7 @@ export default defineComponent({
               variant="text"
               class="map-tool-btn"
               color="grey-darken-3"
+              :aria-label="mapStyle === 'street' ? 'Mostrar satélite' : 'Mostrar mapa de ruas'"
               @click="toggleMapStyle"
             >
               <v-icon>{{
@@ -2753,6 +3569,30 @@ export default defineComponent({
             </v-btn>
           </template>
         </v-tooltip>
+
+        <div class="map-tool-divider" />
+
+        <v-tooltip
+          :text="
+            treeRegistrationMode ? 'Cancelar cadastro pelo mapa' : 'Cadastrar árvore pelo mapa'
+          "
+          location="left"
+        >
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon
+              variant="text"
+              class="map-tool-btn"
+              :color="treeRegistrationMode ? 'green-darken-3' : 'grey-darken-3'"
+              :aria-pressed="treeRegistrationMode"
+              aria-label="Cadastrar árvore pelo mapa"
+              @click="toggleTreeRegistrationMode()"
+            >
+              <v-icon>mdi-map-marker-plus-outline</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
       </div>
 
       <!-- Botão de expandir, separado (ação de layout) -->
@@ -2762,9 +3602,8 @@ export default defineComponent({
             v-bind="props"
             icon
             variant="flat"
-            color="white"
             class="map-tools-panel map-tools-panel--single"
-            :class="{ 'text-red': isExpanded }"
+            :aria-label="isExpanded ? 'Reduzir mapa' : 'Expandir mapa'"
             @click="toggleExpand"
           >
             <v-icon>{{ isExpanded ? 'mdi-fullscreen-exit' : 'mdi-fullscreen' }}</v-icon>
@@ -2772,21 +3611,6 @@ export default defineComponent({
         </template>
       </v-tooltip>
 
-      <!-- BOTÃO CANCELAR ROTA -->
-      <v-fade-transition>
-        <v-btn
-          v-if="isRouting"
-          icon
-          color="red"
-          :size="isMobile ? 'default' : 'large'"
-          elevation="4"
-          class="mt-2"
-          @click="stopRouting"
-        >
-          <v-icon>mdi-close-thick</v-icon>
-          <v-tooltip activator="parent" location="left">Cancelar Rota</v-tooltip>
-        </v-btn>
-      </v-fade-transition>
     </div>
 
     <!-- =====================================================
@@ -2828,7 +3652,7 @@ export default defineComponent({
               color="green"
               variant="flat"
               class="font-weight-bold"
-              title="Visíveis no mapa / Carregadas em memória"
+              title="Árvores visíveis / Resultados dos filtros"
             >
               {{ visibleTreeCount }}/{{ treeCount }}
             </v-chip>
@@ -2860,7 +3684,7 @@ export default defineComponent({
               size="small"
               color="blue-lighten-4"
               class="stat-btn"
-              title="Carregadas em memória (depende do modo de carregamento)"
+              title="Árvores que correspondem aos filtros ativos"
               @click="
                 () => {
                   sidebarOpen = true
@@ -2880,8 +3704,7 @@ export default defineComponent({
               @click="
                 () => {
                   sidebarOpen = true
-                  activeFilter = 'DANGER'
-                  activeTab = 'arvores'
+                  showTreesNearPowerLine()
                 }
               "
             >
@@ -2916,7 +3739,7 @@ export default defineComponent({
             </v-chip>
           </div>
           <div class="text-caption text-grey-darken-1 mt-1 d-flex justify-space-between">
-            <span>{{ treeCount }} árvores carregadas no total</span>
+            <span>{{ treeCount }} árvores correspondem aos filtros</span>
             <span v-if="cityStats" class="text-grey-darken-2">
               <v-icon size="12" color="blue" class="mr-1">mdi-city</v-icon>
               {{ cityStats.total }} na cidade
@@ -2974,7 +3797,7 @@ export default defineComponent({
                   >{{ speciesDistribution.length }} espécies</v-chip
                 >
                 <v-chip size="small" color="blue-darken-2" variant="tonal"
-                  >{{ densityTrees.length }} árvores</v-chip
+                  >{{ filteredTrees.length }} árvores</v-chip
                 >
                 <v-chip
                   v-if="crownAreaEstimate.measuredTrees > 0"
@@ -2997,6 +3820,9 @@ export default defineComponent({
                   v-for="species in speciesDistribution"
                   :key="species.name"
                   class="px-1"
+                  :class="{
+                    'species-count-list__item--selected': selectedSpecies === species.name,
+                  }"
                 >
                   <template #prepend
                     ><span class="species-symbol" aria-hidden="true">{{
@@ -3006,24 +3832,18 @@ export default defineComponent({
                   <v-list-item-title class="text-body-2">{{ species.name }}</v-list-item-title>
                   <template #append>
                     <v-chip size="x-small" variant="outlined">{{ species.count }}</v-chip>
-                    <v-btn
-                      icon="mdi-fire"
-                      size="x-small"
-                      variant="text"
-                      :aria-label="'Mostrar concentração de ' + species.name"
-                      @click="
-                        () => {
-                          treeDensityDimension = 'species'
-                          treeDensityCategory = species.name
-                          showTreeDensityLayer = true
-                        }
-                      "
+                    <v-checkbox-btn
+                      :model-value="selectedSpecies === species.name"
+                      density="compact"
+                      color="green-darken-2"
+                      :aria-label="`${selectedSpecies === species.name ? 'Limpar filtro de' : 'Filtrar por'} ${species.name}`"
+                      @update:model-value="setSpeciesFilter(species.name)"
                     />
                   </template>
                 </v-list-item>
               </v-list>
               <p class="text-caption text-grey mt-1 mb-0">
-                Resumo apenas dos registros carregados no mapa.
+                Resumo dos registros que correspondem aos filtros ativos.
               </p>
               <p class="text-caption text-grey-darken-1 mt-2 mb-0">
                 A cor indica onde há mais árvores da categoria selecionada.
@@ -3308,13 +4128,23 @@ export default defineComponent({
               <div class="filter-chips-scroll">
                 <v-chip
                   size="small"
-                  :variant="activeFilter === 'PRIORITY' ? 'flat' : 'outlined'"
-                  :color="activeFilter === 'PRIORITY' ? 'error' : 'grey'"
-                  @click="activeFilter = 'PRIORITY'"
+                  :variant="activeFilter === 'CRITICAL' ? 'flat' : 'outlined'"
+                  :color="activeFilter === 'CRITICAL' ? 'error' : 'grey'"
+                  @click="activeFilter = 'CRITICAL'"
+                  class="mr-1 mb-1"
+                >
+                  <v-icon start size="14">mdi-alert-decagram</v-icon>
+                  Críticos ({{ criticalCount }})
+                </v-chip>
+                <v-chip
+                  size="small"
+                  :variant="activeFilter === 'TO_PRUNE' ? 'flat' : 'outlined'"
+                  :color="activeFilter === 'TO_PRUNE' ? 'orange-darken-2' : 'grey'"
+                  @click="activeFilter = 'TO_PRUNE'"
                   class="mr-1 mb-1"
                 >
                   <v-icon start size="14">mdi-content-cut</v-icon>
-                  Precisa de poda ({{ criticalCount }})
+                  Para podar ({{ toPruneCount }})
                 </v-chip>
                 <v-chip
                   size="small"
@@ -3323,20 +4153,7 @@ export default defineComponent({
                   @click="activeFilter = 'ALL'"
                   class="mr-1 mb-1"
                 >
-                  Todos ({{ treeCount }})
-                </v-chip>
-                <v-chip
-                  v-for="(cfg, key) in STATUS_CONFIG"
-                  :key="key"
-                  size="small"
-                  :variant="activeFilter === key ? 'flat' : 'outlined'"
-                  :color="cfg.color"
-                  @click="activeFilter = String(key)"
-                  class="mr-1 mb-1"
-                >
-                  <v-icon start size="14">{{ cfg.icon }}</v-icon>
-                  {{ key === 'PRUNED' ? 'Com poda registrada' : cfg.label }}
-                  ({{ statusCounts[key] || 0 }})
+                  Todos ({{ allFilterCount }})
                 </v-chip>
               </div>
             </div>
@@ -3361,7 +4178,7 @@ export default defineComponent({
             </div>
 
             <div v-if="filteredTrees.length === 0" class="text-caption text-center text-grey pa-4">
-              Nenhuma árvore encontrada com este filtro
+              Nenhuma árvore para estes filtros
             </div>
 
             <div class="tree-list-scroll-new">
@@ -3370,7 +4187,7 @@ export default defineComponent({
                   v-for="tree in filteredTrees.slice(0, 50)"
                   :key="tree.id"
                   :active="selectedTree?.id === tree.id"
-                  :color="tree.nearPowerLine ? 'red' : 'green'"
+                  :color="STATUS_CONFIG[tree.status]?.color || 'green'"
                   @click="
                     () => {
                       flyToTree(tree)
@@ -3381,13 +4198,10 @@ export default defineComponent({
                   two-line
                 >
                   <template #prepend>
-                    <v-avatar
-                      size="32"
-                      :color="
-                        tree.nearPowerLine ? 'red-darken-2' : STATUS_CONFIG[tree.status]?.bg || '#4CAF50'
-                      "
-                    >
-                      <span class="tree-species-icon" aria-hidden="true">{{ speciesIcon(tree.speciesName) }}</span>
+                    <v-avatar size="32" :color="STATUS_CONFIG[tree.status]?.bg || 'green'">
+                      <span class="tree-species-icon" aria-hidden="true">{{
+                        speciesIcon(tree.speciesName)
+                      }}</span>
                     </v-avatar>
                   </template>
 
@@ -3397,7 +4211,7 @@ export default defineComponent({
 
                   <v-list-item-subtitle class="text-caption">
                     {{ STATUS_CONFIG[tree.status]?.label || tree.status }}
-                    <span v-if="tree.nearPowerLine" class="text-red"> · ⚠ Risco</span>
+                    <span v-if="tree.nearPowerLine"> · Risco operacional</span>
                   </v-list-item-subtitle>
                   <span v-if="tree.pruningLabel" class="text-caption text-green-darken-3">
                     {{ tree.pruningLabel }}
@@ -3558,7 +4372,12 @@ export default defineComponent({
       class="location-error-alert"
       @click:close="locationError = ''"
     >
-      {{ locationError }}
+      <div class="location-error-content">
+        <span>{{ locationError }}. A área do mapa continua disponível.</span>
+        <v-btn size="small" variant="tonal" :loading="locating" @click.stop="goToUserLocation(true)"
+          >Usar minha localização</v-btn
+        >
+      </div>
     </v-alert>
 
     <!-- ============ BADGE MODO MARCAÇÃO ============ -->
@@ -3574,8 +4393,9 @@ export default defineComponent({
       {{ snackbarText }}
     </v-snackbar>
 
-    <!-- ============ IA DRAWER (Lateral Direita) ============ -->
+    <!-- ============ ANÁLISE DA ÁRVORE ============ -->
     <v-navigation-drawer
+      v-if="aiDrawerOpen"
       v-model="aiDrawerOpen"
       location="right"
       temporary
@@ -3583,42 +4403,106 @@ export default defineComponent({
       class="ai-drawer"
       :scrim="false"
     >
-      <!-- Header do Drawer -->
       <div class="ai-drawer-header">
         <div class="d-flex align-center">
           <div class="ai-drawer-icon">
-            <v-icon size="22" color="white">mdi-brain</v-icon>
+            <v-icon size="22" color="white">mdi-tree</v-icon>
           </div>
           <div class="ml-3">
-            <p class="ai-drawer-title">Análise de IA</p>
+            <h2 class="ai-drawer-title mb-0">Análise da árvore</h2>
             <p class="ai-drawer-subtitle">{{ selectedTree?.speciesName || 'Árvore' }}</p>
-            <p v-if="selectedTree?.pruningLabel" class="ai-drawer-subtitle">
-              {{ selectedTree.pruningLabel }}
-            </p>
+            <p v-if="selectedTree" class="ai-drawer-subtitle">Identificação: #{{ selectedTree.id }}</p>
           </div>
         </div>
-        <v-btn icon variant="text" size="small" @click="closeAiDrawer">
+        <v-btn
+          icon
+          variant="text"
+          size="small"
+          aria-label="Fechar análise da árvore"
+          @click="closeAiDrawer"
+        >
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </div>
 
       <v-divider />
 
-      <v-btn
-        v-if="selectedTree"
-        block
-        class="mx-4 mt-3"
-        style="width: calc(100% - 32px)"
-        color="green-darken-2"
-        variant="tonal"
-        @click="openNestObservationDialog"
-      >
-        <span class="nest-icon mr-2" aria-hidden="true">{{ NEST_ICON }}</span>
-        Registrar vistoria de ninhos
-      </v-btn>
+      <div v-if="selectedTree" class="ai-drawer-body">
+        <TreeAiStats
+          v-if="aiTreeData"
+          :key="aiTreeData.id"
+          :data="aiTreeData"
+          :prediction-state="aiPredictionState"
+          :error-message="aiDetailsError"
+          @retry="retryAiAnalysis"
+        />
 
-      <!-- Conteúdo do Drawer -->
-      <div class="ai-drawer-body" v-if="aiDrawerOpen || aiTreeData">
+        <v-card class="tree-analysis-location mt-4" variant="outlined">
+          <v-card-text class="py-3">
+            <p class="text-subtitle-2 font-weight-bold mb-2">Localização e solo</p>
+            <p class="text-body-2 mb-1">{{ selectedTree.address || 'Endereço não informado' }}</p>
+            <p class="text-caption text-medium-emphasis mb-2">
+              {{ selectedTree.latitude.toFixed(5) }}, {{ selectedTree.longitude.toFixed(5) }}
+            </p>
+            <p class="text-body-2 mb-0">
+              <strong>Solo:</strong>
+              {{
+                ['PENDING', 'PROCESSING'].includes(selectedTree.soilStatus || '')
+                  ? 'Em processamento'
+                  : selectedTree.soilQuality && selectedTree.soilQuality !== 'UNKNOWN'
+                    ? getSoilInfo(selectedTree.soilQuality).name
+                    : 'Não informado'
+              }}
+            </p>
+          </v-card-text>
+        </v-card>
+
+        <v-btn
+          v-if="selectedTree"
+          block
+          class="mt-4"
+          color="primary"
+          variant="tonal"
+          prepend-icon="mdi-content-cut"
+          @click="openTreePruning(selectedTree)"
+        >
+          Registrar poda desta árvore
+        </v-btn>
+        <v-btn
+          v-if="canEditTreeLocation(selectedTree)"
+          block
+          class="mt-2"
+          color="primary"
+          variant="outlined"
+          prepend-icon="mdi-map-marker-move"
+          @click="void openTreeLocationEdit(selectedTree)"
+        >
+          Editar localização
+        </v-btn>
+        <v-btn
+          v-if="canEditTree(selectedTree)"
+          block
+          class="mt-2"
+          color="primary"
+          variant="outlined"
+          prepend-icon="mdi-pencil"
+          @click="openTreeEdit(selectedTree)"
+        >
+          Editar árvore
+        </v-btn>
+
+        <v-btn
+          v-if="selectedTree"
+          block
+          class="mt-2"
+          color="green-darken-2"
+          variant="tonal"
+          @click="openNestObservationDialog"
+        >
+          <span class="nest-icon mr-2" aria-hidden="true">{{ NEST_ICON }}</span>
+          Registrar vistoria de ninhos
+        </v-btn>
+
         <TreeFieldMeasurement
           v-if="selectedTree && !selectedTree.isDemoData"
           :key="selectedTree.id"
@@ -3627,23 +4511,6 @@ export default defineComponent({
           :wire-height="fieldWireHeight"
           @saved="fieldMeasurementSaved"
         />
-
-        <!-- Loading -->
-        <div v-if="loadingAiData" class="ai-drawer-loading">
-          <v-progress-circular indeterminate color="deep-purple" size="48" width="4" />
-          <p class="mt-4 text-body-2 text-grey-darken-1">Carregando análise de IA...</p>
-        </div>
-
-        <!-- Dados da IA -->
-        <TreeAiStats v-else-if="aiTreeData" :key="aiTreeData.id" :data="aiTreeData" />
-
-        <!-- Sem dados -->
-        <div v-else class="ai-drawer-empty">
-          <v-icon size="64" color="grey-lighten-1">mdi-brain</v-icon>
-          <p class="mt-4 text-body-2 text-grey-darken-1 text-center">
-            Nenhuma análise de IA disponível para esta árvore.
-          </p>
-        </div>
       </div>
     </v-navigation-drawer>
 
@@ -3791,6 +4658,164 @@ export default defineComponent({
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="quickSpeciesDialog" max-width="480" :persistent="quickSpeciesLoading">
+      <v-card class="rounded-xl" title="Cadastro rápido · espécie">
+        <v-card-text>
+          <p class="text-body-2 mb-4">
+            A espécie fica selecionada para os próximos pontos. Cada árvore recebe as coordenadas
+            confirmadas no mapa.
+          </p>
+          <v-alert v-if="quickSpeciesError" type="error" variant="tonal" class="mb-4">
+            {{ quickSpeciesError }}
+            <template #append>
+              <v-btn variant="text" :loading="quickSpeciesLoading" @click="loadQuickTreeSpecies">
+                Tentar novamente
+              </v-btn>
+            </template>
+          </v-alert>
+          <v-autocomplete
+            v-model="quickTreeSpeciesId"
+            :items="quickTreeSpecies"
+            item-title="commonName"
+            item-value="id"
+            label="Espécie da árvore *"
+            variant="outlined"
+            :loading="quickSpeciesLoading"
+            :disabled="quickSpeciesLoading || quickTreeSaving"
+            no-data-text="Nenhuma espécie encontrada"
+          >
+            <template #item="{ props, item }">
+              <v-list-item v-bind="props" :subtitle="item.raw.scientificName" />
+            </template>
+          </v-autocomplete>
+        </v-card-text>
+        <v-card-actions class="px-6 pb-5">
+          <v-spacer />
+          <v-btn :disabled="quickSpeciesLoading" @click="quickSpeciesDialog = false">Fechar</v-btn>
+          <v-btn
+            color="green-darken-3"
+            variant="flat"
+            :disabled="!quickTreeSpeciesId || quickSpeciesLoading"
+            @click="confirmQuickTreeSpecies"
+            >Escolher espécie</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="locationEditDialog" max-width="560" persistent scrollable>
+      <v-card class="location-review-card rounded-xl">
+        <v-card-title class="flex items-center gap-3 px-6 pt-5">
+          <v-avatar color="green-darken-2" size="42">
+            <v-icon color="white">mdi-map-marker-tree</v-icon>
+          </v-avatar>
+          <div class="min-w-0">
+            <h2 class="text-h6 font-weight-bold m-0">Revisar nova localização</h2>
+            <p class="text-body-2 text-medium-emphasis mb-0">
+              {{ locationEditTree?.speciesName || 'Árvore' }}
+            </p>
+          </div>
+        </v-card-title>
+        <v-card-text class="location-review-content px-6 pt-4">
+          <v-alert
+            v-if="locationEditError"
+            :type="locationEditConflict ? 'warning' : 'error'"
+            variant="tonal"
+            class="mb-4"
+            role="alert"
+          >
+            {{ locationEditError }}
+            <template v-if="locationEditConflict" #append>
+              <v-btn
+                variant="text"
+                :loading="locationEditLoading"
+                @click="reloadTreeAfterLocationConflict"
+                >Recarregar versão atual</v-btn
+              >
+            </template>
+          </v-alert>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label for="location-latitude" class="mb-1 block text-sm font-semibold">Latitude</label>
+              <v-text-field
+                id="location-latitude"
+                v-model="locationLatitudeInput"
+                aria-label="Latitude"
+                type="number"
+                step="any"
+                inputmode="decimal"
+                variant="outlined"
+                density="comfortable"
+                hide-details="auto"
+              />
+            </div>
+            <div>
+              <label for="location-longitude" class="mb-1 block text-sm font-semibold">Longitude</label>
+              <v-text-field
+                id="location-longitude"
+                v-model="locationLongitudeInput"
+                aria-label="Longitude"
+                type="number"
+                step="any"
+                inputmode="decimal"
+                variant="outlined"
+                density="comfortable"
+                hide-details="auto"
+              />
+            </div>
+          </div>
+
+          <v-alert
+            v-if="!locationInputsValid"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-1 mb-4"
+          >
+            Informe latitude entre −90 e 90 e longitude entre −180 e 180.
+          </v-alert>
+
+          <div class="mt-2">
+            <label for="location-address" class="mb-1 block text-sm font-semibold">Endereço associado</label>
+            <v-text-field
+              id="location-address"
+              v-model="locationAddressInput"
+              aria-label="Endereço associado (revise)"
+              maxlength="300"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+            />
+            <div class="mt-1 flex flex-col justify-between gap-1 text-xs text-medium-emphasis sm:flex-row">
+              <span>Confira rua e número para a nova posição.</span>
+              <span>{{ locationAddressInput.length }}/300 caracteres</span>
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-lg border px-3 py-2 text-sm text-medium-emphasis">
+            <span class="font-semibold">Posição anterior</span>
+            <span class="ml-1">
+              {{ locationOriginalPosition?.latitude.toFixed(6) }},
+              {{ locationOriginalPosition?.longitude.toFixed(6) }}
+            </span>
+          </div>
+        </v-card-text>
+        <v-card-actions class="location-review-actions px-6 pb-4 pt-3">
+          <v-spacer />
+          <v-btn :disabled="locationSaving" @click="cancelTreeLocationEdit">Cancelar</v-btn>
+          <v-btn
+            color="green-darken-2"
+            variant="flat"
+            :loading="locationSaving"
+            :disabled="!canSaveLocation"
+            @click="saveTreeLocation"
+            >Salvar localização</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -3801,6 +4826,7 @@ export default defineComponent({
   height: 100%;
   width: 100%;
   overflow: hidden;
+  background: var(--mt-canvas);
 }
 
 .map-root.map-expanded {
@@ -3816,6 +4842,22 @@ export default defineComponent({
   width: 100%;
   height: 100%;
   z-index: 1;
+  background: var(--mt-canvas);
+}
+
+:global(:root[data-theme='dark'] #pruning-map-container .leaflet-control-zoom a) {
+  border-color: var(--mt-border) !important;
+  background: var(--mt-surface) !important;
+  color: var(--mt-ink) !important;
+}
+
+:global(:root[data-theme='dark'] #pruning-map-container .leaflet-control-attribution) {
+  background: color-mix(in srgb, var(--mt-surface) 88%, transparent);
+  color: var(--mt-text-muted);
+}
+
+:global(:root[data-theme='dark'] #pruning-map-container .leaflet-control-attribution a) {
+  color: var(--mt-teal) !important;
 }
 
 .daily-route-map-card {
@@ -3826,9 +4868,9 @@ export default defineComponent({
   z-index: 1100;
   width: min(360px, calc(100% - 32px));
   padding: 14px;
-  border: 1px solid #dcebb0;
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--mt-surface);
   backdrop-filter: blur(12px);
 }
 .daily-route-next {
@@ -3837,7 +4879,7 @@ export default defineComponent({
   gap: 2px;
   padding: 9px 10px;
   border-radius: 10px;
-  background: #f4f8e7;
+  background: var(--mt-surface-soft);
 }
 :global(.daily-route-stop-icon) {
   display: flex;
@@ -3860,7 +4902,7 @@ export default defineComponent({
 :global(.daily-route-tooltip) {
   border: 0;
   border-radius: 8px;
-  color: #1b5e20;
+  color: var(--mt-forest);
   font-weight: 700;
 }
 
@@ -3898,10 +4940,73 @@ export default defineComponent({
   pointer-events: auto;
 }
 
+.map-filter-empty-card {
+  position: absolute;
+  z-index: 1002;
+  bottom: 92px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  transform: translateX(-50%);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.18);
+}
+
+.tree-registration-pick-card {
+  position: absolute;
+  z-index: 1100;
+  top: 72px;
+  left: 50%;
+  width: min(400px, calc(100% - 24px));
+  padding: 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--mt-border);
+  border-radius: 16px;
+}
+
+.tree-location-edit-card {
+  position: absolute;
+  z-index: 1101;
+  top: 72px;
+  left: 50%;
+  width: min(420px, calc(100% - 24px));
+  padding: 16px;
+  transform: translateX(-50%);
+  border: 1px solid #f59e0b;
+  border-radius: 16px;
+}
+
+:global(.tree-registration-pin-shell) {
+  background: transparent;
+  border: 0;
+}
+
+:global(.tree-registration-pin) {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: #16803c;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.35);
+  transform: rotate(-45deg);
+}
+
+:global(.tree-registration-pin--outside) {
+  background: #b42318;
+}
+
+:global(.tree-registration-pin span) {
+  transform: rotate(45deg);
+}
+
 .filter-toggle {
-  background: rgba(255, 255, 255, 0.9) !important;
+  background: var(--mt-surface) !important;
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--mt-border);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
   padding: 4px;
   height: auto !important;
@@ -3918,7 +5023,7 @@ export default defineComponent({
 }
 
 .toggle-btn:not(.v-btn--active) {
-  color: #555 !important;
+  color: var(--mt-forest) !important;
 }
 
 @media (max-width: 768px) {
@@ -3934,6 +5039,15 @@ export default defineComponent({
     flex: 1;
     padding: 0 8px !important;
     font-size: 10px !important;
+  }
+  .tree-registration-pick-card {
+    top: 72px;
+  }
+  .tree-location-edit-card {
+    top: 70px;
+  }
+  .map-filter-empty-card {
+    bottom: 82px;
   }
 }
 
@@ -3951,7 +5065,7 @@ export default defineComponent({
 
 /* Painel agrupado dos controles do mapa (estilo Google Maps/Mapbox) */
 .map-tools-panel {
-  background: #ffffff;
+  background: var(--mt-surface);
   border-radius: 14px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   display: flex;
@@ -3965,6 +5079,12 @@ export default defineComponent({
   padding: 0;
   width: 44px;
   height: 44px;
+  border: 1px solid var(--mt-border);
+  color: var(--mt-forest);
+}
+
+:deep(.map-tools-panel--single .v-icon) {
+  color: var(--mt-forest);
 }
 
 .map-tool-btn {
@@ -3974,14 +5094,14 @@ export default defineComponent({
 }
 
 .map-tool-btn:hover {
-  background: rgba(0, 0, 0, 0.05) !important;
+  background: var(--mt-surface-soft) !important;
 }
 
 /* Divisória sutil entre os botões */
 .map-tool-divider {
   width: 22px;
   height: 1px;
-  background: #ececec;
+  background: var(--mt-border);
   margin: 1px 0;
 }
 
@@ -4000,8 +5120,8 @@ export default defineComponent({
   z-index: 1001;
   width: 296px;
   max-height: calc(100% - 104px);
-  background: #fff;
-  border: 1px solid rgba(27, 74, 44, 0.14);
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 20px;
   box-shadow: 0 16px 44px rgba(22, 49, 32, 0.2);
   overflow-y: auto;
@@ -4024,7 +5144,7 @@ export default defineComponent({
 .sidebar-title {
   font-size: 16px;
   font-weight: 700;
-  color: #1b5e20;
+  color: var(--mt-forest);
   display: flex;
   align-items: center;
   margin-bottom: 12px;
@@ -4033,7 +5153,7 @@ export default defineComponent({
 .sidebar-subtitle {
   font-size: 13px;
   font-weight: 600;
-  color: #424242;
+  color: var(--mt-forest);
   margin-bottom: 8px;
 }
 
@@ -4045,11 +5165,11 @@ export default defineComponent({
 }
 
 .stat-card {
-  background: #fff;
+  background: var(--mt-surface);
   border-radius: 10px;
   padding: 10px;
   text-align: center;
-  border: 2px solid #f0f0f0;
+  border: 2px solid var(--mt-border);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -4068,7 +5188,7 @@ export default defineComponent({
 
 .stat-label {
   font-size: 11px;
-  color: #666;
+  color: var(--mt-text-muted);
   font-weight: 500;
 }
 
@@ -4099,14 +5219,14 @@ export default defineComponent({
 }
 
 .tree-list-item:hover {
-  background: #f5f5f5;
+  background: var(--mt-surface-soft);
 }
 .tree-list-item--active {
-  background: #e8f5e9 !important;
+  background: var(--mt-surface-soft) !important;
 }
 
 .tree-list-item--danger {
-  background: #fff3f3;
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 11%, var(--mt-surface));
 }
 
 .tree-list-icon {
@@ -4127,14 +5247,14 @@ export default defineComponent({
 .tree-list-name {
   font-size: 13px;
   font-weight: 600;
-  color: #333;
+  color: var(--mt-forest);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .tree-list-meta {
   font-size: 11px;
-  color: #888;
+  color: var(--mt-text-muted);
 }
 .soil-legend-scroll {
   max-height: 160px;
@@ -4156,7 +5276,8 @@ export default defineComponent({
   left: 20px;
   z-index: 1000;
   width: 240px;
-  background: rgba(255, 255, 255, 0.9);
+  color: var(--mt-forest);
+  background: color-mix(in srgb, var(--mt-surface) 92%, transparent);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(121, 85, 72, 0.2);
   border-radius: 16px;
@@ -4166,11 +5287,11 @@ export default defineComponent({
 }
 
 .legend-header {
-  background: #efebe9;
+  background: var(--mt-surface-soft);
   padding: 10px 14px;
   font-size: 11px;
   font-weight: 800;
-  color: #5d4037;
+  color: var(--mt-forest);
   text-transform: uppercase;
   display: flex;
   align-items: center;
@@ -4205,21 +5326,21 @@ export default defineComponent({
 .item-name {
   font-size: 11px;
   font-weight: 700;
-  color: #333;
+  color: var(--mt-forest);
 }
 
 .item-impact {
   font-size: 9px;
-  color: #795548;
+  color: var(--mt-text-muted);
   font-weight: 600;
 }
 
 .legend-footer {
   padding: 8px;
   font-size: 9px;
-  color: #999;
+  color: var(--mt-text-muted);
   text-align: center;
-  background: #fafafa;
+  background: var(--mt-surface-soft);
 }
 
 /* ============ LEGENDA ============ */
@@ -4245,6 +5366,24 @@ export default defineComponent({
 }
 
 /* ============ ALERTA / BADGE ============ */
+.bounds-limit-alert {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  z-index: 1001;
+  width: min(620px, calc(100% - 24px));
+  transform: translateX(-50%);
+}
+
+.bounds-limit-content,
+.location-error-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .location-error-alert {
   position: absolute;
   /* Acima da barra de filtros (bottom 30px + ~48px de altura), sem sobrepor. */
@@ -4254,7 +5393,9 @@ export default defineComponent({
   z-index: 1001;
   max-width: 360px;
   /* Fundo sólido: o tonal translúcido deixava o texto ilegível sobre o mapa. */
-  background: #fff7ed !important;
+  background: rgb(var(--v-theme-surface)) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+  border: 1px solid rgb(var(--v-theme-warning));
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 
@@ -4264,8 +5405,8 @@ export default defineComponent({
   left: 50%;
   transform: translateX(-50%);
   z-index: 1001;
-  background: #ff8f00;
-  color: #fff;
+  background: rgb(var(--v-theme-warning));
+  color: rgb(var(--v-theme-on-warning));
   padding: 8px 20px;
   border-radius: 20px;
   font-weight: 600;
@@ -4350,6 +5491,8 @@ export default defineComponent({
   padding: 0 !important;
   overflow: hidden;
   border-radius: 12px !important;
+  background: var(--mt-surface) !important;
+  color: var(--mt-forest);
 }
 
 :deep(.leaflet-popup-content) {
@@ -4358,9 +5501,13 @@ export default defineComponent({
 }
 
 :deep(.leaflet-popup-close-button) {
-  color: #fff !important;
+  color: var(--mt-forest) !important;
   font-size: 16px !important;
   padding: 10px 10px 0 0 !important;
+}
+
+:deep(.tree-popup .leaflet-popup-close-button) {
+  color: #fff !important;
 }
 
 :deep(.tree-popup .leaflet-popup-content-wrapper) {
@@ -4430,6 +5577,21 @@ export default defineComponent({
     max-width: calc(100% - 24px);
   }
 
+  .bounds-limit-alert {
+    width: calc(100% - 24px);
+    top: calc(env(safe-area-inset-top, 0px) + 64px);
+  }
+
+  .bounds-limit-content,
+  .location-error-content {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .location-error-content .v-btn {
+    align-self: flex-start;
+  }
+
   .stats-grid {
     gap: 6px;
   }
@@ -4479,11 +5641,11 @@ export default defineComponent({
 }
 
 .dashboard-card {
-  background: #fff;
+  background: var(--mt-surface);
   border-radius: 16px;
   padding: 13px 14px;
   box-shadow: 0 12px 32px rgba(22, 49, 32, 0.2);
-  border: 1px solid rgba(27, 74, 44, 0.14);
+  border: 1px solid var(--mt-border);
   min-width: 226px;
 }
 
@@ -4549,7 +5711,7 @@ export default defineComponent({
 }
 
 .sidebar-tabs {
-  background: #fbfcf9;
+  background: var(--mt-surface);
 }
 
 .sidebar-tabs :deep(.v-tab) {
@@ -4564,9 +5726,9 @@ export default defineComponent({
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: #f5f7f3;
+  background: var(--mt-surface-soft);
   scrollbar-width: thin;
-  scrollbar-color: #c5d2c3 transparent;
+  scrollbar-color: var(--mt-border) transparent;
 }
 
 .tab-panel {
@@ -4586,10 +5748,10 @@ export default defineComponent({
 
 /* ============ CARDS E STATS ============ */
 .city-stats-card {
-  background: linear-gradient(135deg, #fff, #f1f6e8);
+  background: linear-gradient(135deg, var(--mt-surface), var(--mt-surface-soft));
   border-radius: 12px;
   padding: 12px;
-  border: 1px solid #e2ead7;
+  border: 1px solid var(--mt-border);
 }
 
 .action-buttons {
@@ -4599,10 +5761,10 @@ export default defineComponent({
 }
 
 .controls-section {
-  background: #fff;
+  background: var(--mt-surface);
   border-radius: 12px;
   padding: 12px;
-  border: 1px solid #e5ebe2;
+  border: 1px solid var(--mt-border);
 }
 
 .follow-control {
@@ -4619,17 +5781,17 @@ export default defineComponent({
 .follow-control__hint {
   display: block;
   margin-top: 2px;
-  color: #78909c;
+  color: var(--mt-text-muted);
   font-size: 10px;
   line-height: 1.25;
 }
 
 /* ============ FILTROS ============ */
 .filter-section {
-  background: #fff;
+  background: var(--mt-surface);
   border-radius: 12px;
   padding: 12px;
-  border: 1px solid #e5ebe2;
+  border: 1px solid var(--mt-border);
 }
 
 .filter-chips-scroll {
@@ -4647,12 +5809,12 @@ export default defineComponent({
   max-height: 320px;
   overflow-y: auto;
   border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
 }
 
 .tree-list-item-new {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--mt-border);
   cursor: pointer;
   transition: background 0.2s ease;
 }
@@ -4670,7 +5832,7 @@ export default defineComponent({
 }
 
 .tree-list-item-new:hover {
-  background: rgba(76, 175, 80, 0.05);
+  background: var(--mt-surface-soft);
 }
 
 .tree-list-item-new:last-child {
@@ -4679,10 +5841,10 @@ export default defineComponent({
 
 /* ============ CONFIGURAÇÕES ============ */
 .config-section {
-  background: #fff;
+  background: var(--mt-surface);
   border-radius: 8px;
   padding: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--mt-border);
 }
 
 .legend-grid {
@@ -4793,7 +5955,28 @@ export default defineComponent({
     padding: 12px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    max-height: calc(100vh - 200px);
+    max-height: none;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .map-sidebar--tabs {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .ai-drawer {
+    width: 100vw !important;
+    height: 100dvh !important;
+  }
+
+  .ai-drawer-body {
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
   .tree-list-scroll-new {
@@ -4813,7 +5996,42 @@ export default defineComponent({
 
 /* ============ AI DRAWER ============ */
 .ai-drawer {
+  width: min(480px, 100vw) !important;
+  max-width: 100vw !important;
   z-index: 2001 !important;
+  background: var(--mt-surface) !important;
+  color: var(--mt-ink);
+}
+
+.ai-drawer :deep(.v-navigation-drawer__content) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.location-review-card {
+  display: flex;
+  max-height: min(760px, calc(100dvh - 24px));
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--mt-surface) !important;
+  color: var(--mt-ink);
+}
+
+.location-review-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.location-review-actions {
+  position: sticky;
+  bottom: 0;
+  flex: 0 0 auto;
+  border-top: 1px solid var(--mt-border);
+  background: var(--mt-surface);
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
 }
 
 .ai-drawer-header {
@@ -4821,14 +6039,15 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: #fafafa;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
 }
 
 .ai-drawer-icon {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #7b1fa2, #ab47bc);
+  background: linear-gradient(135deg, var(--mt-green), var(--mt-forest));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4838,20 +6057,23 @@ export default defineComponent({
 .ai-drawer-title {
   font-size: 15px;
   font-weight: 700;
-  color: #333;
+  color: rgb(var(--v-theme-on-surface));
   line-height: 1.2;
+  margin: 0;
 }
 
 .ai-drawer-subtitle {
   font-size: 12px;
-  color: #888;
+  color: var(--mt-text-muted);
   margin-top: 2px;
 }
 
 .ai-drawer-body {
   padding: 16px;
   overflow-y: auto;
-  height: calc(100% - 74px);
+  height: auto;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .ai-drawer-loading {
@@ -4919,7 +6141,8 @@ export default defineComponent({
 }
 
 :deep(.soil-glass-popup) .leaflet-popup-content-wrapper {
-  background: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--mt-surface) 95%, transparent);
+  color: var(--mt-ink);
   backdrop-filter: blur(10px);
   border-radius: 16px;
   padding: 0;
@@ -4946,7 +6169,7 @@ export default defineComponent({
 :deep(.species-tag) {
   font-weight: 800;
   font-size: 14px;
-  color: #1a1a1a;
+  color: var(--mt-ink);
 }
 
 :deep(.quality-badge) {
@@ -4962,7 +6185,7 @@ export default defineComponent({
 }
 
 :deep(.growth-prediction) {
-  background: #f8fafc;
+  background: var(--mt-surface-soft);
   padding: 10px;
   border-radius: 10px;
   margin-bottom: 12px;
@@ -4973,7 +6196,7 @@ export default defineComponent({
 :deep(.prediction-label) {
   font-size: 10px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--mt-text-muted);
   text-transform: uppercase;
 }
 
@@ -4985,7 +6208,7 @@ export default defineComponent({
 
 :deep(.soil-definition) {
   font-size: 12px;
-  color: #475569;
+  color: var(--mt-text-muted);
   line-height: 1.5;
   margin-bottom: 16px;
 }
@@ -5008,12 +6231,12 @@ export default defineComponent({
   justify-content: space-between;
   font-size: 11px;
   font-weight: 700;
-  color: #334155;
+  color: var(--mt-ink);
 }
 
 :deep(.metric-bar) {
   height: 6px;
-  background: #e2e8f0;
+  background: var(--mt-border);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -5026,7 +6249,7 @@ export default defineComponent({
 
 :deep(.footer-metrics) {
   display: flex;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--mt-border);
   padding-top: 12px;
   gap: 16px;
 }
@@ -5037,10 +6260,24 @@ export default defineComponent({
   gap: 5px;
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 :deep(.leaflet-popup-tip) {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--mt-surface);
+}
+
+:deep(.leaflet-popup-content-wrapper) {
+  background: var(--mt-surface);
+  color: var(--mt-ink);
+}
+
+:deep(.leaflet-popup-content) {
+  color: var(--mt-ink);
+}
+
+:deep(.tree-popup button:focus-visible) {
+  outline: 3px solid var(--mt-focus);
+  outline-offset: 2px;
 }
 </style>

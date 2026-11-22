@@ -106,3 +106,11 @@ local usada na validação já possui essa configuração. Não exponha arquivos
 
 Referências: [guards globais no NestJS](https://docs.nestjs.com/recipes/passport)
 e [conector MongoDB e replica set no Prisma](https://www.prisma.io/docs/orm/overview/databases/mongodb).
+
+## Atualização de escopo — 20/11/2026
+
+Este documento registra um snapshot anterior e não deve ser usado isoladamente para afirmar o estado atual do backend. No worktree `/home/josewalter/.codex/worktrees/maptree-painel-funcionario/backend-maptree` (`22089ea`, com alterações locais), o modelo e os serviços agora incluem `Tree.organizationId`, escopo por organização e reconciliação administrativa das árvores sem vínculo. O acesso de MANAGER/USER a árvores sem organização falha fechado. Essa alteração permanece local e ainda precisa de verificação contra Mongo descartável e dados legados.
+
+Atualização de 20/11/2026: após a adição do módulo editorial, o inventário local registra 110 operações em 16 controllers. O teste `route-protection.spec.ts` descobre os controllers pela árvore de módulos de `AppModule`, confere as operações públicas e valida `401`/`403`; junto das suítes de validação e serviço editorial passou com 217 casos. Também foi alinhado `GET /api/organizations` a ADMIN, pois a operação lista organizações sem filtro por ator; gestores e funcionários usam a rota de detalhe da própria organização.
+
+Para o escopo editorial e a matriz atual, consulte [SDD-editor-landing-e-seguranca-rotas.md](SDD-editor-landing-e-seguranca-rotas.md) e [inventario-rotas-seguranca.md](inventario-rotas-seguranca.md). O resultado atual não cobre homologação, Mongo real descartável, navegador autenticado nem domínios de produção.

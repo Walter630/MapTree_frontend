@@ -344,14 +344,15 @@ export default defineComponent({
 .new-funcionario-btn {
   height: 44px !important;
   background: #c6f513 !important;
+  color: #00281a !important;
   border-radius: 10px;
 }
 
 /* Card que envolve a tabela */
 .employees-card {
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--mt-surface);
   overflow: hidden;
 }
 
@@ -367,12 +368,12 @@ export default defineComponent({
 .employees-card-title {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #2c3e2c;
+  color: var(--mt-ink);
 }
 
 .employees-card-subtitle {
   font-size: 0.78rem;
-  color: #9a9a9a;
+  color: var(--mt-text-muted);
 }
 
 .employees-search {
@@ -387,18 +388,18 @@ export default defineComponent({
 
 .modern-table :deep(thead th) {
   font-weight: 700 !important;
-  color: #556 !important;
+  color: var(--mt-text-muted) !important;
   text-transform: uppercase;
   font-size: 0.72rem !important;
   letter-spacing: 0.4px;
-  background: #fafafa;
+  background: var(--mt-surface-soft);
 }
 
 .modern-table :deep(tbody tr:hover) {
-  background: #f6faf4 !important;
+  background: var(--mt-surface-soft) !important;
 }
 
 .modern-table :deep(td) {
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: 1px solid var(--mt-border) !important;
 }
 </style>

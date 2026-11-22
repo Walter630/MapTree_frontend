@@ -3,11 +3,7 @@
     <PageHeader
       title="Registrar Poda"
       subtitle="Registre uma nova poda realizada no sistema"
-      :breadcrumbs="[
-        { text: 'Meu Painel', to: '/user' },
-        { text: 'Podas', to: '/user/podas' },
-        { text: '#Nova Poda' },
-      ]"
+      :breadcrumbs="pruningBreadcrumbs"
     />
 
     <v-alert type="info" variant="tonal" class="mb-5"
@@ -15,7 +11,7 @@
       conclui a parada.<v-btn
         class="ml-2"
         variant="text"
-        :to="`${route.path.startsWith('/admin') ? '/admin' : route.path.startsWith('/manager') ? '/manager' : '/user'}/routes/daily`"
+        :to="{ name: profileRoutes.daily, query: { date: form.date } }"
         >Abrir rota diária</v-btn
       ></v-alert
     >
@@ -43,12 +39,26 @@
                   item-title="displayName"
                   item-value="id"
                   :rules="[rules.required]"
-                  placeholder="Selecione a árvore"
+                  placeholder="Busque por espécie ou identificador"
+                  prepend-inner-icon="mdi-magnify"
                   variant="outlined"
                   density="comfortable"
                   :loading="loadingTrees"
                   no-data-text="Nenhuma árvore disponível"
                 />
+                <v-alert
+                  v-if="selectedTree"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-1"
+                  role="status"
+                >
+                  <strong>{{ selectedTree.species?.commonName || 'Árvore' }}</strong
+                  ><br />
+                  Identificação: #{{ selectedTree.id }}<br />
+                  {{ treeCoordinates(selectedTree) }}
+                </v-alert>
               </v-col>
 
               <!-- Tipo de Poda -->
@@ -135,7 +145,7 @@
           </v-alert>
 
           <v-btn
-            color="#C5E11F"
+            color="primary"
             block
             height="48"
             class="mb-3 font-weight-bold text-none"
@@ -163,10 +173,12 @@
 
     <!-- Success Dialog -->
     <v-dialog v-model="showSuccess" max-width="400">
-      <v-card class="pa-4 text-center">
-        <v-icon size="64" color="success" class="mb-4">mdi-check-circle</v-icon>
-        <h3 class="text-h6 font-weight-bold mb-2">Poda Registrada!</h3>
-        <p class="text-body-2 text-grey mb-4">
+      <v-card class="pa-4 text-center pruning-success-card">
+        <div class="success-confirmation-icon" aria-hidden="true">
+          <v-icon size="34" color="white">mdi-check</v-icon>
+        </div>
+        <h3 class="text-h6 font-weight-bold mb-2">Poda registrada!</h3>
+        <p class="text-body-2 text-medium-emphasis mb-4">
           A data da poda aparece na árvore no mapa. A avaliação de risco é exibida separadamente.
         </p>
         <v-btn color="success" block @click="goToList"> Ver Lista de Podas </v-btn>
@@ -185,16 +197,32 @@
 
 <script setup lang="ts">
 import type { TreeApiRecord } from '@/types/treeApi'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { localDate, treeIdentity, treeCoordinates } from '@/utils/pruningWorkflow'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import { apiConnect } from '@/plugins/apiConnect'
 import { getApiErrorMessage } from '@/utils/apiError'
-import { getDailyRouteSchedules } from '@/utils/dailyRouteSchedules'
+import { getDailyRouteSchedules, getDailyRouteSchedulesByStatus } from '@/utils/dailyRouteSchedules'
 
 const router = useRouter()
 const route = useRoute()
+
+const profileRoutes = computed(() => {
+  if (route.name === 'ManagerPruningRegistration' || route.path.startsWith('/manager')) {
+    return { home: 'ManagerHome', list: 'ManagerPruningList', daily: 'ManagerDailyRoutes' }
+  }
+  if (route.name === 'AdminPruningRegistration' || route.path.startsWith('/admin')) {
+    return { home: 'AdminHome', list: 'AdminPruningList', daily: 'AdminDailyRoutes' }
+  }
+  return { home: 'UserHome', list: 'PruningList', daily: 'UserDailyRoutes' }
+})
+
+const pruningBreadcrumbs = computed(() => [
+  { text: 'Meu Painel', to: { name: profileRoutes.value.home } },
+  { text: 'Podas', to: { name: profileRoutes.value.list } },
+  { text: '#Nova Poda' },
+])
 
 // Refs
 const formRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
@@ -209,11 +237,15 @@ let attemptedSchedule: { id: string; treeId: string; date: string } | undefined
 // Data
 const trees = ref<(TreeApiRecord & { displayName: string })[]>([])
 const loadingTrees = ref(true)
+let routePriorityRequest = 0
 
 const form = ref({
   idTree: '',
   type: '',
-  date: localDate(),
+  date:
+    typeof route.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date)
+      ? route.query.date
+      : localDate(),
   observations: '',
 })
 
@@ -247,14 +279,37 @@ const getTypeLabel = (type: string) => {
   return typeObj?.label || type
 }
 
+const prioritizePendingTrees = async (date: string) => {
+  const request = ++routePriorityRequest
+  try {
+    const schedules = await getDailyRouteSchedules(date)
+    if (request !== routePriorityRequest || date !== form.value.date) return
+    const pendingOrder = new Map(
+      getDailyRouteSchedulesByStatus(schedules, 'PENDING').map((stop, index) => [
+        stop.treeId,
+        index,
+      ]),
+    )
+    trees.value = [...trees.value].sort((a, b) => {
+      const aOrder = pendingOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER
+      const bOrder = pendingOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER
+      return aOrder - bOrder || a.displayName.localeCompare(b.displayName, 'pt-BR')
+    })
+  } catch {
+    // A falha da agenda não impede poda avulsa; a busca ainda oferece o inventário completo.
+  }
+}
+
 const loadTrees = async () => {
   loadingTrees.value = true
   try {
     const response = await apiConnect.get<TreeApiRecord[]>('/trees')
-    trees.value = (response.data || []).map((tree) => ({
+    const allTrees = (response.data || []).map((tree) => ({
       ...tree,
       displayName: `${treeIdentity(tree)} · ${treeCoordinates(tree)}`,
     }))
+    trees.value = allTrees
+    await prioritizePendingTrees(form.value.date)
     if (
       typeof route.query.treeId === 'string' &&
       trees.value.some((tree) => tree.id === route.query.treeId)
@@ -266,6 +321,8 @@ const loadTrees = async () => {
     loadingTrees.value = false
   }
 }
+
+watch(() => form.value.date, prioritizePendingTrees)
 
 const submit = async () => {
   if (submitting.value) return
@@ -279,7 +336,11 @@ const submit = async () => {
       date: date === localDate() ? new Date().toISOString() : `${date}T12:00:00-03:00`,
       observations,
     }
-    if (attemptedSchedule?.treeId !== idTree || attemptedSchedule.date !== date) {
+    if (
+      !attemptedSchedule ||
+      attemptedSchedule.treeId !== idTree ||
+      attemptedSchedule.date !== date
+    ) {
       const schedules = await getDailyRouteSchedules(date)
       const matches = schedules.filter(
         (stop) => stop.status === 'PENDING' && stop.treeId === idTree,
@@ -311,11 +372,11 @@ const submit = async () => {
 }
 
 const cancel = () => {
-  router.back()
+  void router.push({ name: profileRoutes.value.list })
 }
 
 const goToList = () => {
-  router.push('/user/podas')
+  void router.push({ name: profileRoutes.value.list })
 }
 
 // Lifecycle
@@ -326,8 +387,8 @@ onMounted(() => {
 
 <style scoped>
 .form-card {
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 24px;
 }
@@ -336,27 +397,42 @@ onMounted(() => {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #c5e11f 0%, #9ed013 100%);
+  background: rgb(var(--v-theme-primary));
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.pruning-success-card {
+  align-items: center;
+}
+
+.success-confirmation-icon {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  border-radius: 9999px;
+  background: #16803c;
+}
+
 .field-label {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #555;
+  color: var(--mt-forest);
   margin-bottom: 6px;
   display: block;
 }
 
 .required {
-  color: #c80c34;
+  color: rgb(var(--v-theme-error));
 }
 
 .summary-card {
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 24px;
   position: sticky;

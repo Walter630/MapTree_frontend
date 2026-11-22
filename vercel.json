@@ -1,4 +1,41 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "app.maptree.com.br"
+        }
+      ],
+      "destination": "/login",
+      "permanent": false
+    },
+    {
+      "source": "/:path((?!$).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": {
+            "re": "^(www\\.)?maptree\\.com\\.br$"
+          }
+        }
+      ],
+      "destination": "https://app.maptree.com.br/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.maptree.com.br"
+        }
+      ],
+      "destination": "https://maptree.com.br/",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -10,6 +47,15 @@
     }
   ],
   "headers": [
+    {
+      "source": "/503.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [

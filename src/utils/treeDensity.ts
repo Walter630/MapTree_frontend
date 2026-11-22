@@ -5,6 +5,7 @@ export interface TreeDensityInput {
   longitude: number
   speciesName?: string
   status?: string
+  effectiveStatus?: string
   vigor?: string
   nearPowerLine?: boolean
   nestCount?: number | null
@@ -46,11 +47,15 @@ export function getTreeDensityCategory(
     case 'species':
       return tree.speciesName?.trim() || 'Espécie não identificada'
     case 'status':
-      return tree.status?.trim() || 'Sem status'
+      return tree.effectiveStatus?.trim() || tree.status?.trim() || 'Sem status'
     case 'vigor':
       return tree.vigor?.trim() || 'Sem vigor informado'
     case 'proximity':
-      return tree.nearPowerLine ? 'Indicador de risco ativo' : 'Sem alerta atual'
+      return ['CRITICAL', 'TO_PRUNE', 'DANGER'].includes(
+        (tree.effectiveStatus || tree.status || '').trim().toUpperCase(),
+      )
+        ? 'Risco operacional ativo'
+        : 'Sem alerta atual'
     case 'nests':
       return Number.isFinite(tree.nestCount) && Number(tree.nestCount) > 0
         ? 'Com ninhos'

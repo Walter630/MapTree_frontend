@@ -132,9 +132,9 @@ watch(pageCount, (count) => {
 
 <style scoped>
 .catalog {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--mt-surface);
   min-width: 0;
   align-self: start;
 }
@@ -145,7 +145,7 @@ watch(pageCount, (count) => {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 1px solid #eef1f4;
+  border-bottom: 1px solid var(--mt-border);
 }
 h2 {
   display: flex;
@@ -153,16 +153,16 @@ h2 {
   flex-wrap: wrap;
   font-size: 0.92rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--mt-forest);
 }
 h2 span {
   font-size: 0.72rem;
   font-weight: 500;
   margin-left: 8px;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 .catalog-map-link {
-  color: #287543;
+  color: var(--mt-teal);
   font-size: 0.78rem;
   padding: 4px 0;
   text-underline-offset: 4px;
@@ -180,16 +180,16 @@ h2 span {
   min-width: 0;
   min-height: 62px;
   padding: 8px 4px;
-  border-bottom: 1px solid #f0f2f4;
-  color: #334155;
+  border-bottom: 1px solid var(--mt-border);
+  color: var(--mt-ink);
   text-decoration: none;
   border-radius: 4px;
 }
 .catalog-species:hover {
-  background: #f4f8f5;
+  background: var(--mt-surface-soft);
 }
 a:focus-visible {
-  outline: 2px solid #237648;
+  outline: 2px solid var(--mt-focus);
   outline-offset: 2px;
 }
 .catalog-symbol {
@@ -198,7 +198,7 @@ a:focus-visible {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: #edf5ef;
+  background: var(--mt-surface-soft);
   font-size: 1rem;
   flex-shrink: 0;
 }
@@ -215,7 +215,7 @@ a:focus-visible {
 }
 .catalog-info em {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 .catalog-count {
   text-align: right;
@@ -227,7 +227,7 @@ a:focus-visible {
   display: block;
   font-size: 0.64rem;
   font-weight: 400;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 .catalog-footer {
   display: flex;
@@ -240,7 +240,7 @@ a:focus-visible {
 .catalog-footer > span,
 .empty-catalog {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 .empty-catalog {
   padding: 24px 0;

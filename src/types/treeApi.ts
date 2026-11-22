@@ -2,12 +2,16 @@ import type { AiPrediction, MaintenanceSchedule, Measurement, Soil } from '@/plu
 
 export interface TreeApiRecord {
   id: string
+  createdById?: string | null
+  updatedAt?: string | Date | null
   age?: string | Date
   latitude?: number | string | null
   longitude?: number | string | null
   lat?: number | string | null
   lng?: number | string | null
+  address?: string | null
   status?: string
+  effectiveStatus?: string
   measuredStatus?: string
   lastPruneDate?: string | null
   vigor?: string
@@ -20,6 +24,7 @@ export interface TreeApiRecord {
   wireHeight?: number
   wire_height_m?: number
   soilQuality?: string
+  soilStatus?: string
   soil?: Soil & { vigor?: string }
   solo?: Soil[]
   aiPrediction?: AiPrediction | null

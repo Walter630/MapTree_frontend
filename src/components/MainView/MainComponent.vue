@@ -10,15 +10,21 @@
         <v-chip class="dash-date-chip" variant="outlined" prepend-icon="mdi-calendar-blank-outline">
           {{ todayLabel }}
         </v-chip>
-        <v-btn
-          color="blue-darken-2"
-          variant="tonal"
-          class="dash-ghost-btn text-none"
-          prepend-icon="mdi-map-marker-path"
-          @click="goToRoutes"
-        >
-          Minhas rotas
-        </v-btn>
+        <div class="dash-route-cards" aria-label="Rotas de poda">
+          <v-card
+            variant="outlined"
+            class="dash-route-entry"
+            role="button"
+            tabindex="0"
+            @click="goToRoutes"
+            @keydown.enter="goToRoutes"
+            @keydown.space.prevent="goToRoutes"
+          >
+            <v-icon color="primary">mdi-map-marker-path</v-icon>
+            <span><strong>Rotas</strong><small>Consultar e planejar por data</small></span>
+            <v-icon size="18">mdi-chevron-right</v-icon>
+          </v-card>
+        </div>
         <v-btn
           color="green-darken-2"
           class="dash-create-btn text-none"
@@ -645,13 +651,13 @@ export default defineComponent({
   justify-content: space-between;
   gap: 6px;
   font-size: 0.75rem;
-  color: #345941;
+  color: var(--mt-forest);
   margin-bottom: 8px;
 }
 /* ===== Container ===== */
 .dash {
   padding: 20px 24px 40px;
-  background: #f7f8fa;
+  background: var(--mt-canvas);
   min-height: calc(100dvh - 56px);
   max-width: 1440px;
   margin: 0 auto;
@@ -670,13 +676,13 @@ export default defineComponent({
 .dash-hello {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--mt-forest);
   line-height: 1.2;
 }
 
 .dash-sub {
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
   margin-top: 2px;
 }
 
@@ -686,9 +692,41 @@ export default defineComponent({
   gap: 12px;
   flex-wrap: wrap;
 }
+.dash-route-cards {
+  display: grid;
+  grid-template-columns: minmax(175px, 1fr);
+  gap: 8px;
+}
+.dash-route-entry {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  cursor: pointer;
+  color: var(--mt-forest);
+  background: var(--mt-surface);
+  border-color: var(--mt-border);
+}
+.dash-route-entry span {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  line-height: 1.25;
+  text-align: left;
+}
+.dash-route-entry small {
+  margin-top: 3px;
+  color: var(--mt-text-muted);
+  font-size: 0.68rem;
+}
+.dash-route-entry:focus-visible {
+  outline: 3px solid var(--mt-focus);
+  outline-offset: 2px;
+}
 
 .dash-date-chip {
-  background: #fff;
+  background: var(--mt-surface);
   font-size: 0.8rem;
 }
 
@@ -712,8 +750,8 @@ export default defineComponent({
 }
 
 .kpi {
-  background: #fff;
-  border: 1px solid #eceef1;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 16px 18px;
   display: flex;
@@ -722,8 +760,8 @@ export default defineComponent({
 }
 
 .kpi--danger {
-  background: linear-gradient(135deg, #fff6f6 0%, #ffffff 60%);
-  border-color: #f3c9c9;
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 8%, var(--mt-surface));
+  border-color: rgb(var(--v-theme-error));
 }
 
 .kpi-top {
@@ -742,25 +780,25 @@ export default defineComponent({
 }
 
 .kpi-ico--green {
-  background: #e9f6ea;
+  background: var(--mt-surface-soft);
 }
 .kpi-ico--red {
-  background: #fdecec;
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 12%, var(--mt-surface));
 }
 .kpi-ico--blue {
-  background: #e7f1fb;
+  background: color-mix(in srgb, rgb(var(--v-theme-info)) 12%, var(--mt-surface));
 }
 
 .kpi-name {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 .kpi-num {
   font-size: 1.9rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--mt-forest);
   line-height: 1;
 }
 
@@ -772,16 +810,16 @@ export default defineComponent({
 }
 
 .kpi-foot--up {
-  color: #2e7d32;
+  color: rgb(var(--v-theme-success));
 }
 .kpi-foot--danger {
-  color: #d32f2f;
+  color: rgb(var(--v-theme-error));
 }
 
 /* ===== Painéis ===== */
 .panel {
-  background: #fff;
-  border: 1px solid #eceef1;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -793,7 +831,7 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid #f1f3f5;
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .panel-title {
@@ -801,13 +839,13 @@ export default defineComponent({
   align-items: center;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--mt-forest);
 }
 
 .panel-link {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #2e7d32;
+  color: rgb(var(--v-theme-success));
   cursor: pointer;
 }
 
@@ -831,7 +869,7 @@ export default defineComponent({
   display: flex;
   gap: 14px;
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 .map-legend span {
@@ -880,7 +918,7 @@ export default defineComponent({
 
 .alerts-tools {
   padding: 12px 16px 8px;
-  border-bottom: 1px solid #f1f3f5;
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .alerts-list {
@@ -894,7 +932,7 @@ export default defineComponent({
   width: 4px;
 }
 .alerts-list::-webkit-scrollbar-thumb {
-  background: #e0e0e0;
+  background: var(--mt-border);
   border-radius: 4px;
 }
 
@@ -909,11 +947,11 @@ export default defineComponent({
 }
 
 .alert-row:hover {
-  background: #f6f8fa;
+  background: var(--mt-surface-soft);
 }
 
 .alert-thumb {
-  background: #f3f4f6;
+  background: var(--mt-surface-soft);
 }
 
 .alert-info {
@@ -933,18 +971,18 @@ export default defineComponent({
   font-size: 0.72rem;
   font-weight: 700;
   font-family: monospace;
-  color: #475569;
+  color: var(--mt-text-muted);
 }
 
 .alert-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--mt-forest);
 }
 
 .alert-coords {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
   display: flex;
   align-items: center;
   gap: 2px;
@@ -956,7 +994,7 @@ export default defineComponent({
   align-items: center;
   justify-content: center;
   height: 180px;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
   text-align: center;
   gap: 6px;
   font-size: 0.85rem;
@@ -989,7 +1027,7 @@ export default defineComponent({
 }
 
 .report-row:hover {
-  background: #f6f8fa;
+  background: var(--mt-surface-soft);
 }
 
 .report-info {
@@ -1002,7 +1040,7 @@ export default defineComponent({
 .report-nm {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--mt-forest);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1010,7 +1048,7 @@ export default defineComponent({
 
 .report-dt {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
 }
 
 .panel {
@@ -1045,6 +1083,10 @@ export default defineComponent({
 }
 
 @media (max-width: 600px) {
+  .dash-route-cards {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
   .kpi-grid {
     grid-template-columns: 1fr;
   }

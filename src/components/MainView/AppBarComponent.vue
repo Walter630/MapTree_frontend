@@ -1,6 +1,6 @@
 <template>
   <!-- ===== Desktop AppBar ===== -->
-  <v-app-bar v-if="!isMobile" color="white" flat height="68" class="appbar-desktop">
+  <v-app-bar v-if="!isMobile" color="surface" flat height="68" class="appbar-desktop">
     <div class="appbar-content">
       <button
         type="button"
@@ -8,32 +8,34 @@
         aria-label="Ir para o painel inicial"
         @click="goToHome()"
       >
-        <img :src="logoSrc" alt="Logo MapTree" class="logo-img" @error="onLogoError" />
+        <img
+          :src="logoSrc"
+          alt="Logo MapTree"
+          class="logo-img"
+          :class="{ 'logo-img--white': themeIsDark }"
+          @error="onLogoError"
+        />
       </button>
 
       <nav class="desktop-nav" aria-label="Navegação principal">
-        <v-tooltip v-for="item in currentMenu" :key="item.to" location="bottom">
-          <template #activator="{ props }">
-            <v-btn
-              v-bind="props"
-              variant="text"
-              class="nav-item text-none"
-              :class="{ 'nav-item--active': isActive(item.to) }"
-              :color="isActive(item.to) ? 'green-darken-2' : 'grey-darken-2'"
-              :aria-current="isActive(item.to) ? 'page' : undefined"
-              @click="goTo(item.to)"
-            >
-              <v-icon
-                size="21"
-                class="nav-icon-3d"
-                :color="isActive(item.to) ? green : 'grey-darken-2'"
-                >{{ item.icon }}</v-icon
-              >
-              <span class="nav-label">{{ item.title }}</span>
-            </v-btn>
-          </template>
-          <span>{{ item.title }}</span>
-        </v-tooltip>
+        <v-btn
+          v-for="item in currentMenu"
+          :key="item.to"
+          variant="text"
+          class="nav-item text-none"
+          :class="{ 'nav-item--active': isActive(item.to) }"
+          :color="isActive(item.to) ? 'primary' : 'on-surface'"
+          :aria-current="isActive(item.to) ? 'page' : undefined"
+          @click="goTo(item.to)"
+        >
+          <v-icon
+            size="21"
+            class="nav-icon-3d"
+            :color="isActive(item.to) ? 'primary' : 'on-surface'"
+            >{{ item.icon }}</v-icon
+          >
+          <span class="nav-label">{{ item.title }}</span>
+        </v-btn>
       </nav>
 
       <div class="appbar-actions">
@@ -43,11 +45,26 @@
               v-bind="props"
               icon
               variant="text"
-              :color="isNotificationActive ? green : 'grey-darken-2'"
+              :color="isNotificationActive ? 'primary' : 'on-surface'"
               aria-label="Abrir notificações"
               @click="goToNotification()"
             >
               <v-icon class="nav-icon-3d">mdi-bell-outline</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
+
+        <v-tooltip :text="themeActionLabel" location="bottom">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon
+              variant="text"
+              color="on-surface"
+              :aria-label="themeActionLabel"
+              @click="toggleTheme"
+            >
+              <v-icon>{{ themeIsDark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
             </v-btn>
           </template>
         </v-tooltip>
@@ -107,7 +124,7 @@
       v-model="drawer"
       location="left"
       temporary
-      color="white"
+      color="surface"
       class="mobile-drawer"
     >
       <!-- Logo no drawer -->
@@ -115,6 +132,7 @@
         <img
           src="@/assets/LogomaptreeHeaderpng.png"
           alt="Logo MapTree"
+          :class="{ 'logo-img--white': themeIsDark }"
           style="height: 40px; max-width: 100%"
           @click="
             () => {
@@ -134,7 +152,7 @@
           :prepend-icon="item.icon"
           :title="item.title"
           :active="isActive(item.to)"
-          :color="isActive(item.to) ? 'green-darken-1' : undefined"
+          :color="isActive(item.to) ? 'primary' : undefined"
           @click="
             () => {
               goTo(item.to)
@@ -147,7 +165,7 @@
 
       <template v-slot:append>
         <div class="pa-4">
-          <v-btn block variant="tonal" color="grey" prepend-icon="mdi-logout" @click="logout">
+          <v-btn block variant="tonal" color="on-surface" prepend-icon="mdi-logout" @click="logout">
             Sair
           </v-btn>
         </div>
@@ -155,7 +173,7 @@
     </v-navigation-drawer>
 
     <!-- AppBar Mobile -->
-    <v-app-bar color="white" flat class="appbar-mobile" elevation="1">
+    <v-app-bar color="surface" flat class="appbar-mobile" elevation="1">
       <v-btn
         icon
         variant="text"
@@ -172,16 +190,31 @@
         aria-label="Ir para o painel inicial"
         @click="goToHome()"
       >
-        <img src="@/assets/LogomaptreeHeaderpng.png" alt="" style="height: 32px" />
+        <img
+          src="@/assets/LogomaptreeHeaderpng.png"
+          alt=""
+          :class="{ 'logo-img--white': themeIsDark }"
+          style="height: 32px"
+        />
       </button>
 
       <v-spacer />
+
+      <v-btn
+        icon
+        variant="text"
+        color="on-surface"
+        :aria-label="themeActionLabel"
+        @click="toggleTheme"
+      >
+        <v-icon>{{ themeIsDark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+      </v-btn>
 
       <!-- Notificações -->
       <v-btn
         icon
         variant="text"
-        :color="isActive('/notifications') ? green : 'black'"
+        :color="isActive('/notifications') ? 'primary' : 'on-surface'"
         @click="goToNotification()"
       >
         <v-icon>mdi-bell-outline</v-icon>
@@ -194,6 +227,10 @@
 import { useAppStore } from '@/stores/app'
 import { getHomeRouteByRole } from '@/router/helpers/getHomeRoute'
 import { getNotificationRoute } from '@/router/helpers/getNotificationRoute'
+import {
+  themePreferenceInjectionKey,
+  type ThemePreferenceContext,
+} from '@/utils/themePreference'
 
 /* ===================================
    TIPOS
@@ -221,15 +258,18 @@ const MENUS: Record<string, MenuItem[]> = {
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/admin' },
     { title: 'Empresas', icon: 'mdi-domain', to: '/admin/companies' },
     { title: 'Gestores', icon: 'mdi-account-group', to: '/admin/managers' },
+    { title: 'Solicitações', icon: 'mdi-account-clock-outline', to: '/admin/manager-requests' },
+    { title: 'Landing', icon: 'mdi-web', to: '/admin/landing' },
     { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/admin/trees/new' },
-    { title: 'Rota do dia', icon: 'mdi-map-marker-path', to: '/admin/routes/daily' },
+    { title: 'Rotas', icon: 'mdi-map-marker-path', to: '/admin/routes/daily' },
     { title: 'Mapa', icon: 'mdi-map', to: '/admin/map' },
   ],
   MANAGER: [
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/manager' },
+    { title: 'Município', icon: 'mdi-map-marker-radius-outline', to: '/manager/municipality' },
     { title: 'Funcionários', icon: 'mdi-account-group', to: '/manager/employees' },
     { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/manager/trees/new' },
-    { title: 'Rotas diárias', icon: 'mdi-map-marker-path', to: '/manager/routes/daily' },
+    { title: 'Rotas', icon: 'mdi-map-marker-path', to: '/manager/routes/daily' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/manager/reports' },
     { title: 'Mapa', icon: 'mdi-map', to: '/manager/map' },
   ],
@@ -237,7 +277,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { title: 'Painel', icon: 'mdi-view-dashboard', to: '/user' },
     { title: 'Cadastrar árvore', icon: 'mdi-tree', to: '/user/trees/new' },
     { title: 'Podas', icon: 'mdi-content-cut', to: '/user/podas' },
-    { title: 'Rota do dia', icon: 'mdi-map-marker-path', to: '/user/routes/daily' },
+    { title: 'Rotas', icon: 'mdi-map-marker-path', to: '/user/routes/daily' },
     { title: 'Relatórios', icon: 'mdi-file-chart', to: '/user/reports' },
     { title: 'Mapa', icon: 'mdi-map', to: '/user/mapUser' },
   ],
@@ -250,10 +290,13 @@ const MENUS: Record<string, MenuItem[]> = {
 export default {
   name: 'AppBarComponent',
 
+  inject: {
+    themeContext: { from: themePreferenceInjectionKey, default: undefined },
+  },
+
   data() {
     return {
       drawer: false,
-      green: '#007F43',
       user: null as User | null,
       logoSrc: new URL('@/assets/LogomaptreeHeaderpng.png', import.meta.url).href,
     }
@@ -275,6 +318,15 @@ export default {
 
     isNotificationActive(): boolean {
       return this.$route.path.endsWith('/notifications')
+    },
+
+    themeIsDark(): boolean {
+      const context = this.themeContext as ThemePreferenceContext | undefined
+      return context?.preference.value === 'dark'
+    },
+
+    themeActionLabel(): string {
+      return this.themeIsDark ? 'Ativar tema claro' : 'Ativar tema escuro'
     },
   },
 
@@ -333,6 +385,11 @@ export default {
       this.store.setIsMobile(window.innerWidth < 1120)
     },
 
+    toggleTheme(): void {
+      const context = this.themeContext as ThemePreferenceContext | undefined
+      context?.toggle()
+    },
+
     async logout(): Promise<void> {
       try {
         await this.$api.logout()
@@ -389,9 +446,22 @@ export default {
   border-radius: 10px;
   padding: 0 10px;
   white-space: nowrap;
+  background-color: transparent;
+  transition: background-color 0.16s ease;
+}
+.nav-item:hover,
+.nav-item:focus-visible {
+  background-color: var(--mt-surface-soft) !important;
+}
+.nav-item :deep(.v-btn__overlay) {
+  background-color: var(--mt-surface-soft);
+}
+.appbar-actions :deep(.v-btn__overlay),
+.appbar-mobile :deep(.v-btn__overlay) {
+  background-color: var(--mt-surface-soft);
 }
 .nav-item--active {
-  background: #edf6c9;
+  background: var(--mt-surface-soft);
   font-weight: 700;
 }
 .nav-icon-3d {
@@ -424,6 +494,9 @@ export default {
   filter: saturate(1.2) brightness(1.03);
   transition: transform 0.2s;
 }
+.logo-img--white {
+  filter: brightness(0) invert(1);
+}
 .logo-img:hover {
   transform: scale(1.03);
 }
@@ -435,7 +508,7 @@ export default {
   border-radius: 10px;
 }
 .user-menu-trigger:hover {
-  background: #f0f5f1;
+  background: var(--mt-surface-soft);
 }
 .user-avatar {
   background-color: var(--mt-lime);

@@ -23,14 +23,14 @@
           </v-icon>
           {{ crumb.text }}
         </span>
-        <v-icon v-if="i < breadcrumbs.length - 1" size="small" class="mx-1 text-grey-darken-1">
+        <v-icon v-if="i < breadcrumbs.length - 1" size="small" class="mx-1 breadcrumb-separator">
           mdi-chevron-right
         </v-icon>
       </template>
     </div>
 
     <!-- Título + Botão voltar -->
-    <div class="d-flex align-center">
+    <div class="page-header-heading">
       <v-btn
         v-if="showBackButton"
         icon="mdi-chevron-left"
@@ -40,20 +40,28 @@
         aria-label="Voltar à página anterior"
         @click="router.back()"
       />
-      <div>
-        <h2 class="text-h5 font-weight-bold text-indigo-darken-4">{{ title }}</h2>
-        <p v-if="subtitle" class="text-caption text-grey mt-1">{{ subtitle }}</p>
+      <div class="page-header-copy">
+        <h2
+          class="text-h5 font-weight-bold page-header-title"
+          :class="{ 'page-header-title--route': title.startsWith('Rota de ') }"
+        >
+          {{ title }}
+        </h2>
+        <p v-if="subtitle" class="text-caption page-header-subtitle mt-1">{{ subtitle }}</p>
+      </div>
+      <div v-if="$slots.actions" class="page-header-actions">
+        <slot name="actions" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router'
 
 interface Breadcrumb {
   text: string
-  to?: string
+  to?: RouteLocationRaw
   icon?: string
 }
 
@@ -112,23 +120,36 @@ const textIconMap: Record<string, string> = {
   '#CadastrarFuncionário': 'mdi-account-plus',
   'Cadastrar árvore': 'mdi-tree',
   'Rotas diárias': 'mdi-map-marker-path',
+  Rotas: 'mdi-map-marker-path',
   'Rota do dia': 'mdi-map-marker-path',
 }
 
 function getBreadcrumbIcon(crumb: Breadcrumb) {
-  return crumb.icon || (crumb.to ? routeIconMap[crumb.to] : undefined) || textIconMap[crumb.text]
+  const path = crumb.to
+    ? typeof crumb.to === 'string'
+      ? crumb.to
+      : router.resolve(crumb.to).path
+    : undefined
+  return crumb.icon || (path ? routeIconMap[path] : undefined) || textIconMap[crumb.text]
 }
 </script>
 
 <style scoped>
 .breadcrumb-item {
-  color: #53635a;
+  color: var(--mt-text-muted);
   transition: color 0.2s ease;
   text-decoration: none;
 }
 
 .breadcrumb-current {
-  color: #173d2a;
+  color: var(--mt-forest);
+}
+.breadcrumb-separator,
+.page-header-subtitle {
+  color: var(--mt-text-muted);
+}
+.page-header-title {
+  color: var(--mt-forest);
 }
 
 .breadcrumb-icon {
@@ -138,11 +159,11 @@ function getBreadcrumbIcon(crumb: Breadcrumb) {
 }
 
 .breadcrumb-item:hover {
-  color: #429205 !important;
+  color: var(--mt-green) !important;
 }
 
 .breadcrumb-item:hover .breadcrumb-icon {
-  color: #429205;
+  color: var(--mt-green);
   transform: translateY(-1px);
 }
 
@@ -151,13 +172,60 @@ function getBreadcrumbIcon(crumb: Breadcrumb) {
 }
 
 .breadcrumb-link:hover {
-  color: #429205 !important;
+  color: var(--mt-green) !important;
 }
 
 .back-btn {
   min-width: 42px;
   min-height: 42px;
   border-radius: 8px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--mt-border);
+}
+
+.page-header-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0;
+}
+
+.page-header-copy {
+  min-width: 0;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+
+.page-header-title--route {
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .page-header-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .page-header-actions {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+
+  .back-btn {
+    margin: 0 !important;
+  }
+
+  .page-header-title:not(.page-header-title--route),
+  .page-header-subtitle {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 </style>

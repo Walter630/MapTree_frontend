@@ -146,7 +146,7 @@ async function save() {
       />
       <p v-if="error" role="alert" class="fm-error">{{ error }}</p>
       <div class="fm-buttons">
-        <v-btn type="submit" color="green-darken-3" :loading="saving" :disabled="saving"
+        <v-btn type="submit" color="primary" :loading="saving" :disabled="saving"
           >Salvar medição</v-btn
         >
         <v-btn variant="text" :disabled="saving" @click="editing = false">Cancelar</v-btn>
@@ -157,8 +157,8 @@ async function save() {
 
 <style scoped>
 .field-measurement {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 16px;
@@ -179,21 +179,21 @@ async function save() {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: #e9f6ea;
-  color: #2e7d32;
+  background: color-mix(in srgb, var(--mt-status-success) 14%, var(--mt-surface));
+  color: var(--mt-status-success);
 }
 
 .fm-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--mt-ink);
   line-height: 1.2;
   margin: 0;
 }
 
 .fm-subtitle {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
   margin: 2px 0 0;
 }
 
@@ -205,7 +205,7 @@ async function save() {
 }
 
 .fm-metric {
-  background: #f4f8f4;
+  background: var(--mt-surface-soft);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -215,7 +215,7 @@ async function save() {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 .fm-metric dd {
@@ -223,7 +223,7 @@ async function save() {
   font-size: 1.5rem;
   font-weight: 800;
   line-height: 1.1;
-  color: #1e293b;
+  color: var(--mt-ink);
 }
 
 .fm-reference {
@@ -231,19 +231,19 @@ async function save() {
   align-items: center;
   gap: 6px;
   font-size: 0.875rem;
-  color: #334155;
+  color: var(--mt-ink);
   margin: 0;
 }
 
 .fm-note {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
   margin: 2px 0 12px;
 }
 
 .fm-feedback {
   font-size: 0.875rem;
-  color: #2e7d32;
+  color: var(--mt-status-success);
   margin: 0 0 8px;
 }
 
@@ -259,7 +259,7 @@ async function save() {
 
 .fm-error {
   font-size: 0.875rem;
-  color: #b3261e;
+  color: var(--mt-status-error);
   margin: 0;
 }
 

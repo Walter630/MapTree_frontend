@@ -324,8 +324,8 @@ onMounted(loadProfile)
 <style scoped>
 .profile-page {
   min-height: calc(100dvh - 64px);
-  background: #f5f7f2;
-  color: #1e2d25;
+  background: var(--mt-canvas);
+  color: var(--mt-ink);
 }
 
 .profile-hero {
@@ -438,9 +438,9 @@ onMounted(loadProfile)
 }
 
 .profile-card {
-  border: 1px solid #e1e8dc;
+  border: 1px solid var(--mt-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--mt-surface);
   padding: clamp(18px, 3vw, 28px);
 }
 
@@ -449,7 +449,7 @@ onMounted(loadProfile)
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
-  color: #24382e;
+  color: var(--mt-ink);
   font-size: 1rem;
   font-weight: 900;
 }
@@ -468,18 +468,18 @@ onMounted(loadProfile)
   gap: 4px;
   padding: 14px;
   border-radius: 8px;
-  background: #f6f8f3;
+  background: var(--mt-surface-soft);
 }
 
 .summary-item span {
-  color: #6b776f;
+  color: var(--mt-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .summary-item strong {
-  color: #1f2f27;
+  color: var(--mt-ink);
   font-weight: 800;
   overflow-wrap: anywhere;
 }

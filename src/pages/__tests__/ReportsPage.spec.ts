@@ -109,4 +109,18 @@ describe('ReportsPage details', () => {
     expect(dialog.text()).toContain('Localização não informada')
     expect(dialog.text()).toContain('Nenhuma observação foi registrada nesta intervenção.')
   })
+
+  it('calcula o gráfico mensal com os registros retornados pela API', async () => {
+    get.mockResolvedValue({ data: [{ ...report, date: new Date().toISOString() }] })
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as {
+      periodChartData: Array<{ count: number }>
+      activeTeams?: number
+    }
+    expect(vm.periodChartData.at(-1)?.count).toBe(1)
+    expect(vm.activeTeams).toBeUndefined()
+    expect(wrapper.text()).not.toContain('Equipes')
+  })
 })
