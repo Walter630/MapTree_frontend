@@ -302,26 +302,26 @@ export default defineComponent({
   flex-direction: column;
   align-items: flex-start;
   padding: 14px 16px;
-  background: #ffffff;
-  border: 1px solid #e8e8e8;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 14px;
-  border-left: 4px solid #cfcfcf;
+  border-left: 4px solid var(--mt-border);
 }
 
 .notif-summary-item--danger {
-  border-left-color: #e53935;
+  border-left-color: var(--mt-status-error);
 }
 .notif-summary-item--warn {
-  border-left-color: #fb8c00;
+  border-left-color: var(--mt-status-warning);
 }
 .notif-summary-item--ok {
-  border-left-color: #2e7d32;
+  border-left-color: var(--mt-status-success);
 }
 
 .notif-summary-value {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #2c3e2c;
+  color: var(--mt-ink);
   line-height: 1;
 }
 
@@ -329,7 +329,7 @@ export default defineComponent({
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #9a9a9a;
+  color: var(--mt-text-muted);
   margin-top: 4px;
 }
 
@@ -341,13 +341,13 @@ export default defineComponent({
 
 .tabs-container {
   box-shadow: none;
-  background-color: #f6f6f6;
+  background-color: var(--mt-surface-soft);
   border-radius: 12px;
 }
 
 .notification-card {
-  border: 1px solid #e0e0e0;
-  background-color: #fafafa;
+  border: 1px solid var(--mt-border);
+  background-color: var(--mt-surface);
   border-radius: 12px;
 }
 
@@ -363,11 +363,11 @@ export default defineComponent({
 .v-tab {
   text-transform: none !important;
   font-weight: 500;
-  color: #555 !important;
+  color: var(--mt-ink) !important;
 }
 
 .v-tab--selected {
-  color: #429205 !important;
+  color: rgb(var(--v-theme-primary)) !important;
   font-weight: 600 !important;
   box-shadow: none;
 }

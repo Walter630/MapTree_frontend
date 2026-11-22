@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Store Pinia mockada: usuário já carregado como USER, então o guard não tenta
 // buscar o perfil via API.
 const mockStore = {
-  user: { role: 'USER' } as { role: string } | null,
+  user: { role: 'USER' } as { role: string; managerRequest?: { id: string; status: string } | null } | null,
   setUser: vi.fn(),
   logout: vi.fn(),
 }
@@ -60,6 +60,25 @@ describe('router role guard', () => {
 
     expect(router.currentRoute.value.path).toBe('/user')
     expect(mockStore.logout).not.toHaveBeenCalled()
+  })
+
+  it('encaminha solicitante pendente para acompanhar a própria análise', async () => {
+    mockStore.user = { role: 'USER', managerRequest: { id: 'request-1', status: 'PENDING' } }
+    const { default: router } = await import('../index')
+    await router.push('/user/reports')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/cadastro/solicitacao')
+    expect(mockStore.logout).not.toHaveBeenCalled()
+  })
+
+  it('permite ao solicitante acessar a página de acompanhamento', async () => {
+    mockStore.user = { role: 'USER', managerRequest: { id: 'request-1', status: 'REJECTED' } }
+    const { default: router } = await import('../index')
+    await router.push('/cadastro/solicitacao')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/cadastro/solicitacao')
   })
 
   it('permite que um USER acesse a própria rota de USER', async () => {

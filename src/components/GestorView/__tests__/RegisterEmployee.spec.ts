@@ -38,6 +38,9 @@ describe('RegisterEmployee', () => {
     const wrapper = mount(RegisterEmployee, {
       global: {
         plugins: [vuetify],
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         provide: {
           [routerKey as symbol]: { push, back: vi.fn() },
         },

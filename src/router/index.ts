@@ -3,54 +3,6 @@ import { apiConnect, type User } from '@/plugins/apiConnect'
 import { useAppStore } from '@/stores/app'
 
 /* ===================================
-   IMPORTS — Páginas Públicas
-=================================== */
-
-import MainPage from '@/pages/MainPage.vue'
-import LoginPage from '@/pages/LoginPage.vue'
-import RecoveryPage from '@/pages/RecoveryPage.vue'
-import MainComponent from '@/components/MainView/MainComponent.vue'
-import RegisterComponent from '@/components/MainView/RegisterComponent.vue'
-
-/* ===================================
-   IMPORTS — Admin
-=================================== */
-
-import AdminPage from '@/pages/AdminPage.vue'
-import AdminMainComponent from '@/components/AdminView/MainComponentAdmin.vue'
-import AdminManagersView from '@/components/AdminView/AdminManagersView.vue'
-import AdminCompaniesView from '@/components/AdminView/AdminCompaniesView.vue'
-import AdminRegisterCompanyView from '@/components/AdminView/AdminRegisterCompanyView.vue'
-import AdminRegisterManagersView from '@/components/AdminView/AdminRegisterManagersView.vue'
-
-/* ===================================
-   IMPORTS — Gestor (Manager)
-=================================== */
-
-import ManagerPage from '@/pages/GestorPage.vue'
-import ManagerMainComponent from '@/components/GestorView/ManagerMainComponent.vue'
-import ManagerEmployeesView from '@/components/GestorView/ManagerEmployeesView.vue'
-import RegisterEmployee from '@/components/GestorView/RegisterEmployee.vue'
-import ManagerReportsView from '@/components/GestorView/ManagerReportsView.vue'
-import ManagerNotificationsView from '@/components/GestorView/ManagerNotificationsView.vue'
-
-/* ===================================
-   IMPORTS — Usuário (Funcionário)
-=================================== */
-
-import UserPage from '@/pages/UserPage.vue'
-import MapPage from '@/pages/map/MapPage.vue'
-import ReportsPage from '@/pages/ReportsPage.vue'
-import NotificationPage from '@/pages/NotificationPage.vue'
-import PruningList from '@/pages/PruningList.vue'
-import PruningRegistration from '@/pages/PruningRegistration.vue'
-import LogoutPage from '@/pages/LogoutPage.vue'
-import NovaPagina from '@/pages/NovaPagina.vue'
-import TreeRegistrationPage from '@/pages/TreeRegistrationPage.vue'
-import DailyRoutesPage from '@/pages/DailyRoutesPage.vue'
-import DashboardPreviewsPage from '@/pages/DashboardPreviewsPage.vue'
-
-/* ===================================
    DEFINIÇÃO DAS ROTAS
 =================================== */
 
@@ -59,19 +11,44 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      component: MainPage,
+      component: () => import('@/pages/MainPage.vue'),
       meta: { requiresAuth: true },
       children: [
         /* --- Rotas Públicas --- */
-        { path: '', name: 'Main', component: MainComponent, meta: { requiresAuth: true } },
-        { path: 'login', name: 'Login', meta: { public: true }, component: LoginPage },
         {
-          path: 'register',
+          path: '',
+          name: 'Landing',
+          component: () => import('@/pages/PublicLandingPage.vue'),
+          meta: { public: true },
+        },
+        {
+          path: 'login',
+          name: 'Login',
+          meta: { public: true },
+          component: () => import('@/pages/LoginPage.vue'),
+        },
+        {
+          path: 'cadastro',
           name: 'Register',
           meta: { public: true },
-          component: RegisterComponent,
+          component: () => import('@/components/MainView/RegisterComponent.vue'),
         },
-        { path: 'recovery', name: 'Recovery', meta: { public: true }, component: RecoveryPage },
+        {
+          path: 'register',
+          redirect: { name: 'Register' },
+          meta: { public: true },
+        },
+        {
+          path: 'cadastro/solicitacao',
+          name: 'ManagerRequestStatus',
+          component: () => import('@/pages/ManagerRequestStatusPage.vue'),
+        },
+        {
+          path: 'recovery',
+          name: 'Recovery',
+          meta: { public: true },
+          component: () => import('@/pages/RecoveryPage.vue'),
+        },
         {
           path: 'recovery-code',
           name: 'RecoveryCode',
@@ -84,12 +61,21 @@ const router = createRouter({
           meta: { public: true },
           redirect: { name: 'Recovery' },
         },
-        { path: 'logout', name: 'Logout', component: LogoutPage },
-        { path: 'nova-pagina', name: 'NovaPagina', component: NovaPagina, meta: { role: 'ADMIN' } },
+        {
+          path: 'logout',
+          name: 'Logout',
+          component: () => import('@/pages/LogoutPage.vue'),
+        },
+        {
+          path: 'nova-pagina',
+          name: 'NovaPagina',
+          component: () => import('@/pages/NovaPagina.vue'),
+          meta: { role: 'ADMIN' },
+        },
         {
           path: 'dashboard-previews',
           name: 'DashboardPreviews',
-          component: DashboardPreviewsPage,
+          component: () => import('@/pages/DashboardPreviewsPage.vue'),
           meta: { role: 'ADMIN' },
         },
         {
@@ -101,30 +87,68 @@ const router = createRouter({
         /* --- Admin --- */
         {
           path: 'admin',
-          component: AdminPage,
+          component: () => import('@/pages/AdminPage.vue'),
           meta: { requiresAuth: true, role: 'ADMIN', home: true },
           children: [
-            { path: '', name: 'AdminHome', component: AdminMainComponent },
-            { path: 'managers', name: 'AdminManagers', component: AdminManagersView },
-            { path: 'companies', name: 'AdminCompanies', component: AdminCompaniesView },
+            {
+              path: '',
+              name: 'AdminHome',
+              component: () => import('@/components/AdminView/MainComponentAdmin.vue'),
+            },
+            {
+              path: 'managers',
+              name: 'AdminManagers',
+              component: () => import('@/components/AdminView/AdminManagersView.vue'),
+            },
+            {
+              path: 'manager-requests',
+              name: 'AdminManagerRequests',
+              component: () => import('@/components/AdminView/AdminManagerRequestsView.vue'),
+            },
+            {
+              path: 'landing',
+              name: 'AdminLandingEditor',
+              component: () => import('@/pages/AdminLandingEditorPage.vue'),
+            },
+            {
+              path: 'companies',
+              name: 'AdminCompanies',
+              component: () => import('@/components/AdminView/AdminCompaniesView.vue'),
+            },
             {
               path: 'register-company',
               name: 'AdminRegisterCompany',
-              component: AdminRegisterCompanyView,
+              component: () => import('@/components/AdminView/AdminRegisterCompanyView.vue'),
             },
             {
               path: 'register-managers',
               name: 'AdminRegisterManagers',
-              component: AdminRegisterManagersView,
+              component: () => import('@/components/AdminView/AdminRegisterManagersView.vue'),
             },
-            { path: 'trees/new', name: 'AdminTreeRegistration', component: TreeRegistrationPage },
-            { path: 'map', name: 'AdminMap', component: MapPage },
-            { path: 'routes/daily', name: 'AdminDailyRoutes', component: DailyRoutesPage },
-            { path: 'podas', name: 'AdminPruningList', component: PruningList },
+            {
+              path: 'trees/new',
+              name: 'AdminTreeRegistration',
+              component: () => import('@/pages/TreeRegistrationPage.vue'),
+            },
+            {
+              path: 'map',
+              name: 'AdminMap',
+              component: () => import('@/pages/map/MapPage.vue'),
+            },
+            {
+              path: 'routes/daily',
+              name: 'AdminDailyRoutes',
+              component: () => import('@/pages/DailyRoutesPage.vue'),
+            },
+            {
+              path: 'podas',
+              name: 'AdminPruningList',
+              component: () => import('@/pages/PruningList.vue'),
+            },
             {
               path: 'podas/nova',
               name: 'AdminPruningRegistration',
-              component: PruningRegistration,
+              component: () => import('@/pages/PruningRegistration.vue'),
             },
           ],
         },
@@ -132,28 +156,61 @@ const router = createRouter({
         /* --- Gestor (Manager) --- */
         {
           path: 'manager',
-          component: ManagerPage,
+          component: () => import('@/pages/GestorPage.vue'),
           meta: { requiresAuth: true, role: 'MANAGER', home: true },
           children: [
-            { path: '', name: 'ManagerHome', component: ManagerMainComponent },
-            { path: 'employees', name: 'ManagerEmployees', component: ManagerEmployeesView },
-            { path: 'register-employee', name: 'RegisterEmployee', component: RegisterEmployee },
-            { path: 'trees/new', name: 'ManagerTreeRegistration', component: TreeRegistrationPage },
-            { path: 'routes/daily', name: 'ManagerDailyRoutes', component: DailyRoutesPage },
-            { path: 'podas', name: 'ManagerPruningList', component: PruningList },
+            {
+              path: '',
+              name: 'ManagerHome',
+              component: () => import('@/components/GestorView/ManagerMainComponent.vue'),
+            },
+            {
+              path: 'employees',
+              name: 'ManagerEmployees',
+              component: () => import('@/components/GestorView/ManagerEmployeesView.vue'),
+            },
+            {
+              path: 'municipality',
+              name: 'ManagerMunicipality',
+              component: () => import('@/pages/ManagerMunicipalitySettingsPage.vue'),
+            },
+            {
+              path: 'register-employee',
+              name: 'RegisterEmployee',
+              component: () => import('@/components/GestorView/RegisterEmployee.vue'),
+            },
+            {
+              path: 'trees/new',
+              name: 'ManagerTreeRegistration',
+              component: () => import('@/pages/TreeRegistrationPage.vue'),
+            },
+            {
+              path: 'routes/daily',
+              name: 'ManagerDailyRoutes',
+              component: () => import('@/pages/DailyRoutesPage.vue'),
+            },
+            {
+              path: 'podas',
+              name: 'ManagerPruningList',
+              component: () => import('@/pages/PruningList.vue'),
+            },
             {
               path: 'podas/nova',
               name: 'ManagerPruningRegistration',
-              component: PruningRegistration,
+              component: () => import('@/pages/PruningRegistration.vue'),
             },
-            { path: 'reports', name: 'ManagerReports', component: ManagerReportsView },
+            {
+              path: 'reports',
+              name: 'ManagerReports',
+              component: () => import('@/components/GestorView/ManagerReportsView.vue'),
+            },
             {
               path: 'notifications',
               name: 'ManagerNotifications',
-              component: ManagerNotificationsView,
+              component: () => import('@/components/GestorView/ManagerNotificationsView.vue'),
               meta: { notification: true, role: 'MANAGER' },
             },
-            { path: 'map', name: 'ManagerMap', component: MapPage },
+            { path: 'map', name: 'ManagerMap', component: () => import('@/pages/map/MapPage.vue') },
           ],
         },
 
@@ -161,27 +218,61 @@ const router = createRouter({
         {
           path: 'user',
           name: 'Employees',
-          component: UserPage,
+          component: () => import('@/pages/UserPage.vue'),
           meta: { requiresAuth: true, role: 'USER', home: true },
           children: [
-            { path: '', name: 'UserHome', component: MainComponent },
-            { path: 'trees/new', name: 'UserTreeRegistration', component: TreeRegistrationPage },
-            { path: 'reports', name: 'UserReports', component: ReportsPage },
-            { path: 'mapUser', name: 'Map', component: MapPage },
-            { path: 'routes/daily', name: 'UserDailyRoutes', component: DailyRoutesPage },
-            { path: 'podas', name: 'PruningList', component: PruningList },
-            { path: 'podas/nova', name: 'PruningRegistration', component: PruningRegistration },
+            {
+              path: '',
+              name: 'UserHome',
+              component: () => import('@/components/MainView/MainComponent.vue'),
+            },
+            {
+              path: 'trees/new',
+              name: 'UserTreeRegistration',
+              component: () => import('@/pages/TreeRegistrationPage.vue'),
+            },
+            {
+              path: 'trees/:treeId/edit',
+              name: 'UserTreeEdit',
+              component: () => import('@/pages/TreeRegistrationPage.vue'),
+            },
+            {
+              path: 'reports',
+              name: 'UserReports',
+              component: () => import('@/pages/ReportsPage.vue'),
+            },
+            { path: 'mapUser', name: 'Map', component: () => import('@/pages/map/MapPage.vue') },
+            {
+              path: 'routes/daily',
+              name: 'UserDailyRoutes',
+              component: () => import('@/pages/DailyRoutesPage.vue'),
+            },
+            {
+              path: 'podas',
+              name: 'PruningList',
+              component: () => import('@/pages/PruningList.vue'),
+            },
+            {
+              path: 'podas/nova',
+              name: 'PruningRegistration',
+              component: () => import('@/pages/PruningRegistration.vue'),
+            },
             {
               path: 'notifications',
               name: 'UserNotifications',
-              component: NotificationPage,
+              component: () => import('@/pages/NotificationPage.vue'),
               meta: { notification: true, role: 'USER' },
             },
           ],
         },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('@/pages/NotFoundPage.vue'),
+      meta: { public: true },
+    },
   ],
 })
 
@@ -226,11 +317,13 @@ router.beforeEach(async (to, _from, next) => {
 
   const user = store.user
   if (!user) return next({ name: 'Login' })
-  if (to.name === 'Main') {
-    const home = { ADMIN: '/admin', MANAGER: '/manager', USER: '/user' }[user.role]
-    return home ? next(home) : next({ name: 'Login' })
-  }
 
+  if (user.role === 'USER' && user.managerRequest && to.path !== '/cadastro/solicitacao') {
+    return next('/cadastro/solicitacao')
+  }
+  if (to.path === '/cadastro/solicitacao' && user.role === 'USER' && !user.managerRequest) {
+    return next('/user')
+  }
   // 4. Verificação de role: se a role não bate, NÃO desloga.
   //    Apenas redireciona o usuário para a home da própria role.
   const requiredRole = to.meta.role

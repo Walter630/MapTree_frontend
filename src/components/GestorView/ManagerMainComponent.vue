@@ -5,6 +5,16 @@
       <div>
         <h1 class="dash-hello">Olá, {{ user?.name || 'Gestor' }}!</h1>
         <p class="dash-sub">Aqui está o resumo das operações da sua equipe.</p>
+        <div
+          class="tw:mt-2 tw:inline-flex tw:max-w-full tw:flex-wrap tw:items-center tw:gap-1.5 tw:rounded-full tw:border tw:border-mt-border tw:bg-mt-surface tw:px-3 tw:py-1.5 tw:text-sm tw:text-mt-ink"
+          data-testid="manager-company"
+        >
+          <span class="tw:font-medium tw:text-mt-text-muted">Empresa:</span>
+          <span v-if="user?.organization?.name" class="tw:break-words tw:font-semibold">
+            {{ user.organization.name }}
+          </span>
+          <span v-else class="tw:font-semibold">Nenhuma empresa vinculada</span>
+        </div>
       </div>
       <div class="dash-header-actions">
         <v-chip class="dash-date-chip" variant="outlined" prepend-icon="mdi-calendar-blank-outline">
@@ -498,6 +508,7 @@ interface User {
   name: string
   email?: string
   role?: string
+  organization?: { id?: string | number; name?: string }
 }
 
 interface Pruning {
@@ -786,13 +797,13 @@ export default defineComponent({
   justify-content: space-between;
   gap: 6px;
   font-size: 0.75rem;
-  color: #345941;
+  color: var(--mt-green);
   margin-bottom: 8px;
 }
 /* ===== Container ===== */
 .dash {
   padding: 20px 24px 40px;
-  background: #f7f8fa;
+  background: var(--mt-canvas);
   min-height: calc(100dvh - 56px);
   max-width: 1440px;
   margin: 0 auto;
@@ -811,13 +822,13 @@ export default defineComponent({
 .dash-hello {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--mt-ink);
   line-height: 1.2;
 }
 
 .dash-sub {
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
   margin-top: 2px;
 }
 
@@ -829,14 +840,14 @@ export default defineComponent({
 }
 
 .dash-date-chip {
-  background: #fff;
+  background: var(--mt-surface);
   font-size: 0.8rem;
 }
 
 .dash-filter {
   min-width: 180px;
   max-width: 200px;
-  background: #fff;
+  background: var(--mt-surface);
   border-radius: 10px;
 }
 
@@ -861,8 +872,8 @@ export default defineComponent({
 }
 
 .kpi {
-  background: #fff;
-  border: 1px solid #eceef1;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   padding: 16px 18px;
   display: flex;
@@ -871,8 +882,8 @@ export default defineComponent({
 }
 
 .kpi--danger {
-  background: linear-gradient(135deg, #fff6f6 0%, #ffffff 60%);
-  border-color: #f3c9c9;
+  background: linear-gradient(135deg, var(--mt-surface)6f6 0%, var(--mt-surface)fff 60%);
+  border-color: color-mix(in srgb, rgb(var(--v-theme-error)) 32%, var(--mt-border));
 }
 
 .kpi-top {
@@ -891,25 +902,25 @@ export default defineComponent({
 }
 
 .kpi-ico--green {
-  background: #e9f6ea;
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 12%, var(--mt-surface));
 }
 .kpi-ico--red {
-  background: #fdecec;
+  background: color-mix(in srgb, rgb(var(--v-theme-error)) 12%, var(--mt-surface));
 }
 .kpi-ico--blue {
-  background: #e7f1fb;
+  background: color-mix(in srgb, rgb(var(--v-theme-info)) 12%, var(--mt-surface));
 }
 
 .kpi-name {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 .kpi-num {
   font-size: 1.9rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--mt-ink);
   line-height: 1;
 }
 
@@ -921,16 +932,16 @@ export default defineComponent({
 }
 
 .kpi-foot--up {
-  color: #2e7d32;
+  color: var(--mt-status-success);
 }
 .kpi-foot--danger {
-  color: #d32f2f;
+  color: var(--mt-status-error);
 }
 
 /* ===== Painéis genéricos ===== */
 .panel {
-  background: #fff;
-  border: 1px solid #eceef1;
+  background: var(--mt-surface);
+  border: 1px solid var(--mt-border);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -942,7 +953,7 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid #f1f3f5;
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .panel-title {
@@ -950,13 +961,13 @@ export default defineComponent({
   align-items: center;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--mt-ink);
 }
 
 .panel-link {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #2e7d32;
+  color: rgb(var(--v-theme-primary));
   cursor: pointer;
 }
 
@@ -980,7 +991,7 @@ export default defineComponent({
   display: flex;
   gap: 14px;
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--mt-text-muted);
 }
 
 .map-legend span {
@@ -1029,7 +1040,7 @@ export default defineComponent({
 
 .alerts-tools {
   padding: 12px 16px 8px;
-  border-bottom: 1px solid #f1f3f5;
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .alerts-chips {
@@ -1050,7 +1061,7 @@ export default defineComponent({
   width: 4px;
 }
 .alerts-list::-webkit-scrollbar-thumb {
-  background: #e0e0e0;
+  background: var(--mt-border);
   border-radius: 4px;
 }
 
@@ -1065,11 +1076,11 @@ export default defineComponent({
 }
 
 .alert-row:hover {
-  background: #f6f8fa;
+  background: var(--mt-surface-soft);
 }
 
 .alert-thumb {
-  background: #f3f4f6;
+  background: var(--mt-surface-soft);
 }
 
 .alert-info {
@@ -1089,18 +1100,18 @@ export default defineComponent({
   font-size: 0.72rem;
   font-weight: 700;
   font-family: monospace;
-  color: #475569;
+  color: var(--mt-text-muted);
 }
 
 .alert-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--mt-ink);
 }
 
 .alert-coords {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1112,7 +1123,7 @@ export default defineComponent({
   align-items: center;
   justify-content: center;
   height: 180px;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
   text-align: center;
   gap: 6px;
   font-size: 0.85rem;
@@ -1150,7 +1161,7 @@ export default defineComponent({
 }
 
 .report-row:hover {
-  background: #f6f8fa;
+  background: var(--mt-surface-soft);
 }
 
 .report-info {
@@ -1163,7 +1174,7 @@ export default defineComponent({
 .report-nm {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--mt-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1171,14 +1182,14 @@ export default defineComponent({
 
 .report-dt {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--mt-text-muted);
 }
 
 /* Dialogs */
 .alert-tree-dialog .detail-label {
   display: block;
   margin-bottom: 4px;
-  color: #64748b;
+  color: var(--mt-text-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1186,7 +1197,8 @@ export default defineComponent({
 
 .glass-card {
   backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95) !important;
+  background: color-mix(in srgb, var(--mt-surface) 95%, transparent) !important;
+  color: var(--mt-ink);
 }
 
 .panel {

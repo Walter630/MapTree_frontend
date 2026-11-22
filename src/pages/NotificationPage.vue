@@ -13,8 +13,7 @@
     <v-tabs
       v-model="tab"
       density="comfortable"
-      class="mb-4 mt-8"
-      style="box-shadow: none; background-color: #f6f6f6"
+      class="notification-tabs mb-4 mt-8"
       grow
     >
       <v-tab value="todas">Todas {{ countByTab('todas') }}</v-tab>
@@ -218,6 +217,11 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.notification-tabs {
+  background: var(--mt-surface);
+  border-radius: 12px;
+  box-shadow: none;
+}
 .notification-card-clickable {
   cursor: pointer;
 }
